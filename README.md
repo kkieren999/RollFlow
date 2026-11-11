@@ -36,3 +36,11 @@ Any further commits to `main` will publish updated versions. GitHub Pages is pub
 **Demonstration only.** All students, portraits and school details are fictional. State is kept in local browser storage. There is no staff authentication, secure database, OneSchool integration, SMS delivery, or school data transfer. Do not use for real student attendance or live school records.
 
 Do not add real student data or private keys to this repository.
+
+## Pin for Today — manual supervisions
+
+From **Class Finder → Class Details** or **Take attendance**, select **Pin for Today** on a school class that is not already assigned to you. The class appears in a dedicated blue-outlined **Today's supervisions** section on **Home** and **My Timetable** with **Supervision** labelling, **Take attendance**, **Class details**, and **Unpin supervision** controls. The roll retains the standard photo grid and submission workflow.
+
+Pins are temporary: they are tied to the current date in **Australia/Brisbane**, saved in this browser's localStorage for the day, and automatically invalidated after midnight. Selecting another date hides today's pins. Pins never modify the permanent teacher timetable. The demo now defaults the roll date to today's Brisbane date.
+
+**Production note:** This is frontend-only sample behaviour. Real-school pins and attendance changes require staff sign-in, server-side relief/supervision authorisation, audit logging, school-system integration and secure synchronisation. No real student or school data is stored in this repository.
