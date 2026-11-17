@@ -454,6 +454,14 @@ preferencesPage=function(){return basePreferences().replace('</main>',v2Panel('T
 function recordAudit(type,details){workspace.audit.unshift({at:new Date().toISOString(),by:workspace.profile.name,type,details});saveWorkspace()}
 function notificationContent(){const settings=workspace.settings;return `<div class="settings-note">Reminders are shown here while using this browser.</div>${settings.rollReminders?`<div class="simple-row">${classes.filter(c=>!isSubmitted(c.id)).length} assigned rolls outstanding</div>`:''}${settings.supervisionReminders?`<div class="simple-row">${pinnedClasses().length} supervision classes pinned today</div>`:''}${settings.movementAlerts?`<div class="simple-row">${state.movements.filter(item=>!item.returnedAt).length} students currently out of class</div>`:''}${settings.timetableChanges||settings.roomChanges?workspace.coverPlans.filter(plan=>plan.date===state.date).map(plan=>`<div class="simple-row">${esc(plan.classId)} · ${esc(plan.period)} · ${settings.roomChanges?'Room '+esc(plan.room):''}</div>`).join(''):''}${workspace.teachingNotes.filter(note=>note.date&&note.date<=state.date).map(note=>`<div class="simple-row">Follow-up due: ${esc(note.title)} · ${esc(note.date)}</div>`).join('')}${settings.schoolNotices?'<button class="btn" data-nav="alerts">School notices</button>':''}`}
 function quickLinks(){return v2Panel('MY QUICK LINKS',workspace.links.map(link=>`<div class="simple-row"><a href="${esc(link.url)}" target="_blank" rel="noopener noreferrer">${esc(link.title)}</a><button class="btn small" data-extra="deleteLink" data-id="${link.id}">Remove</button></div>`).join('')+`<form id="extra-link"><label>Link title<input name="title" required maxlength="80"></label><label>Web address<input name="url" type="url" required placeholder="https://"></label><button class="btn">Add link</button></form>`)}
+function rollReminderDue(date,period,now=new Date()){
+ const starts={0:515,1:540,2:615,3:690,4:800,5:875};
+ if(starts[period]===undefined)return false;
+ const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Australia/Brisbane',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(now);
+ const value=type=>parts.find(part=>part.type===type).value;
+ const today=`${value('year')}-${value('month')}-${value('day')}`;
+ return date<today||(date===today&&Number(value('hour'))*60+Number(value('minute'))>=starts[period]+10);
+}
 home=function(){
  const plans=workspace.coverPlans.filter(plan=>plan.date===state.date);
  const periodNumber=cls=>{const period=plans.find(plan=>plan.classId===cls.id)?.period||cls.period;return /^(roll|home\s*group)$/i.test(period.trim())?0:Number(period.match(/\d+/)?.[0]||99)};
@@ -463,7 +471,8 @@ home=function(){
  const next=pending[0];
  const lesson=cls=>{const plan=plans.find(item=>item.classId===cls.id),period=periodNumber(cls);return `${period===0?'ROLL':period===99?esc(plan?.period||cls.period):'PERIOD '+period} · ${esc(periodTimes[period]||cls.time)} · Room ${esc(plan?.room||cls.room)}${!cls.myClass?' · Cover':''}`};
  const attention=[];
- if(workspace.settings.rollReminders&&pending.length)attention.push(`<div class="simple-row"><div><strong>${pending.length} rolls awaiting submission</strong><span>Check progress in today’s schedule below.</span></div><button class="btn small" data-nav="reports">Review rolls</button></div>`);
+ const overdue=pending.filter(cls=>rollReminderDue(state.date,periodNumber(cls)));
+ if(workspace.settings.rollReminders&&overdue.length)attention.push(`<div class="simple-row"><div><strong>${overdue.length} ${overdue.length===1?'roll':'rolls'} awaiting submission</strong><span>Lessons started at least 10 minutes ago. Check today’s schedule below.</span></div><button class="btn small" data-nav="reports">Review rolls</button></div>`);
  if(workspace.settings.roomChanges||workspace.settings.timetableChanges)plans.forEach(plan=>attention.push(`<div class="simple-row"><div><strong>${esc(plan.classId)} · ${esc(plan.type)}</strong><span>${esc(plan.period)} · Room ${esc(plan.room)}</span></div><button class="btn small" data-nav="cover">View change</button></div>`));
  const due=workspace.teachingNotes.filter(note=>!note.completed&&note.date&&note.date<=state.date);
  if(due.length)attention.push(`<div class="simple-row"><div><strong>${due.length} teaching follow-up${due.length===1?'':'s'} due</strong><span>${due.slice(0,2).map(note=>esc(note.title)).join(' · ')}</span></div><button class="btn small" data-nav="teaching-notes">Review notes</button></div>`);
@@ -542,6 +551,7 @@ document.addEventListener('click',event=>{const button=event.target.closest('[da
 document.addEventListener('submit',event=>{if(event.target.id==='extra-cover')event.target.elements.namedItem('teacher').value=workspace.profile.name},true);
 state.page=['home','timetable','roll'].includes(workspace.settings.landing)?workspace.settings.landing:'home';if(!workspace.settings.today&&workspace.lastDate)state.date=workspace.lastDate;if(state.page==='roll'&&workspace.settings.remember&&schoolClasses.some(c=>c.id===workspace.lastClass))state.classId=workspace.lastClass;
 document.addEventListener('change',event=>{if(event.target.matches('[data-date]')){workspace.lastDate=state.date;saveWorkspace()}});
+setInterval(()=>{if(state.page==='home'&&!document.hidden&&!state.modal&&!state.drawer)render()},30000);
 render();
 })();
 </script></body></html>
