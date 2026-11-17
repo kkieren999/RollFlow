@@ -1,5 +1,13 @@
 # RollFlow — Teacher Edition
 
+## V2 — My Teaching Workspace
+
+Home now supports optional, ordered widgets for classes, favourites, recently viewed rolls, teaching notes, supervision and reminders. My Preferences controls the dashboard, light/dark appearance, density, text size, contrast, reduced motion, landing page, remembered class, portraits, hints and reminders. My Profile saves fictional teacher details and avatar initials.
+
+Favourite Classes provides persistent shortcuts; Recently Viewed keeps the latest 12 opened rolls and can be cleared. My Teaching Notes supports creating, editing, pinning and deleting class-linked notes with tags and follow-up dates. Cover & Supervision builds on the existing Brisbane-date manual pins. Attendance Reports filters submitted rolls by date and class, shows status totals and submission history, and exports sample CSV records.
+
+Workspace preferences are stored separately under `rollflow_workspace_v2`; existing attendance storage remains intact. Notes and preferences stay in the current browser. Reminder counts appear inside the workspace; there are no push notifications or school-system connections. All data must remain fictional.
+
 A single-page, browser-based teacher attendance demo designed for Queensland schools.
 
 ## What is included
