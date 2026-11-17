@@ -2,6 +2,10 @@
 
 ## V2 — My Teaching Workspace
 
+The complete workspace update adds grouped navigation, global class/student/page search, keyboard shortcuts, configurable web links, next-lesson briefing and in-app follow-up reminders. Workflow preferences include day/week timetable, assigned-class filtering, date behaviour, automatic next lesson, unmarked-first ordering, submission confirmation, totals, list/portrait view and save confirmation. Notification categories control the local briefing. Reset preferences retains attendance and personal content.
+
+Cover planning supports manually entered relief allocations, supervision and temporary timetable changes with handover notes. Reports include outstanding rolls and reason-required reopening of submitted demo rolls; local audit entries retain the previous marks and record resubmission under the personalised teacher name. This audit is editable browser storage, not a secure production audit trail.
+
 Home now supports optional, ordered widgets for classes, favourites, recently viewed rolls, teaching notes, supervision and reminders. My Preferences controls the dashboard, light/dark appearance, density, text size, contrast, reduced motion, landing page, remembered class, portraits, hints and reminders. My Profile saves fictional teacher details and avatar initials.
 
 Favourite Classes provides persistent shortcuts; Recently Viewed keeps the latest 12 opened rolls and can be cleared. My Teaching Notes supports creating, editing, pinning and deleting class-linked notes with tags and follow-up dates. Cover & Supervision builds on the existing Brisbane-date manual pins. Attendance Reports filters submitted rolls by date and class, shows status totals and submission history, and exports sample CSV records.
