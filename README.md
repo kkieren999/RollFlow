@@ -2,6 +2,8 @@
 
 ## V2 — My Teaching Workspace
 
+Home is a focused daily overview: next outstanding lesson roll, actionable reminders, today's schedule including manual cover, and up to four favourite shortcuts. Empty attention and favourite sections are hidden. Supporting sections can be toggled in Preferences. Full notes, recently viewed history and cover editors remain on their own pages; quick-link editing is in Preferences and What's New is in Help.
+
 The complete workspace update adds grouped navigation, global class/student/page search, keyboard shortcuts, configurable web links, next-lesson briefing and in-app follow-up reminders. Workflow preferences include day/week timetable, assigned-class filtering, date behaviour, automatic next lesson, unmarked-first ordering, submission confirmation, totals, list/portrait view and save confirmation. Notification categories control the local briefing. Reset preferences retains attendance and personal content.
 
 Cover planning supports manually entered relief allocations, supervision and temporary timetable changes with handover notes. Reports include outstanding rolls and reason-required reopening of submitted demo rolls; local audit entries retain the previous marks and record resubmission under the personalised teacher name. This audit is editable browser storage, not a secure production audit trail.
