@@ -532,6 +532,7 @@ const dayStyle=document.createElement('style');dayStyle.textContent=`.teacher-da
 const focusedRender=render;
 render=function(){
  focusedRender();
+ document.querySelectorAll('.side-nav [data-nav]').forEach(button=>{if(['favourites','recent','teaching-notes','reports'].includes(button.dataset.nav))button.remove()});
  const main=document.querySelector('main');
  if(state.page==='timetable'){main.querySelector('.today-banner')?.remove();const subtitle=document.querySelector('.page-sub');if(subtitle?.textContent.includes('Alex Morgan'))subtitle.textContent='Teacher · '+workspace.profile.name}
  if(state.page==='preferences'){
