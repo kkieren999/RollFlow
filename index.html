@@ -456,10 +456,12 @@ function notificationContent(){const settings=workspace.settings;return `<div cl
 function quickLinks(){return v2Panel('MY QUICK LINKS',workspace.links.map(link=>`<div class="simple-row"><a href="${esc(link.url)}" target="_blank" rel="noopener noreferrer">${esc(link.title)}</a><button class="btn small" data-extra="deleteLink" data-id="${link.id}">Remove</button></div>`).join('')+`<form id="extra-link"><label>Link title<input name="title" required maxlength="80"></label><label>Web address<input name="url" type="url" required placeholder="https://"></label><button class="btn">Add link</button></form>`)}
 home=function(){
  const plans=workspace.coverPlans.filter(plan=>plan.date===state.date);
- const scheduled=[...new Set([...classes.map(cls=>cls.id),...pinnedClasses().map(cls=>cls.id),...plans.map(plan=>plan.classId)])].map(id=>schoolClasses.find(cls=>cls.id===id)).filter(Boolean);
+ const periodNumber=cls=>{const period=plans.find(plan=>plan.classId===cls.id)?.period||cls.period;return /^(roll|home\s*group)$/i.test(period.trim())?0:Number(period.match(/\d+/)?.[0]||99)};
+ const periodTimes={0:'8:35–8:50 am',1:'9:00–10:10 am',2:'10:15–11:25 am',3:'11:30 am–12:40 pm',4:'1:20–2:30 pm',5:'2:35–3:10 pm'};
+ const scheduled=[...new Set([...classes.map(cls=>cls.id),...pinnedClasses().map(cls=>cls.id),...plans.map(plan=>plan.classId)])].map(id=>schoolClasses.find(cls=>cls.id===id)).filter(Boolean).sort((first,second)=>periodNumber(first)-periodNumber(second)||first.id.localeCompare(second.id));
  const pending=scheduled.filter(cls=>!isSubmitted(cls.id));
  const next=pending[0];
- const lesson=cls=>{const plan=plans.find(item=>item.classId===cls.id);return `${esc(plan?.period||cls.period)} · ${esc(cls.time)} · Room ${esc(plan?.room||cls.room)}${!cls.myClass?' · Cover':''}`};
+ const lesson=cls=>{const plan=plans.find(item=>item.classId===cls.id),period=periodNumber(cls);return `${period===0?'ROLL':period===99?esc(plan?.period||cls.period):'PERIOD '+period} · ${esc(periodTimes[period]||cls.time)} · Room ${esc(plan?.room||cls.room)}${!cls.myClass?' · Cover':''}`};
  const attention=[];
  if(workspace.settings.rollReminders&&pending.length)attention.push(`<div class="simple-row"><div><strong>${pending.length} rolls awaiting submission</strong><span>Check progress in today’s schedule below.</span></div><button class="btn small" data-nav="reports">Review rolls</button></div>`);
  if(workspace.settings.roomChanges||workspace.settings.timetableChanges)plans.forEach(plan=>attention.push(`<div class="simple-row"><div><strong>${esc(plan.classId)} · ${esc(plan.type)}</strong><span>${esc(plan.period)} · Room ${esc(plan.room)}</span></div><button class="btn small" data-nav="cover">View change</button></div>`));
