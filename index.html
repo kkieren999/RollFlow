@@ -696,7 +696,7 @@ function showReviewDialog(title,body,footer='<button class="btn" data-review-clo
  document.getElementById('review-dialog')?.remove();const dialog=document.createElement('div');dialog.id='review-dialog';dialog.className='modal-shade';dialog.innerHTML=`<div class="dialog review-dialog" role="dialog" aria-modal="true" aria-labelledby="review-title"><div class="dialog-head"><h2 id="review-title">${esc(title)}</h2><button class="xbtn" data-review-close aria-label="Close">×</button></div><div class="dialog-body">${body}</div><div class="dialog-footer">${footer}</div></div>`;document.body.appendChild(dialog);dialog.addEventListener('click',e=>{if(e.target===dialog)dialog.remove()});dialog.querySelector('button')?.focus();
 }
 function showStudentCorrection(){
- const id=state.drawer,p=getPerson(id),c=getClass();if(!p||!isSubmitted()||!c.ids.includes(id)||!scheduledClassesFor(state.date).some(x=>x.id===c.id)){showToast('Only submitted, scheduled sample rolls can be corrected here.');return}
+ const id=state.drawer,p=getPerson(id),c=getClass();if(!p||!isSubmitted()||!c.ids.includes(id)){showToast('Only submitted sample rolls can be corrected here.');return}
  const old=statusFor(id),key=bucket();
  showReviewDialog('Correct student attendance',`<p>${esc(p.name)} · ${esc(c.id)} · ${esc(niceDate())}</p><label class="review-field">New status<select id="correction-status">${[['P','Present'],['A','Absent'],['L','Late']].map(([v,l])=>`<option value="${v}" ${old===v?'selected':''}>${l}</option>`).join('')}</select></label><label class="review-field">Reason for correction<textarea id="correction-reason" required maxlength="500" placeholder="e.g. Student arrived late"></textarea></label><p class="settings-note">The roll remains submitted. A local correction entry records the previous and new status.</p>`,'<button class="btn" data-review-close>Cancel</button><button class="btn green" data-apply-correction>Save correction</button>');
  const dlg=document.getElementById('review-dialog');dlg.dataset.key=key;dlg.dataset.student=id;
@@ -782,7 +782,7 @@ render=function(){
  document.querySelectorAll('#overlay,#modal').forEach(el=>el.remove());
  v21Render();
  if(state.storageError||state.workspaceStorageError){document.querySelector('main')?.insertAdjacentHTML('afterbegin','<div class="storage-warning" role="alert">Some changes are not saved. Keep this page open. <button type="button" class="btn small" data-retry-storage>Retry saving</button></div>')}
- if(state.page==='roll'&&isSubmitted()&&scheduledClassesFor(state.date).some(c=>c.id===state.classId)){document.querySelector('.footer-message')?.insertAdjacentHTML('beforeend',' <span>· Tap a student name to correct attendance</span>')}
+ if(state.page==='roll'&&isSubmitted()){document.querySelector('.footer-message')?.insertAdjacentHTML('beforeend',' <span>· Tap a student name to correct attendance</span>')}
  if(state.page==='cover'){const form=document.getElementById('extra-cover');if(form){form.querySelector('[name=period]')?.replaceWith(makeCoverPeriodSelect());form.querySelector('[name=teacher]')?.closest('label')?.setAttribute('hidden','')}}
 };
 document.addEventListener('click',event=>{if(!event.target.closest('[data-retry-storage]'))return;const a=persist(),b=saveWorkspace();render();if(a&&b)showToast('Changes saved successfully')});
