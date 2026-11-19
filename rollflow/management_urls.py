@@ -1,5 +1,5 @@
 from django.urls import path
-from accounts import staff_views, student_views, timetable_views
+from accounts import staff_views, student_views, timetable_views, master_views
 
 urlpatterns = [
     path("", staff_views.dashboard, name="management-dashboard"),
@@ -35,5 +35,6 @@ urlpatterns = [
     path("periods/<int:pk>/edit/", timetable_views.period_edit, name="management-period-edit"),
     path("periods/<int:pk>/remove/", timetable_views.period_remove, name="management-period-remove"),
     path("periods/<int:pk>/restore/", timetable_views.period_restore, name="management-period-restore"),
+    path("master/", master_views.master, name="management-master"),
     path("<str:section>/", staff_views.section, name="management-section"),
 ]
