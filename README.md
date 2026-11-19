@@ -1,5 +1,11 @@
 # RollFlow V3.0 — School application foundation
 
+## V3.4.3 — Usability and stability
+
+Published import statistics are shown separately from manual directory records. The dated Master Timetable has week navigation, Today, first imported day, staff/room lookup, filtering/highlighting, compact/expanded layout, and current-period indicators. The teacher timetable remains restricted to the linked staff ID. Staff, student and class directories support server-side sorting over the full matched queryset and retain filters across pagination. Other admin tables support client-side sorting and pagination over their loaded records. The timetable management tab is remembered in the session.
+
+Frontend syntax and focused synthetic rendering checks passed. Additional Django regression tests cover dashboard statistics, staff/room filtering, personal timetable scope, tab persistence and sorting. The full Django suite still needs to be run in the server or CI environment; this is not a verified production deployment.
+
 ## V3.4.2 — Operational timetable publication
 
 For operational school use, school ICT must provision a private HTTPS application host and PostgreSQL database, approve access, confidentiality and retention controls, run migrations and the complete regression suite, and provision individual accounts. Configure the non-debug environment variables below, a random secret of at least 50 characters and `ROLLFLOW_LIVE_TIMETABLE=1`. This flag does not itself establish approval or production readiness. Do not place school exports in GitHub.
