@@ -1,5 +1,13 @@
 # RollFlow V3.0 — School application foundation
 
+## V3.1 — Staff management
+
+After running `python manage.py migrate`, sign in through Admin login. The authenticated administrator is directed to `/manage/`, the RollFlow-branded staff portal. The existing Django administration site remains at `/admin/` for advanced administrative tasks. The new portal includes dashboard account counts, searchable/paginated staff directory, account creation and editing, Teacher/Administrator role changes, password reset, activation/deactivation, staff profile information, draft class allocations, CSV import and recent account activity.
+
+Staff imports accept only the UTF-8 header `staff_id,username,first_name,last_name,faculty,campus`, up to 200 rows and 200 KB. Import is transactional and duplicate IDs/usernames are rejected. Every imported account is inactive with an unusable password; administrators must reset passwords before activation. Draft class codes do not grant class access; actual class/timetable relationships are planned for V3.3. No real staff information should be imported. The two roles are intentionally broad for testing, and administrator accounts are full Django superusers. Least-privilege roles, SSO/MFA, secure audit retention and production controls need later development. The staff API checks administrator access and uses CSRF-protected mutations; deactivation, role changes and password resets revoke affected database sessions. Staff account events are logged without passwords.
+
+The public Pages demonstration remains on main; its staff changes are browser-local and do not create server accounts. Student management, classes, timetables, relief, attendance monitoring, movements, reports and school settings are navigation placeholders pending later stages. The backend test suite includes authentication and staff-management tests; run it with the instructions below.
+
 **Development branch: v3.0-foundation.** This is an application foundation for fictional testing, not a production release or authorised school attendance system.
 
 The existing public GitHub Pages site on the main branch continues to use the fixed public demo credentials (teacher / teacher and admin / admin). The Django server does not accept those credentials unless an administrator deliberately creates such an account; do not do that. Real school credentials, photographs and records must not be used here.
@@ -29,7 +37,7 @@ python manage.py createsuperuser
 python manage.py runserver 127.0.0.1:8000
 ```
 
-Choose a unique administrator username and strong password at the prompts. Open http://127.0.0.1:8000/ and select the Admin login cog. The administrator overview is Django's database-backed administration interface. Under Users, add a fictional teacher with a strong password, first and last name; on the user's change page ensure Active is checked, Staff and Superuser are unchecked, and assign the Teacher group. Add an optional Staff Profile to set faculty, campus and staff ID. Sign out, then sign in through the teacher login. Account names are assigned by the administrator, not editable in the teacher workspace. Disable accounts instead of deleting them.
+Choose a unique administrator username and strong password at the prompts. Open http://127.0.0.1:8000/ and select the Admin login cog. The administrator overview is RollFlow's database-backed management interface. Select Staff Management → Add staff, enter fictional staff information and a strong password, select Teacher and activate the account. Staff ID, faculty and campus can be managed on this page. Sign out, then sign in through the teacher login. Account names are assigned by the administrator, not editable in the teacher workspace. Disable accounts instead of deleting them.
 
 ## What is implemented
 
