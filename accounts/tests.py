@@ -304,3 +304,75 @@ class TimetableManagementTests(TestCase):
         self.assertEqual(self.client.get("/manage/master/").status_code,403)
         self.client.logout()
         self.assertRedirects(self.client.get("/teacher/master/"),"/")
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, SESSION_COOKIE_SECURE=False, CSRF_COOKIE_SECURE=False)
+class OneSchoolImportTests(TestCase):
+    def setUp(self):
+        from .models import StaffProfile
+        self.admin = User.objects.create_superuser("importadmin", password="Fictional-import-password-52")
+        self.teacher = User.objects.create_user("importteacher", password="Fictional-teacher-password-54")
+        self.teacher.groups.add(Group.objects.get(name="Teacher"))
+        StaffProfile.objects.create(user=self.teacher,staff_id="DEMO01")
+        self.client.force_login(self.admin)
+
+    def csv(self, extra=""):
+        from .oneschool_csv import HEADER
+        return (",".join(HEADER)+"\nDEMO071A,Mathematics,07,Mon,23/11/2026,PERIOD 1,08:50,10:00,DEMO01,,DEMOA,Example,Teacher,M01,Sample room\nDEMO071A,Mathematics,07,Tue,24/11/2026,PERIOD 1,09:00,10:10,DEMO02,,DEMOB,Example,Teacher,M02,Sample room\n"+extra).encode()
+
+    def upload(self, data=None):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        return self.client.post("/manage/oneschool/",{"name":"Fictional term","fictional":"on","csv":SimpleUploadedFile("sample.csv", data if data is not None else self.csv())})
+
+    def test_parser_variable_bell_times_and_shared_resources(self):
+        from .oneschool_csv import parse
+        days,summary,digest=parse(self.csv("DEMO072B,Science,07,Mon,23/11/2026,PERIOD 1,08:50,10:00,DEMO01,,DEMOA,Example,Teacher,M01,Sample room\n"))
+        self.assertEqual(summary["lessons"],3)
+        self.assertEqual(summary["warnings"]["staff_overlap"],1)
+        self.assertEqual(summary["warnings"]["room_overlap"],1)
+        self.assertEqual(days["2026-11-23"][0]["start"],"08:50")
+        self.assertEqual(days["2026-11-24"][0]["start"],"09:00")
+        self.assertNotIn("Staff_MISID",days["2026-11-23"][0])
+        self.assertNotIn("Staff_Last_Name",days["2026-11-23"][0])
+
+    def test_draft_deduplication_and_invalid_import(self):
+        from .models import ImportedTimetable, ImportedTimetableDay
+        self.assertEqual(self.upload().status_code,302)
+        self.assertEqual(self.upload().status_code,302)
+        self.assertEqual(ImportedTimetable.objects.count(),1)
+        self.assertEqual(ImportedTimetableDay.objects.count(),2)
+        self.assertEqual(self.upload(self.csv().replace(b"23/11/2026",b"24/11/2026")).status_code,200)
+        self.assertEqual(ImportedTimetable.objects.count(),1)
+
+    def test_publish_and_teacher_scope(self):
+        from .models import ImportedTimetable
+        self.upload()
+        v=ImportedTimetable.objects.get()
+        self.client.post(f"/manage/oneschool/{v.pk}/publish/")
+        v.refresh_from_db()
+        self.assertEqual(v.status,"draft")
+        self.client.post(f"/manage/oneschool/{v.pk}/publish/",{"ack":"yes"})
+        v.refresh_from_db()
+        self.assertEqual(v.status,"published")
+        self.assertContains(self.client.get("/manage/master/?date=2026-11-23"),"08:50")
+        self.assertContains(self.client.get("/manage/master/?date=2026-11-24"),"09:00")
+        self.client.force_login(self.teacher)
+        self.assertContains(self.client.get("/teacher/timetable/?date=2026-11-23"),"DEMO071A")
+        self.assertNotContains(self.client.get("/teacher/timetable/?date=2026-11-24"),"DEMO071A")
+        self.assertContains(self.client.get("/teacher/master/?date=2026-11-24"),"DEMO071A")
+        self.assertEqual(self.client.get("/manage/oneschool/").status_code,403)
+        self.assertEqual(self.client.post(f"/manage/oneschool/{v.pk}/publish/",{"ack":"yes"}).status_code,403)
+
+    def test_new_publish_retains_prior_snapshot(self):
+        from .models import ImportedTimetable, ImportedTimetableDay
+        self.upload()
+        first=ImportedTimetable.objects.get()
+        self.client.post(f"/manage/oneschool/{first.pk}/publish/",{"ack":"yes"})
+        self.upload(self.csv().replace(b"M02",b"M03"))
+        second=ImportedTimetable.objects.exclude(pk=first.pk).get()
+        self.assertEqual(ImportedTimetable.objects.get(status="published"),first)
+        self.client.post(f"/manage/oneschool/{second.pk}/publish/",{"ack":"yes"})
+        first.refresh_from_db()
+        self.assertEqual(first.status,"archived")
+        self.assertEqual(ImportedTimetable.objects.get(status="published"),second)
+        self.assertEqual(ImportedTimetableDay.objects.filter(version=first).count(),2)
