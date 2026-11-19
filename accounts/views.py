@@ -91,3 +91,18 @@ def sign_out(request):
         SecurityEvent.objects.create(actor=request.user, event="logout")
     logout(request)
     return redirect("teacher-login")
+
+
+@never_cache
+@require_http_methods(["GET"])
+def teacher_timetable(request):
+    role = role_for(request.user)
+    if role is None:
+        return redirect("teacher-login")
+    if role != "teacher":
+        return HttpResponseForbidden("Teacher access required.")
+    from .timetable_views import active_slots
+    from .models import TimetableSlot
+    slots = list(active_slots().filter(teacher=request.user))
+    schedule = [(label, [slot for slot in slots if slot.weekday == day]) for day, label in TimetableSlot._meta.get_field("weekday").choices]
+    return render(request, "teacher_timetable.html", {"schedule": schedule})
