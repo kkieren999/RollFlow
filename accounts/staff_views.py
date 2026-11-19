@@ -118,7 +118,12 @@ def section(request, section):
         elif status == "admin":
             users = users.filter(is_staff=True, is_superuser=True)
         from django.core.paginator import Paginator
-        return page(request, section, staff_page=Paginator(users, 50).get_page(request.GET.get("page")), q=q, status=status)
+        sort=request.GET.get("sort","name")
+        orders={"name":("last_name","first_name"),"username":("username",),"faculty":("staff_profile__faculty",),"status":("is_active",)}
+        sort=sort if sort in orders else "name"
+        direction="desc" if request.GET.get("dir")=="desc" else "asc"
+        users=users.order_by(*[("-" if direction=="desc" else "")+f for f in orders[sort]],"pk")
+        return page(request, section, staff_page=Paginator(users, 50).get_page(request.GET.get("page")), q=q, status=status, sort=sort, direction=direction)
     if section == "audit":
         return page(request, section, events=SecurityEvent.objects.select_related("actor").all()[:200])
     if section == "data":
