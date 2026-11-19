@@ -33,5 +33,7 @@ urlpatterns = [
     path("rooms/<int:pk>/edit/", timetable_views.room_edit, name="management-room-edit"),
     path("periods/add/", timetable_views.period_edit, name="management-period-add"),
     path("periods/<int:pk>/edit/", timetable_views.period_edit, name="management-period-edit"),
+    path("periods/<int:pk>/remove/", timetable_views.period_remove, name="management-period-remove"),
+    path("periods/<int:pk>/restore/", timetable_views.period_restore, name="management-period-restore"),
     path("<str:section>/", staff_views.section, name="management-section"),
 ]
