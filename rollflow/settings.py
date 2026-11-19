@@ -87,3 +87,8 @@ X_FRAME_OPTIONS = "DENY"
 # Set ONLY behind a trusted proxy that strips incoming forwarded headers.
 if os.environ.get("ROLLFLOW_TRUST_HTTPS_PROXY") == "1":
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+# Only enable on an approved, private school-hosted timetable installation.
+ROLLFLOW_LIVE_TIMETABLE = os.environ.get("ROLLFLOW_LIVE_TIMETABLE") == "1"
+if ROLLFLOW_LIVE_TIMETABLE and (DEBUG or DATABASES["default"]["ENGINE"] != "django.db.backends.postgresql" or len(SECRET_KEY) < 50):
+    raise ImproperlyConfigured("Live timetable requires DEBUG off, PostgreSQL and a secret key of at least 50 characters.")
