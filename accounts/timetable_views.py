@@ -155,14 +155,18 @@ def period_remove(request,pk):
         return page(request,"timetable",period_remove_record=period,period_slot_count=period.slots.filter(active=True).count())
     with transaction.atomic():
         period=get_object_or_404(SchoolPeriod.objects.select_for_update(),pk=pk)
-        if period.slots.filter(active=True).exists():
-            messages.error(request,"This period still has active lessons. Reassign or archive them before removal.")
-            return redirect("management-timetable")
+        archived_count=0
         if period.active:
+            slots=list(period.slots.select_for_update().filter(active=True))
+            archived_count=len(slots)
+            for slot in slots:
+                slot.active=False
+                slot.save(update_fields=["active"])
+                event(request,"timetable_slot_archived",str(slot.pk))
             period.active=False
             period.save(update_fields=["active"])
             event(request,"schoolperiod_removed",period.code)
-    messages.success(request,"Period removed from the active school day. Archived lesson records retained.")
+    messages.success(request,f"Period removed. {archived_count} lesson(s) archived. Lesson records retained.")
     return redirect("management-timetable")
 
 @administrator
