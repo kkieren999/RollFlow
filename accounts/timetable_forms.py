@@ -64,6 +64,10 @@ class PeriodForm(forms.ModelForm):
         model = SchoolPeriod
         fields = ["code","label","start_time","end_time"]
         widgets = {"start_time":forms.TimeInput(attrs={"type":"time"},format="%H:%M"),"end_time":forms.TimeInput(attrs={"type":"time"},format="%H:%M")}
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args,**kwargs)
+        if self.instance.pk:
+            self.fields["code"].disabled = True
     def clean_code(self):
         return normalize_code(self.cleaned_data["code"])
     def clean(self):
@@ -72,7 +76,7 @@ class PeriodForm(forms.ModelForm):
         if start and end:
             if end <= start:
                 raise forms.ValidationError("End time must be after start time.")
-            if SchoolPeriod.objects.exclude(pk=self.instance.pk).filter(start_time__lt=end,end_time__gt=start).exists():
+            if self.instance.active and SchoolPeriod.objects.exclude(pk=self.instance.pk).filter(active=True,start_time__lt=end,end_time__gt=start).exists():
                 raise forms.ValidationError("Periods must not overlap.")
         return c
 
@@ -85,7 +89,7 @@ class SlotForm(forms.ModelForm):
         self.fields["teacher"].queryset = teachers()
         self.fields["school_class"].queryset = SchoolClass.objects.filter(active=True).order_by("code")
         self.fields["room"].queryset = Room.objects.filter(active=True).order_by("code")
-        self.fields["period"].queryset = SchoolPeriod.objects.all()
+        self.fields["period"].queryset = SchoolPeriod.objects.filter(active=True)
     def clean(self):
         c = super().clean()
         if c.get("active") and all(c.get(k) for k in ("school_class","teacher","room","weekday","period")):
