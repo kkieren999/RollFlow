@@ -1,12 +1,12 @@
 # RollFlow V3.0 — School application foundation
 
-## V3.4.1 — Direct timetable publishing
+## V3.4.2 — Operational timetable publication
 
-The GitHub Pages site remains fictional. Its temporary Test Import accepts the original CSV structure up to 20 MB/150,000 rows, displays masked identifiers and does not publish or retain test results. Use school-approved data only.
+For operational school use, school ICT must provision a private HTTPS application host and PostgreSQL database, approve access, confidentiality and retention controls, run migrations and the complete regression suite, and provision individual accounts. Configure the non-debug environment variables below, a random secret of at least 50 characters and `ROLLFLOW_LIVE_TIMETABLE=1`. This flag does not itself establish approval or production readiness. Do not place school exports in GitHub.
 
-For actual school timetable publishing, school ICT must provision a private HTTPS application host and PostgreSQL database, approve access, confidentiality and retention controls, run the migrations and entire test suite, and provision individual staff accounts. Set the non-debug configuration variables documented below, a randomly generated secret of at least 50 characters, and `ROLLFLOW_LIVE_TIMETABLE=1` only on that approved installation. Never use the demo credentials or commit real exports. The new flag rejects debug/SQLite configurations. It does not itself establish approval, secure hosting or production readiness.
+The operational OneSchool Import Centre has one primary action: **Import & publish timetable**. Administrators enter a version name, choose the original full-size CSV and confirm authorisation and full-snapshot replacement. CSV schema validation and atomic publication are retained; earlier versions can be reviewed and republished. No draft requirement, sample-download control or temporary testing screen is exposed in operational mode. The teacher landing and master timetable display the published snapshot or a clear unpublished empty state, and unfinished administrative modules are hidden. Individual teaching schedules require a verified OneSchool Staff_Id link. Live class membership/attendance, automatic reconciliation into the manual directories and OneSchool write-back are not enabled.
 
-Administrators can then select OneSchool Import Centre, enter a version name, choose the original full-size CSV, confirm authorisation and acknowledge full-snapshot replacement, and select Import & publish timetable. The original rows are validated before any publication; earlier published snapshots are retained. Review mode remains available. Teachers see the published timetable rather than fictional attendance when live mode is enabled. Class memberships, live roll marking and OneSchool write-back are not implemented. This release is a timetable-only pilot candidate, not a certified attendance system.
+The static browser demo is distinct: it publishes a persistent masked timetable to local IndexedDB only. The development server keeps non-operational regression fixtures and test controls for engineering verification; they must not be used as school records.
 
 ## V3.4 — OneSchool integration and advanced timetable management
 
