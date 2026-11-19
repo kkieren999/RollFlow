@@ -259,3 +259,28 @@ class TimetableManagementTests(TestCase):
         c.force_login(self.admin)
         self.assertEqual(c.post("/manage/timetable/add/",self.slot()).status_code,403)
         self.assertEqual(self.client.post("/manage/periods/add/",{"code":"EXTRA","label":"Extra","start_time":"09:30","end_time":"10:00"}).status_code,200)
+
+
+    def test_school_period_remove_restore_and_history(self):
+        from .models import SchoolPeriod, TimetableSlot
+        self.assertRedirects(self.client.post("/manage/periods/add/",{"code":"EXTRA","label":"Extra","start_time":"15:15","end_time":"15:30"}),"/manage/timetable/")
+        period=SchoolPeriod.objects.get(code="EXTRA")
+        slot=TimetableSlot.objects.create(school_class=self.klass,teacher=self.teacher,room=self.room,weekday=1,period=period)
+        url=f"/manage/periods/{period.pk}/remove/"
+        self.assertContains(self.client.get(url),"active lesson")
+        self.assertRedirects(self.client.post(url),"/manage/timetable/")
+        period.refresh_from_db()
+        self.assertTrue(period.active)
+        self.client.post(f"/manage/timetable/{slot.pk}/archive/")
+        self.assertRedirects(self.client.post(url),"/manage/timetable/")
+        period.refresh_from_db()
+        self.assertFalse(period.active)
+        self.assertTrue(TimetableSlot.objects.filter(pk=slot.pk,active=False).exists())
+        self.assertEqual(self.client.post("/manage/timetable/add/",self.slot(period=period.pk)).status_code,200)
+        self.assertRedirects(self.client.post(f"/manage/periods/{period.pk}/restore/"),"/manage/timetable/")
+        period.refresh_from_db()
+        self.assertTrue(period.active)
+        slot.refresh_from_db()
+        self.assertFalse(slot.active)
+        self.client.force_login(self.teacher)
+        self.assertEqual(self.client.post(url).status_code,403)
