@@ -152,7 +152,7 @@ def dated(request, personal=False,admin_only=False):
         groups.append({"year":y,"cells":cells})
     monday=day-timedelta(days=day.weekday())
     tabs=[{"date":(monday+timedelta(days=i)).isoformat(),"label":["Monday","Tuesday","Wednesday","Thursday","Friday"][i]} for i in range(5)]
-    context=dict(version=version,selected_date=day.isoformat(),day=day,tabs=tabs,periods=periods,groups=groups,rows=filtered,query=query,year=year,years=range(7,13),hide=hide,personal=personal,unlinked=personal and not staff_id,record_exists=record is not None,admin=role=="admin")
+    context=dict(live_timetable=settings.ROLLFLOW_LIVE_TIMETABLE,version=version,selected_date=day.isoformat(),day=day,tabs=tabs,periods=periods,groups=groups,rows=filtered,query=query,year=year,years=range(7,13),hide=hide,personal=personal,unlinked=personal and not staff_id,record_exists=record is not None,admin=role=="admin")
     if role=="admin":
         return page(request,"master",dated_import=True,**context)
     return render(request,"imported_teacher.html",context)
