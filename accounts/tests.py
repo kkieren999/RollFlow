@@ -407,9 +407,9 @@ class OneSchoolImportTests(TestCase):
     @override_settings(ROLLFLOW_LIVE_TIMETABLE=True)
     def test_operational_import_has_no_fictional_or_draft_controls(self):
         response=self.client.get("/manage/oneschool/")
-        self.assertContains(response,"Import &amp; publish timetable")
+        self.assertContains(response,"Import & publish timetable")
         self.assertNotContains(response,"Download fictional sample")
-        self.assertNotContains(response,"Validate &amp; create draft")
+        self.assertNotContains(response,"Validate & create draft")
         self.assertEqual(self.client.get("/manage/oneschool/sample/").status_code,403)
         self.assertContains(self.client.get("/manage/master/"),"No timetable published")
         self.client.force_login(self.teacher)
