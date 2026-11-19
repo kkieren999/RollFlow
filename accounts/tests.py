@@ -376,3 +376,29 @@ class OneSchoolImportTests(TestCase):
         self.assertEqual(first.status,"archived")
         self.assertEqual(ImportedTimetable.objects.get(status="published"),second)
         self.assertEqual(ImportedTimetableDay.objects.filter(version=first).count(),2)
+
+    def test_direct_publish_disabled_in_demo(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from .models import ImportedTimetable
+        response=self.client.post("/manage/oneschool/",{"name":"Fictional","fictional":"on","publish_now":"yes","replace_ack":"yes","csv":SimpleUploadedFile("sample.csv",self.csv())})
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(ImportedTimetable.objects.count(),0)
+
+    @override_settings(ROLLFLOW_LIVE_TIMETABLE=True)
+    def test_direct_publish_requires_authorisation_and_valid_csv(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from .models import ImportedTimetable
+        def upload(raw,ack="yes"):
+            return self.client.post("/manage/oneschool/",{"name":"Fictional live example","fictional":"on","publish_now":"yes","replace_ack":ack,"csv":SimpleUploadedFile("sample.csv",raw)})
+        self.assertEqual(upload(self.csv(),"").status_code,200)
+        self.assertEqual(ImportedTimetable.objects.count(),0)
+        self.assertEqual(upload(self.csv()).status_code,302)
+        first=ImportedTimetable.objects.get(status="published")
+        self.assertEqual(upload(self.csv().replace(b"23/11/2026",b"24/11/2026")).status_code,200)
+        self.assertEqual(ImportedTimetable.objects.get(status="published"),first)
+        self.assertEqual(upload(self.csv().replace(b"M02",b"M03")).status_code,302)
+        first.refresh_from_db()
+        self.assertEqual(first.status,"archived")
+        self.assertEqual(ImportedTimetable.objects.filter(status="published").count(),1)
+        self.client.force_login(self.teacher)
+        self.assertRedirects(self.client.get("/teacher/"),"/teacher/timetable/",fetch_redirect_response=False)
