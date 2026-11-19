@@ -6,6 +6,7 @@ class StaffProfile(models.Model):
     staff_id = models.CharField(max_length=40, blank=True, unique=True, null=True)
     faculty = models.CharField(max_length=100, blank=True)
     campus = models.CharField(max_length=100, blank=True)
+    class_codes = models.CharField(max_length=300, blank=True)
     def __str__(self):
         return self.user.get_username()
 
