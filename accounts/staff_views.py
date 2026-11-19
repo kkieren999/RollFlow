@@ -1,0 +1,223 @@
+import csv
+import io
+from functools import wraps
+from django.contrib import messages
+from django.contrib.auth.models import Group, User
+from django.contrib.sessions.models import Session
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
+from django.db.models import Q
+from django.http import HttpResponseForbidden, HttpResponseBadRequest
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
+from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_http_methods, require_POST
+from .models import SecurityEvent, StaffProfile
+from .staff_forms import StaffForm, ResetPasswordForm, StaffImportForm
+from .views import role_for
+
+NAVIGATION = (
+    ("SCHOOL MANAGEMENT", (("dashboard", "Dashboard"), ("staff", "Staff Management"), ("students", "Student Management"), ("classes", "Class Management"), ("timetable", "Timetable Management"), ("relief", "Relief & Supervision"))),
+    ("OPERATIONS", (("attendance", "Attendance Monitoring"), ("movements", "Student Movements"), ("notices", "School Notices"), ("reports", "Reports"))),
+    ("SYSTEM", (("roles", "Roles & Permissions"), ("data", "Data Management"), ("audit", "Audit Logs"), ("settings", "School Settings"))),
+)
+TITLES = dict(item for _, items in NAVIGATION for item in items)
+
+def administrator(view):
+    @wraps(view)
+    @never_cache
+    def wrapped(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect("admin-login")
+        if role_for(request.user) != "admin":
+            return HttpResponseForbidden("Administrator access required.")
+        return view(request, *args, **kwargs)
+    return wrapped
+
+def page(request, section, **context):
+    return render(request, "staff_portal.html", {"section": section, "title": TITLES[section], "navigation": NAVIGATION, **context})
+
+def revoke_sessions(user):
+    # Development implementation: database sessions only.
+    for session in Session.objects.filter(expire_date__gt=timezone.now()).iterator():
+        if str(session.get_decoded().get("_auth_user_id")) == str(user.pk):
+            session.delete()
+
+def log(request, event, target):
+    SecurityEvent.objects.create(actor=request.user, event=event, subject=target.username)
+
+def set_role(user, role):
+    user.is_staff = role == "admin"
+    user.is_superuser = role == "admin"
+    user.save()
+    # V3.1 deliberately exposes only the two roles. Remove stale group grants.
+    user.groups.clear()
+    user.user_permissions.clear()
+    if role == "teacher":
+        user.groups.add(Group.objects.get(name="Teacher"))
+
+@administrator
+@require_http_methods(["GET"])
+def dashboard(request):
+    users = User.objects.all()
+    return page(request, "dashboard", stats=[
+        ("Staff accounts", users.count()),
+        ("Active staff", users.filter(is_active=True).count()),
+        ("Teachers", users.filter(groups__name="Teacher", is_staff=False, is_superuser=False).distinct().count()),
+        ("Administrators", users.filter(is_staff=True, is_superuser=True).count()),
+    ], events=SecurityEvent.objects.select_related("actor").all()[:6])
+
+@administrator
+@require_http_methods(["GET"])
+def section(request, section):
+    if section == "dashboard":
+        return redirect("management-dashboard")
+    if section not in TITLES:
+        return HttpResponseBadRequest("Unknown section.")
+    if section == "staff":
+        q = request.GET.get("q", "").strip()[:150]
+        status = request.GET.get("status", "all")
+        users = User.objects.select_related("staff_profile").order_by("last_name", "first_name", "username")
+        if q:
+            users = users.filter(Q(username__icontains=q) | Q(first_name__icontains=q) | Q(last_name__icontains=q) |
+                Q(staff_profile__staff_id__icontains=q) | Q(staff_profile__faculty__icontains=q))
+        if status == "active":
+            users = users.filter(is_active=True)
+        elif status == "inactive":
+            users = users.filter(is_active=False)
+        elif status == "teacher":
+            users = users.filter(groups__name="Teacher", is_staff=False, is_superuser=False).distinct()
+        elif status == "admin":
+            users = users.filter(is_staff=True, is_superuser=True)
+        from django.core.paginator import Paginator
+        return page(request, section, staff_page=Paginator(users, 50).get_page(request.GET.get("page")), q=q, status=status)
+    if section == "audit":
+        return page(request, section, events=SecurityEvent.objects.select_related("actor").all()[:200])
+    if section == "data":
+        return page(request, section, import_form=StaffImportForm())
+    return page(request, section)
+
+@administrator
+@require_http_methods(["GET", "POST"])
+def staff_edit(request, pk=None):
+    target = get_object_or_404(User, pk=pk) if pk is not None else None
+    form = StaffForm(request.POST if request.method == "POST" else None, target=target, actor=request.user)
+    if request.method == "POST" and form.is_valid():
+        c = form.cleaned_data
+        try:
+            with transaction.atomic():
+                if target:
+                    user = User.objects.select_for_update().get(pk=target.pk)
+                    old_role = (user.is_staff, user.is_superuser)
+                    old_active = user.is_active
+                    user.first_name, user.last_name = c["first_name"], c["last_name"]
+                    user.is_active = c["active"]
+                else:
+                    user = User(username=c["username"], first_name=c["first_name"], last_name=c["last_name"], is_active=c["active"])
+                    user.set_password(c["password"])
+                set_role(user, c["role"])
+                StaffProfile.objects.update_or_create(user=user, defaults={
+                    "staff_id": c["staff_id"], "faculty": c["faculty"], "campus": c["campus"], "class_codes": c["class_codes"],
+                })
+                if target and user.pk != request.user.pk and (old_active != user.is_active or old_role != (user.is_staff, user.is_superuser)):
+                    revoke_sessions(user)
+                log(request, "staff_updated" if target else "staff_created", user)
+            messages.success(request, "Staff details saved.")
+            return redirect("management-section", section="staff")
+        except IntegrityError:
+            form.add_error(None, "A staff ID or username is already in use.")
+    return page(request, "staff", form=form, target=target, editor=True)
+
+@administrator
+@require_http_methods(["GET", "POST"])
+def staff_reset(request, pk):
+    target = get_object_or_404(User, pk=pk)
+    if target.pk == request.user.pk:
+        return HttpResponseForbidden("Change your own password using the administrator account settings.")
+    form = ResetPasswordForm(request.POST if request.method == "POST" else None, target=target)
+    if request.method == "POST" and form.is_valid():
+        with transaction.atomic():
+            target = User.objects.select_for_update().get(pk=pk)
+            target.set_password(form.cleaned_data["password"])
+            target.save(update_fields=["password"])
+            revoke_sessions(target)
+            log(request, "password_reset", target)
+        messages.success(request, "Password reset. Existing sessions have been revoked. Share credentials only through an approved channel.")
+        return redirect("management-section", section="staff")
+    return page(request, "staff", form=form, target=target, editor=True, reset=True)
+
+@administrator
+@require_POST
+def staff_status(request, pk):
+    with transaction.atomic():
+        target = get_object_or_404(User.objects.select_for_update(), pk=pk)
+        if target.pk == request.user.pk:
+            return HttpResponseForbidden("You cannot deactivate your own administrator account.")
+        value = request.POST.get("active")
+        if value not in ("0", "1"):
+            return HttpResponseBadRequest("Invalid status.")
+        if value == "1" and not target.has_usable_password():
+            messages.error(request, "Reset this imported account's password before activating it.")
+            return redirect("management-section", section="staff")
+        target.is_active = value == "1"
+        target.save(update_fields=["is_active"])
+        revoke_sessions(target)
+        log(request, "account_activated" if target.is_active else "account_deactivated", target)
+    messages.success(request, "Account status updated.")
+    return redirect("management-section", section="staff")
+
+CSV_HEADER = ["staff_id", "username", "first_name", "last_name", "faculty", "campus"]
+
+def parse_staff_csv(upload):
+    if upload.size > 200000:
+        raise ValidationError("Choose a CSV below 200 KB.")
+    try:
+        raw = upload.read().decode("utf-8-sig")
+        reader = csv.DictReader(io.StringIO(raw), strict=True)
+        if reader.fieldnames != CSV_HEADER:
+            raise ValidationError("Use the exact six-column header shown below.")
+        rows, ids, names = [], set(), set()
+        for line, row in enumerate(reader, 2):
+            if line > 201:
+                raise ValidationError("Import at most 200 rows at once.")
+            if None in row or any(value is None for value in row.values()):
+                raise ValidationError(f"Incorrect columns on row {line}.")
+            values = {key: val.strip() for key, val in row.items()}
+            values["username"] = values["username"].lower()
+            values["staff_id"] = values["staff_id"].upper()
+            if not all(values[k] for k in CSV_HEADER[:4]) or len(values["staff_id"]) > 40 or len(values["username"]) > 150 or any(len(values[k]) > 100 for k in CSV_HEADER[2:]):
+                raise ValidationError(f"Invalid field length or blank required field on row {line}.")
+            User.username_validator(values["username"])
+            name, staff_id = values["username"], values["staff_id"]
+            if name in names or staff_id in ids or User.objects.filter(username__iexact=name).exists() or StaffProfile.objects.filter(staff_id__iexact=staff_id).exists():
+                raise ValidationError(f"Duplicate username or staff ID on row {line}.")
+            names.add(name); ids.add(staff_id); rows.append(values)
+        if not rows:
+            raise ValidationError("The CSV contains no staff records.")
+        return rows
+    except (UnicodeError, csv.Error) as error:
+        raise ValidationError("Use a valid UTF-8 CSV file.") from error
+
+@administrator
+@require_POST
+def staff_import(request):
+    form = StaffImportForm(request.POST, request.FILES)
+    if form.is_valid():
+        try:
+            with transaction.atomic():
+                rows = parse_staff_csv(form.cleaned_data["csv"])
+                teacher_group = Group.objects.get(name="Teacher")
+                for row in rows:
+                    user = User(username=row["username"], first_name=row["first_name"], last_name=row["last_name"], is_active=False)
+                    user.set_unusable_password()
+                    user.save()
+                    user.groups.add(teacher_group)
+                    StaffProfile.objects.create(user=user, staff_id=row["staff_id"], faculty=row["faculty"], campus=row["campus"])
+                    log(request, "staff_imported", user)
+            messages.success(request, f"Imported {len(rows)} inactive teachers. Reset passwords before activation.")
+            return redirect("management-section", section="staff")
+        except ValidationError as err:
+            form.add_error("csv", err)
+        except IntegrityError:
+            form.add_error("csv", "Duplicate details detected. No staff were imported.")
+    return page(request, "data", import_form=form)
