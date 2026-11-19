@@ -2,6 +2,7 @@ import csv
 import io
 from functools import wraps
 from django.contrib import messages
+from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.contrib.sessions.models import Session
 from django.core.exceptions import ValidationError
@@ -35,7 +36,12 @@ def administrator(view):
     return wrapped
 
 def page(request, section, **context):
-    return render(request, "staff_portal.html", {"section": section, "title": TITLES[section], "navigation": NAVIGATION, **context})
+    navigation=NAVIGATION
+    if settings.ROLLFLOW_LIVE_TIMETABLE:
+        available={"dashboard","staff","students","classes","timetable","master","data","oneschool","audit"}
+        navigation=tuple((group,tuple(item for item in items if item[0] in available)) for group,items in NAVIGATION)
+        navigation=tuple((group,items) for group,items in navigation if items)
+    return render(request, "staff_portal.html", {"section": section, "title": TITLES[section], "navigation": navigation, "live_timetable": settings.ROLLFLOW_LIVE_TIMETABLE, **context})
 
 def revoke_sessions(user):
     # Development implementation: database sessions only.
