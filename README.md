@@ -6,7 +6,7 @@ Browser import fingerprints are based on the original decoded CSV content, not m
 
 Strict quote validation, safe date bounds (1900–2099), correct visible allocation counts, staff selection in the staff timetable, filter reset on view switching, and expiry warnings are included. Committed changes notify other open tabs in the same browser/origin; focus/visibility reloads reconcile missed notifications. In-progress imports defer refreshes. Publish a replacement before deleting any active version. Date sorting and keyboard focus have been improved. This is still a local masked timetable and not an operational attendance system.
 
-Focused synthetic regression checks passed for both branch previews; the supplied CSV passed equivalent local structural validation (42,793 rows). Actual browser multi-tab/device testing and the Django integration suite remain unverified.
+Focused synthetic regression checks passed for both branch previews; the supplied CSV passed equivalent local structural validation (42,793 rows). Actual browser multi-tab/device testing remains unverified. The protected Django branch passed all 42 `accounts` regression tests, dependency installation, system checks and migration validation in [GitHub Actions run 44614590326](https://github.com/kkieren999/RollFlow/actions/runs/44614590326) on 20 November 2026 (Brisbane time), using development SQLite. [GitHub Pages deployment run 44614578637](https://github.com/kkieren999/RollFlow/actions/runs/44614578637) also succeeded for the static preview; independent browser testing and a private Django/PostgreSQL production deployment remain unverified.
 
 ## V3.4.3 — Usability and stability
 
