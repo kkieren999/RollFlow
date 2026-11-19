@@ -1,5 +1,13 @@
 # RollFlow — Teacher Edition
 
+## V3.3 — Class & Timetable Management preview
+
+Sign in with admin / admin and open Class Management or Timetable Management. The fictional planning directory starts with 34 classes and 34 recurring lesson slots. Create/edit classes, select a primary teacher, manage dated student enrolments, schedule lessons, manage rooms and periods, archive slots, and import timetable CSV. Existing sample teachers without a matching staff account retain their fixture display names. New allocations require an active fictional teacher account. Teacher / teacher can view the automatically filtered planning timetable under My Timetable → View planned timetable.
+
+CSV header: `class_code,teacher_username,room_code,weekday,period_code`. Weekdays use 1–5. All references must already exist; conflicting teacher/class/room slots are rejected. Import up to 500 rows below 250 KB. New entries are checked for clashes; original fixture inconsistencies are not silently rewritten. School periods seed the existing RollFlow schedule. No term calendars, student-level clashes, or actual roll records are managed by this release.
+
+Public planning data is browser-local and strictly fictional. Roll marking still reads the original fixture data, separate from planning changes. The database-backed version is on the [V3 development branch](https://github.com/kkieren999/RollFlow/tree/v3.0-foundation).
+
 ## V3.2 — Student Management preview
 
 Sign in with the public admin / admin demonstration account and select Student Management. The directory starts with 240 fictional fixture students. Search by name or ID, filter by year, home group or enrolment status, add or edit student records, view profiles, toggle synthetic portraits and import a fictional CSV. Student IDs are stable; leaving dates are required when marking a student as left. Records are kept rather than deleted.
