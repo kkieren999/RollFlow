@@ -68,11 +68,11 @@ def context(request):
 
 @never_cache
 @require_http_methods(["GET"])
-def master(request):
+def master(request, admin_only=False):
     role = role_for(request.user)
     if role is None:
         return redirect("teacher-login")
-    if role not in ("teacher", "admin"):
+    if role not in ("teacher", "admin") or (admin_only and role != "admin"):
         return HttpResponseForbidden("Staff access required.")
     data = context(request)
     if role == "admin":
