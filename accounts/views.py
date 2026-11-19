@@ -106,6 +106,8 @@ def teacher_timetable(request):
     from .oneschool_views import current_version, dated
     if current_version():
         return dated(request, personal=True)
+    if settings.ROLLFLOW_LIVE_TIMETABLE:
+        return render(request, "live_timetable_pending.html")
     from .timetable_views import active_slots
     from .models import TimetableSlot
     slots = list(active_slots().filter(teacher=request.user))
