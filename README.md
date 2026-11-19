@@ -1,5 +1,11 @@
 # RollFlow V3.0 — School application foundation
 
+## V3.4.4 — Import reliability and timetable bug fixes
+
+The protected importer validates CSV quote placement before parsing and uses a SHA-256 fingerprint of the source bytes with a V3.4.4 prefix. Exact repeated files reuse their new-format version, changed source files create new versions; existing snapshots are retained. Staff IDs/codes are normalized and exact staff-ID lookup is preferred when available. Navigation bounds dates to 1900–2099, warns when the published coverage is expired or not yet started, and counts visible allocations after the break filter. The protected server retains archived versions and does not expose deletion. The browser edition requires publishing a replacement before removal and synchronizes committed versions across tabs on the same origin.
+
+Regression tests have been added for source-level identity, malformed quotes, duplicate counts, date bounds, coverage warnings and staff lookup. The GitHub Actions V3 foundation workflow supports manual dispatch. Run `python manage.py check`, `python manage.py makemigrations --check --dry-run`, and `python manage.py test accounts` with dependencies installed. The full Django suite was not executed in the editing environment because Django and network/package access were unavailable. Do not consider this a verified production deployment.
+
 ## V3.4.3 — Usability and stability
 
 Published import statistics are shown separately from manual directory records. The dated Master Timetable has week navigation, Today, first imported day, staff/room lookup, filtering/highlighting, compact/expanded layout, and current-period indicators. The teacher timetable remains restricted to the linked staff ID. Staff, student and class directories support server-side sorting over the full matched queryset and retain filters across pagination. Other admin tables support client-side sorting and pagination over their loaded records. The timetable management tab is remembered in the session.
