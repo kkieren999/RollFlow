@@ -18,7 +18,7 @@ def event(request, action, subject):
     SecurityEvent.objects.create(actor=request.user,event=action,subject=str(subject)[:150])
 
 def active_slots():
-    return TimetableSlot.objects.filter(active=True,school_class__active=True,room__active=True,teacher__is_active=True,teacher__is_staff=False,teacher__is_superuser=False,teacher__groups__name="Teacher").select_related("school_class","teacher","room","period").distinct()
+    return TimetableSlot.objects.filter(active=True,period__active=True,school_class__active=True,room__active=True,teacher__is_active=True,teacher__is_staff=False,teacher__is_superuser=False,teacher__groups__name="Teacher").select_related("school_class","teacher","room","period").distinct()
 
 @administrator
 @require_http_methods(["GET"])
@@ -107,12 +107,14 @@ def save_editor(request,form_class,model,pk,title,section="timetable",initial=No
     if request.method=="POST" and form.is_valid():
         try:
             with transaction.atomic():
+                if model is TimetableSlot and not SchoolPeriod.objects.select_for_update().get(pk=form.cleaned_data["period"].pk).active:
+                    raise ValidationError("This period has been removed. Choose an active period.")
                 saved=form.save()
                 event(request,model.__name__.lower()+("_updated" if pk else "_created"),getattr(saved,"code",str(saved.pk)))
             messages.success(request,title+" saved.")
             return redirect("management-timetable")
-        except IntegrityError:
-            form.add_error(None,"Conflicting or duplicate record. Reload and try again.")
+        except (IntegrityError, ValidationError) as error:
+            form.add_error(None, error if isinstance(error, ValidationError) else "Conflicting or duplicate record. Reload and try again.")
     return page(request,section,editor_form=form,editor_title=title,cancel_url="management-timetable")
 
 @administrator
@@ -143,6 +145,39 @@ def slot_cancel(request,pk):
         slot.save(update_fields=["active"])
         event(request,"timetable_slot_archived",str(slot.pk))
     messages.success(request,"Slot archived.")
+    return redirect("management-timetable")
+
+@administrator
+@require_http_methods(["GET","POST"])
+def period_remove(request,pk):
+    period=get_object_or_404(SchoolPeriod,pk=pk)
+    if request.method=="GET":
+        return page(request,"timetable",period_remove_record=period,period_slot_count=period.slots.filter(active=True).count())
+    with transaction.atomic():
+        period=get_object_or_404(SchoolPeriod.objects.select_for_update(),pk=pk)
+        if period.slots.filter(active=True).exists():
+            messages.error(request,"This period still has active lessons. Reassign or archive them before removal.")
+            return redirect("management-timetable")
+        if period.active:
+            period.active=False
+            period.save(update_fields=["active"])
+            event(request,"schoolperiod_removed",period.code)
+    messages.success(request,"Period removed from the active school day. Archived lesson records retained.")
+    return redirect("management-timetable")
+
+@administrator
+@require_POST
+def period_restore(request,pk):
+    with transaction.atomic():
+        period=get_object_or_404(SchoolPeriod.objects.select_for_update(),pk=pk)
+        if not period.active:
+            if SchoolPeriod.objects.filter(active=True,start_time__lt=period.end_time,end_time__gt=period.start_time).exclude(pk=pk).exists():
+                messages.error(request,"Cannot restore: period times overlap an active period. Edit its times first.")
+                return redirect("management-timetable")
+            period.active=True
+            period.save(update_fields=["active"])
+            event(request,"schoolperiod_restored",period.code)
+    messages.success(request,"Period restored. Archived lessons remain archived.")
     return redirect("management-timetable")
 
 HEADER=["class_code","teacher_username","room_code","weekday","period_code"]
@@ -176,7 +211,7 @@ def import_timetable(request):
                         klass=SchoolClass.objects.get(code__iexact=r["class_code"],active=True)
                         teacher=teachers().get(username__iexact=r["teacher_username"])
                         room=Room.objects.get(code__iexact=r["room_code"],active=True)
-                        period=SchoolPeriod.objects.get(code__iexact=r["period_code"])
+                        period=SchoolPeriod.objects.select_for_update().get(code__iexact=r["period_code"],active=True)
                     except (SchoolClass.DoesNotExist,Room.DoesNotExist,SchoolPeriod.DoesNotExist,User.DoesNotExist) as exc:
                         raise ValidationError(f"Unknown or inactive reference on row {number}.") from exc
                     slot_form=SlotForm({"school_class":klass.pk,"teacher":teacher.pk,"room":room.pk,"weekday":r["weekday"],"period":period.pk,"active":"on"})
