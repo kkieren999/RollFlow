@@ -865,7 +865,7 @@ function demoAdminStaff(){
 
 const STUDENT_PREVIEW_KEY='rollflow_admin_students_v32';
 const studentStatuses={active:'Enrolled',inactive:'Inactive',left:'Left school'};
-let previewStudents=people.map(p=>{const parts=p.name.split(' ');return {id:p.id,first:parts.shift(),last:parts.join(' '),preferred:'',year:Number(p.year)||10,group:'',status:'active',enrolled:'',left:'',portrait:true}});
+let previewStudents=people.map(p=>{const parts=p.name.split(' '),groups=schoolClasses.filter(c=>c.period==='ROLL'&&c.ids.includes(p.id)&&Number(c.year)===Number(p.year));return {id:p.id,first:parts.shift(),last:parts.join(' '),preferred:'',year:Number(p.year)||10,group:groups.length===1?groups[0].name.replace(/ Home Group$/i,''):'',status:'active',enrolled:'',left:'',portrait:true}});
 try{const saved=JSON.parse(localStorage.getItem(STUDENT_PREVIEW_KEY)||'null');if(Array.isArray(saved))previewStudents=saved}catch{}
 let studentAdminMode='list',studentAdminId=null,studentAdminQuery='',studentAdminYear='',studentAdminGroup='',studentAdminStatus='all';
 function studentPreviewSave(next,action,subject){
@@ -889,7 +889,7 @@ function parsePreviewStudentCsv(raw){
 }
 function previewPortrait(p,large=false){
  const fixture=p.portrait?getPerson(p.id)||people[0]:null;
- return fixture?`<img class="${large?'v32-portrait':'v32-thumb'}" src="${esc(photo(fixture))}" alt="Fictional portrait">`:`<span class="${large?'v32-portrait':'v32-thumb'} v32-avatar" aria-hidden="true">${esc((p.first[0]||'')+(p.last[0]||''))}</span>`;
+ return fixture?`<img class="${large?'v32-portrait':'v32-thumb'}" src="${esc(avatarSvg(fixture))}" alt="Fictional portrait">`:`<span class="${large?'v32-portrait':'v32-thumb'} v32-avatar" aria-hidden="true">${esc((p.first[0]||'')+(p.last[0]||''))}</span>`;
 }
 function demoStudentDetail(p){
  const memberships=schoolClasses.filter(c=>c.ids.includes(p.id)),events=previewAudit.filter(e=>e.subject===p.id&&e.action.startsWith('Student'));
