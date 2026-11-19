@@ -261,6 +261,7 @@
 </style>
 </head>
 <body><div id="app"></div>
+<!-- ROLLFLOW_SERVER_BOOTSTRAP -->
 <script>
 (function(){
 'use strict';
@@ -333,11 +334,13 @@ const schoolClasses=[...classes,...schoolClassSeed.map(([id,name,year,faculty,te
 
 function brisbaneToday(){const parts=new Intl.DateTimeFormat('en-AU',{timeZone:'Australia/Brisbane',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());const get=t=>parts.find(x=>x.type===t)?.value||'';return `${get('year')}-${get('month')}-${get('day')}`;}
 // Public, fictional demo identity only; replace with server-side authentication before deployment.
+const serverIdentityNode=document.getElementById('rollflow-server-identity');
+const serverIdentity=serverIdentityNode?JSON.parse(serverIdentityNode.textContent):null;
 const DEMO_AUTH_KEY='rollflow_demo_session_v1';
-let demoRole=null,loginMode='teacher';
-try{const role=sessionStorage.getItem(DEMO_AUTH_KEY);if(['teacher','admin'].includes(role))demoRole=role}catch{}
-function checkDemoCredentials(mode,username,password){return (mode==='teacher'&&username.trim().toLowerCase()==='teacher'&&password==='teacher')||(mode==='admin'&&username.trim().toLowerCase()==='admin'&&password==='admin')?mode:null}
-const KEY='rollflow_teacher_2026_v1';let persisted={};try{persisted=JSON.parse(localStorage.getItem(KEY)||'{}')}catch(e){};
+let demoRole=serverIdentity?'teacher':null,loginMode='teacher';
+if(!serverIdentity){try{const role=sessionStorage.getItem(DEMO_AUTH_KEY);if(['teacher','admin'].includes(role))demoRole=role}catch{}}
+function checkDemoCredentials(mode,username,password){if(serverIdentity)return null;return (mode==='teacher'&&username.trim().toLowerCase()==='teacher'&&password==='teacher')||(mode==='admin'&&username.trim().toLowerCase()==='admin'&&password==='admin')?mode:null}
+const KEY=serverIdentity?'rollflow_fictional_sandbox_user_'+serverIdentity.id:'rollflow_teacher_2026_v1';let persisted={};try{persisted=JSON.parse(localStorage.getItem(KEY)||'{}')}catch(e){};
 const state={movementQuery:'',movementStudentId:'',movementHighlight:0,page:'home',classId:'MAF102A',date:brisbaneToday(),marks:persisted.marks||{},submitted:persisted.submitted||{},notes:persisted.notes||{},pictures:{},passes:persisted.passes||{},movements:persisted.movements||[],readNotices:persisted.readNotices||[],prefs:persisted.prefs||{showPortraits:true,showHints:true},pins:persisted.pins?.date===brisbaneToday()?persisted.pins:{date:brisbaneToday(),ids:[]},sidebarCollapsed:false,rollSidebarExpanded:true,profileOpen:false,studentQuery:'',finder:{query:'',year:'all',subject:'all',day:'all',period:'all'},finderSelected:null,finderTab:'students',rollOrigin:'timetable',dirty:false,history:[],drawer:null,modal:null,mobileNav:false,search:'',toast:''};
 let toastTimer=null;const app=document.getElementById('app');const getClass=()=>schoolClasses.find(c=>c.id===state.classId)||classes[1];const getPerson=id=>people.find(p=>p.id===id);const bucket=(cls=state.classId)=>state.date+'|'+cls;const marksFor=(cls=state.classId)=>state.marks[bucket(cls)]||{};const statusFor=id=>marksFor()[id]||'?';const isSubmitted=(cls=state.classId)=>!!state.submitted[bucket(cls)];const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function persist(){try{localStorage.setItem(KEY,JSON.stringify({marks:state.marks,submitted:state.submitted,notes:state.notes,passes:state.passes,movements:state.movements,readNotices:state.readNotices,prefs:state.prefs,pins:state.pins}));state.storageError=false;return true}catch(e){state.storageError=true;showToast('Attendance data could not be saved. Keep this page open and retry Save.');return false}};
@@ -454,9 +457,10 @@ document.addEventListener('keydown',e=>{if(e.target?.id==='movementStudentSearch
 window.addEventListener('resize',()=>{requestAnimationFrame(fitGrid)});
 window.addEventListener('focus',()=>{const old=state.pins.date;if(old!==brisbaneToday()){state.pins={date:brisbaneToday(),ids:[]};if(state.date===old)state.date=brisbaneToday();persist();render()}});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&state.pins.date!==brisbaneToday()){const old=state.pins.date;state.pins={date:brisbaneToday(),ids:[]};if(state.date===old)state.date=brisbaneToday();persist();render()}});
-const V2KEY='rollflow_workspace_v2';
+const V2KEY=serverIdentity?'rollflow_fictional_workspace_user_'+serverIdentity.id:'rollflow_workspace_v2';
 let workspace;try{workspace=JSON.parse(localStorage.getItem(V2KEY)||'null')}catch{};
 workspace={profile:{name:'Alex Morgan',role:'Teacher',faculty:'Mathematics',years:'10–12',campus:'Rivergum',avatar:'AM'},favourites:[],recent:[],teachingNotes:[],widgets:['classes','favourites','recent','notes','cover','reminders'],settings:{theme:'Light',density:'Comfortable',font:'Standard',landing:'home',remember:true,contrast:false,motion:false,reminders:true},...workspace};
+if(serverIdentity)workspace.profile={name:serverIdentity.name,role:'Teacher',faculty:serverIdentity.faculty,years:'Sample classes',campus:serverIdentity.campus,avatar:''};
 function saveWorkspace(){try{localStorage.setItem(V2KEY,JSON.stringify(workspace));state.workspaceStorageError=false;return true}catch{state.workspaceStorageError=true;showToast('Browser storage is full or unavailable. Changes could not be saved.');return false}}
 navPrimary.splice(1,0,['favourites','users','Favourite Classes'],['recent','calendar-days','Recently Viewed']);
 navPrimary.push(['teaching-notes','clipboard-check','My Teaching Notes']);
@@ -831,6 +835,10 @@ function clearDemoOverlays(){
  document.querySelectorAll('#overlay,#modal,#review-dialog,.toast').forEach(el=>el.remove());
 }
 function setDemoRole(role){
+ if(serverIdentity){
+  if(role===null){const form=document.createElement('form');form.method='post';form.action=serverIdentity.logout;const token=document.createElement('input');token.type='hidden';token.name='csrfmiddlewaretoken';token.value=serverIdentity.csrf;form.appendChild(token);document.body.appendChild(form);form.submit()}
+  return;
+ }
  demoRole=role;
  try{if(role)sessionStorage.setItem(DEMO_AUTH_KEY,role);else sessionStorage.removeItem(DEMO_AUTH_KEY)}catch{}
  clearDemoOverlays();state.history=[];profileEditing=false;
@@ -845,6 +853,12 @@ render=function(){
  if(demoRole==='teacher'){
   app.classList.remove('demo-auth-active');document.title='RollFlow | Teacher Portal';
   signedInTeacherRender();
+  if(serverIdentity){
+   document.querySelectorAll('[data-profile-edit]').forEach(el=>el.remove());
+   const note=document.querySelector('.teacher-profile-local');if(note)note.textContent='Account identity is managed by your administrator. The teaching workspace contains fictional data only.';
+   const header=document.querySelector('.top-left');if(header){header.innerHTML='<span class="server-sandbox-label">DEVELOPMENT · FICTIONAL SCHOOL DATA</span>'}
+   const pageBar=document.querySelector('.page-bar');if(pageBar){pageBar.insertAdjacentHTML('beforeend','<span class="server-sandbox-pill">Sample records · browser only</span>')}
+  }
   const utilities=document.querySelector('.nav-utility');
   if(utilities&&!utilities.querySelector('[data-demo-signout]'))utilities.insertAdjacentHTML('beforeend','<button type="button" class="nav-item demo-teacher-signout" data-demo-signout><span class="nav-icon" aria-hidden="true">↪</span><span class="nav-text">Sign out</span></button>');
   return;
@@ -854,7 +868,7 @@ render=function(){
  app.innerHTML=demoRole==='admin'?adminDemoPage():loginPage();
 };
 document.addEventListener('submit',event=>{
- if(event.target.id!=='demo-login-form')return;
+ if(serverIdentity||event.target.id!=='demo-login-form')return;
  event.preventDefault();event.stopImmediatePropagation();
  if(demoRole)return;
  const data=new FormData(event.target),role=checkDemoCredentials(loginMode,String(data.get('username')||''),String(data.get('password')||''));
@@ -869,6 +883,7 @@ document.addEventListener('click',event=>{
  if(show&&!demoRole){event.stopImmediatePropagation();const p=document.getElementById('demo-password');const visible=p.type==='password';p.type=visible?'text':'password';show.textContent=visible?'Hide':'Show';show.setAttribute('aria-label',visible?'Hide password':'Show password');show.setAttribute('aria-pressed',String(visible));return}
 },true);
 
+const serverSandboxStyle=document.createElement('style');serverSandboxStyle.textContent='.server-sandbox-label{font-size:11px;font-weight:bold;letter-spacing:.5px}.server-sandbox-pill{font-size:11px;color:#7c4e08;background:#fff4d9;border:1px solid #e1c58b;padding:5px 8px;border-radius:5px;white-space:nowrap}@media(max-width:850px){.server-sandbox-pill{white-space:normal;font-size:10px}}';document.head.appendChild(serverSandboxStyle);
 const demoAuthStyle=document.createElement('style');demoAuthStyle.textContent="\n#app.demo-auth-active{display:block;overflow:auto;height:100vh;height:100dvh;background:#112332}\n.demo-auth-screen{min-height:100%;display:flex;flex-direction:column;background:radial-gradient(ellipse at 50% 28%,#263f50 0,#112332 68%);color:#fff}\n.demo-auth-top,.demo-admin-top{display:flex;justify-content:space-between;align-items:center;padding:24px 36px;gap:15px}\n.demo-brand{display:flex;align-items:center;gap:11px;color:white}.demo-brand-icon{width:42px;height:42px;border-radius:9px;background:#168a38;color:white;display:grid;place-items:center}.demo-brand-icon svg{width:26px;height:26px}.demo-brand strong{display:block;font-size:25px;line-height:1;letter-spacing:-.7px}.demo-brand small{display:block;color:#b6cbd6;font-size:10px;letter-spacing:1.2px;margin-top:5px}\n.demo-auth-cog,.demo-admin-signout{display:flex;align-items:center;gap:8px;color:#dce9f0;border:1px solid #597282;background:transparent;border-radius:7px;padding:10px 13px;font-weight:600;min-height:44px}.demo-auth-cog svg{width:21px;height:21px}.demo-auth-cog:hover,.demo-admin-signout:hover{background:#2d495a}\n.demo-auth-main{flex:1;display:grid;place-items:center;padding:22px 18px 40px}.demo-auth-card{width:min(100%,420px);background:#fff;color:#233746;border:1px solid #dbe5ea;border-radius:16px;padding:32px;box-shadow:0 12px 44px #06182455}.demo-auth-heading{text-align:center;margin-bottom:27px}.demo-login-symbol{display:grid;place-items:center;width:48px;height:48px;margin:0 auto 15px;border-radius:12px;color:#168a38;background:#e6f4e9}.demo-login-symbol svg{width:25px;height:25px}.demo-auth-heading h1{font-size:25px;line-height:1.2;letter-spacing:-.5px;color:#182f40}.demo-auth-heading p{font-size:12px;color:#657883;margin-top:8px}\n#demo-login-form{display:grid;gap:9px}#demo-login-form label{font-size:13px;font-weight:700;margin-top:6px}#demo-login-form input{width:100%;min-height:46px;border:1px solid #cbd7de;border-radius:7px;background:#fff;color:#203543;padding:12px;font-size:16px}.demo-password-wrap{display:flex;position:relative;align-items:center}.demo-password-wrap input{padding-right:64px!important}.demo-show-password{position:absolute;right:6px;border:0;border-radius:4px;padding:9px 8px;background:#fff;color:#416071;font-size:12px;font-weight:700;min-height:36px}\n.demo-login-submit{background:#168a38;border:1px solid #168a38;color:white;font-weight:700;border-radius:7px;min-height:46px;margin-top:13px;font-size:14px}.demo-login-submit:hover{background:#10702d}.demo-login-submit.admin-submit{background:#112332;border-color:#112332}.demo-login-error{color:#a12730;background:#fff0f0;border-radius:5px;padding:10px;font-size:12px}.demo-login-example{margin-top:20px;padding:12px 13px;border:1px solid #e0e8ec;background:#f6f8fa;border-radius:8px;display:grid;gap:4px;font-size:12px;color:#536874}.demo-login-example strong{color:#253d4b}.demo-login-example code{color:#253d4b;font-weight:700}.demo-return{display:block;margin:17px auto 0;border:0;background:none;color:#127430;font-weight:600;padding:8px}\n.demo-auth-footer{text-align:center;font-size:11px;color:#b8cbd6;padding:16px 20px 23px;line-height:1.6}.demo-auth-footer span{display:block;color:#92a9b7;margin-top:3px}\n.demo-admin-screen{min-height:100%;display:flex;flex-direction:column;background:#eef2f4;color:#233746}.demo-admin-top{background:#112332;padding:18px 30px}.demo-admin-main{flex:1;width:min(100%,1120px);margin:auto;padding:35px 25px;display:grid;align-content:start;gap:20px}.demo-admin-title{display:flex;justify-content:space-between;align-items:center;gap:15px;flex-wrap:wrap}.demo-admin-title h1{font-size:28px;line-height:1.2;color:#152f3e}.demo-admin-title p{color:#657883;margin-top:5px}.demo-admin-title .demo-admin-eyebrow{font-size:10px;letter-spacing:1.3px;font-weight:700;color:#23743b;margin:0 0 7px}.demo-admin-role{font-size:12px;font-weight:600;color:#344e60}.demo-admin-notice{border:1px solid #cad9df;border-left:4px solid #168a38;background:#fff;padding:16px 18px;border-radius:8px}.demo-admin-notice p{margin-top:5px;color:#596f7c}.demo-admin-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.demo-admin-stats article,.demo-admin-section{background:#fff;border:1px solid #dbe4e8;border-radius:10px;padding:20px}.demo-admin-stats p,.demo-admin-section p{color:#657883;font-size:13px}.demo-admin-stats strong{display:block;font-size:27px;margin-top:8px;color:#173747}.demo-admin-section h2{font-size:17px;margin-bottom:5px;color:#203b49}.demo-account-row{border-top:1px solid #e4e9ed;display:grid;grid-template-columns:1fr 1fr 1.2fr;gap:10px;padding:15px 0 4px;margin-top:14px}.demo-admin-screen .demo-auth-footer{background:#112332}\n@media(max-width:640px){.demo-auth-top,.demo-admin-top{padding:15px 16px}.demo-brand strong{font-size:21px}.demo-brand-icon{width:35px;height:35px}.demo-auth-cog{padding:9px}.demo-auth-cog span{font-size:11px}.demo-auth-card{padding:24px}.demo-auth-main{padding:16px 15px 25px}.demo-admin-main{padding:22px 15px}.demo-admin-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.demo-admin-stats article,.demo-admin-section{padding:15px}.demo-account-row{grid-template-columns:1fr 1fr;font-size:12px}.demo-account-row span:last-child{grid-column:1/-1}.demo-admin-title h1{font-size:23px}}\n";document.head.appendChild(demoAuthStyle);
 setInterval(()=>{if(demoRole!=='teacher'||document.hidden||state.modal||state.drawer||document.getElementById('review-dialog'))return;if(state.page==='home'||state.page==='timetable'){if(!document.activeElement?.matches('input,select,textarea,button'))render();return}if(state.page==='roll'){const heading=document.querySelector('.roll-heading');if(heading&&heading.classList.contains('roll-overdue')!==scheduledRollOverdue(getClass()))render()}if(state.page==='movements')document.querySelectorAll('[data-movement-duration]').forEach(el=>{const m=state.movements.find(x=>x.id===el.dataset.movementDuration);if(m){const n=movementDuration(m);el.textContent=n===null?'Duration not recorded':n+' min'}})},30000);
 render();
