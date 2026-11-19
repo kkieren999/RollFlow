@@ -136,23 +136,42 @@ def dated(request, personal=False,admin_only=False):
     year=request.GET.get("year","")
     if year not in [str(y) for y in range(7,13)]:
         year=""
-    filtered=[r for r in rows if (not year or str(r["year"])==year) and query.casefold() in " ".join(str(r[k]) for k in ("code","subject","staff_code","room","period")).casefold()]
+    staff=request.GET.get("staff","").strip()[:250] if not personal else ""
+    room=request.GET.get("room","").strip()[:250]
+    highlight=request.GET.get("highlight")=="1" and not personal
     hide=request.GET.get("breaks")=="hide"
     import re
-    periods=sorted({(r["start"],r["end"],r["period"]) for r in all_rows if not hide or not re.search(r"\b(break|recess|lunch|interval)\b",r["period"],re.I)})
+    from urllib.parse import urlencode
+    periods=sorted({(r["start"],r["end"],r["period"]) for r in rows if not hide or not re.search(r"\b(break|recess|lunch|interval)\b",r["period"],re.I)})
     visible=set(periods)
-    filtered=[r for r in filtered if (r["start"],r["end"],r["period"]) in visible]
+    def matches(r):
+        return ((not year or str(r["year"])==year) and (not staff or r["staff_code"]==staff) and (not room or r["room"]==room) and query.casefold() in " ".join(str(r[k]) for k in ("code","subject","staff_code","room","period")).casefold())
+    filtered=[r for r in rows if (r["start"],r["end"],r["period"]) in visible and matches(r)]
+    shown=[dict(r,match=matches(r)) for r in rows if (r["start"],r["end"],r["period"]) in visible and (highlight or matches(r))]
+    current_time=timezone.localtime().strftime("%H:%M")
+    is_today=day==today
+    def params(**kwargs):
+        base={"date":day.isoformat(),"q":query,"year":year,"staff":staff,"room":room,"breaks":"hide" if hide else "","highlight":"1" if highlight else ""}
+        base.update(kwargs)
+        return "?"+urlencode({k:v for k,v in base.items() if v})
+    for r in shown:
+        r["staff_url"]=params(staff=r["staff_code"],room="",q="",year="",highlight="")
+        r["room_url"]=params(room=r["room"],staff="",q="",year="",highlight="")
+        r["current"]=is_today and r["start"]<=current_time<r["end"]
     groups=[]
+    period_headers=[dict(start=p[0],end=p[1],label=p[2],current=is_today and p[0]<=current_time<p[1]) for p in periods]
     for y in range(7,13):
-        if year and year!=str(y):
+        if not highlight and year and year!=str(y):
             continue
         cells=[]
-        for p in periods:
-            cells.append([r for r in filtered if r["year"]==y and (r["start"],r["end"],r["period"])==p])
+        for p,h in zip(periods,period_headers):
+            cells.append(dict(current=h["current"],entries=[r for r in shown if r["year"]==y and (r["start"],r["end"],r["period"])==p]))
         groups.append({"year":y,"cells":cells})
     monday=day-timedelta(days=day.weekday())
-    tabs=[{"date":(monday+timedelta(days=i)).isoformat(),"label":["Monday","Tuesday","Wednesday","Thursday","Friday"][i]} for i in range(5)]
-    context=dict(live_timetable=settings.ROLLFLOW_LIVE_TIMETABLE,version=version,selected_date=day.isoformat(),day=day,tabs=tabs,periods=periods,groups=groups,rows=filtered,query=query,year=year,years=range(7,13),hide=hide,personal=personal,unlinked=personal and not staff_id,record_exists=record is not None,admin=role=="admin")
+    tabs=[{"date":(monday+timedelta(days=i)).isoformat(),"label":["Monday","Tuesday","Wednesday","Thursday","Friday"][i],"url":params(date=(monday+timedelta(days=i)).isoformat())} for i in range(5)]
+    current_periods=[p for p in period_headers if p["current"]]
+    next_period=next((p for p in period_headers if is_today and p["start"]>current_time),None)
+    context=dict(live_timetable=settings.ROLLFLOW_LIVE_TIMETABLE,version=version,selected_date=day.isoformat(),day=day,tabs=tabs,periods=period_headers,groups=groups,rows=shown if personal else filtered,query=query,year=year,years=range(7,13),hide=hide,personal=personal,unlinked=personal and not staff_id,record_exists=record is not None,admin=role=="admin",staff=staff,room=room,highlight=highlight,has_filter=bool(query or year or staff or room),staff_choices=sorted({r["staff_code"] for r in rows if r["staff_code"]}|({staff} if staff else set())),room_choices=sorted({r["room"] for r in rows if r["room"]}|({room} if room else set())),today_url=params(date=today.isoformat()),prev_url=params(date=(day-timedelta(days=7)).isoformat()),next_url=params(date=(day+timedelta(days=7)).isoformat()),first_url=params(date=version.summary["first_date"]),clear_url=params(q="",year="",staff="",room=""),break_url=params(breaks="" if hide else "hide"),highlight_url=params(highlight="" if highlight else "1"),is_today=is_today,current_periods=current_periods,next_period=next_period)
     if role=="admin":
         return page(request,"master",dated_import=True,**context)
     return render(request,"imported_teacher.html",context)
