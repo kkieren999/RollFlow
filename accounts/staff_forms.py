@@ -67,6 +67,8 @@ class StaffForm(forms.Form):
         cleaned = super().clean()
         if self.target and self.actor and self.target.pk == self.actor.pk:
             cleaned["role"], cleaned["active"] = "admin", True
+        if self.target and cleaned.get("active") and not self.target.has_usable_password():
+            self.add_error("active", "Reset this account's password before activating it.")
         if not self.target and cleaned.get("password"):
             password = cleaned["password"]
             if password != cleaned.get("password_confirm"):
