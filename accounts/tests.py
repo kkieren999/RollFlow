@@ -402,3 +402,16 @@ class OneSchoolImportTests(TestCase):
         self.assertEqual(ImportedTimetable.objects.filter(status="published").count(),1)
         self.client.force_login(self.teacher)
         self.assertRedirects(self.client.get("/teacher/"),"/teacher/timetable/",fetch_redirect_response=False)
+
+
+    @override_settings(ROLLFLOW_LIVE_TIMETABLE=True)
+    def test_operational_import_has_no_fictional_or_draft_controls(self):
+        response=self.client.get("/manage/oneschool/")
+        self.assertContains(response,"Import &amp; publish timetable")
+        self.assertNotContains(response,"Download fictional sample")
+        self.assertNotContains(response,"Validate &amp; create draft")
+        self.assertEqual(self.client.get("/manage/oneschool/sample/").status_code,403)
+        self.assertContains(self.client.get("/manage/master/"),"No timetable published")
+        self.client.force_login(self.teacher)
+        self.assertContains(self.client.get("/teacher/master/"),"No timetable published")
+        self.assertContains(self.client.get("/teacher/timetable/"),"No timetable published")
