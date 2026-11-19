@@ -1075,11 +1075,25 @@ function setDemoRole(role){
  }
  render();
 }
+
+function showPreviewTeacherPlan(){
+ const slots=planning.slots.filter(x=>x.active&&x.teacher==='teacher'&&planning.classes.some(c=>c.code===x.classCode&&c.active)&&planning.rooms.some(r=>r.code===x.room&&r.active));
+ const body='<p>Read-only weekly schedule from the administration planning preview. Roll marking still uses the original fictional timetable.</p>'+planDays.map((day,i)=>{
+ const entries=slots.filter(x=>x.day===i+1).sort((a,b)=>(planning.periods.find(p=>p.code===a.period)?.start||'').localeCompare(planning.periods.find(p=>p.code===b.period)?.start||''));
+ return '<h3 style="margin-top:16px">'+esc(day)+'</h3>'+entries.map(x=>{const p=planning.periods.find(p=>p.code===x.period),c=planning.classes.find(c=>c.code===x.classCode);return '<div class="simple-row"><div><strong>'+esc(x.classCode+' · '+(c?.name||''))+'</strong><span>'+esc((p?.label||'')+' · '+(p?.start||'')+'–'+(p?.end||'')+' · Room '+x.room)+'</span></div></div>'}).join('')+(entries.length?'':'<p>No planned lessons.</p>');
+ }).join('');
+ showReviewDialog('My planned timetable',body);
+}
+document.addEventListener('click',e=>{
+ if(demoRole==='teacher'&&e.target.closest('[data-v33-teacher-plan]')){e.stopImmediatePropagation();showPreviewTeacherPlan()}
+},true);
+
 const signedInTeacherRender=render;
 render=function(){
  if(demoRole==='teacher'){
   app.classList.remove('demo-auth-active');document.title='RollFlow | Teacher Portal';
   signedInTeacherRender();
+  if(state.page==='timetable'){const main=document.querySelector('main');if(main)main.insertAdjacentHTML('afterbegin','<div style="margin-bottom:10px"><button type="button" class="btn small" data-v33-teacher-plan>View planned timetable</button></div>')}
   const utilities=document.querySelector('.nav-utility');
   if(utilities&&!utilities.querySelector('[data-demo-signout]'))utilities.insertAdjacentHTML('beforeend','<button type="button" class="nav-item demo-teacher-signout" data-demo-signout><span class="nav-icon" aria-hidden="true">↪</span><span class="nav-text">Sign out</span></button>');
   return;
