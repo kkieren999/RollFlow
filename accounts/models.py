@@ -102,3 +102,27 @@ class TimetableSlot(models.Model):
             models.UniqueConstraint(fields=["weekday","period","teacher"], condition=models.Q(active=True), name="unique_active_teacher_slot"),
             models.UniqueConstraint(fields=["weekday","period","room"], condition=models.Q(active=True), name="unique_active_room_slot"),
         ]
+
+class ImportedTimetable(models.Model):
+    class Status(models.TextChoices):
+        DRAFT = "draft", "Draft"
+        PUBLISHED = "published", "Published"
+        ARCHIVED = "archived", "Archived"
+    name = models.CharField(max_length=100)
+    digest = models.CharField(max_length=64, unique=True)
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.DRAFT)
+    summary = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+    published_at = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL)
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [models.UniqueConstraint(fields=["status"],condition=models.Q(status="published"),name="single_published_import")]
+
+class ImportedTimetableDay(models.Model):
+    version = models.ForeignKey(ImportedTimetable,on_delete=models.PROTECT,related_name="days")
+    date = models.DateField()
+    allocations = models.JSONField(default=list)
+    class Meta:
+        ordering = ["date"]
+        constraints = [models.UniqueConstraint(fields=["version","date"],name="unique_imported_day")]
