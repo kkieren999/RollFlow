@@ -1,5 +1,5 @@
 from django.urls import path
-from accounts import staff_views, student_views
+from accounts import staff_views, student_views, timetable_views
 
 urlpatterns = [
     path("", staff_views.dashboard, name="management-dashboard"),
@@ -17,5 +17,21 @@ urlpatterns = [
     path("students/<int:pk>/photo/", student_views.photo, name="management-student-photo"),
     path("students/<int:pk>/photo/upload/", student_views.photo_upload, name="management-student-photo-upload"),
     path("students/<int:pk>/photo/remove/", student_views.photo_remove, name="management-student-photo-remove"),
+    path("classes/", timetable_views.classes, name="management-class-directory"),
+    path("classes/add/", timetable_views.class_edit, name="management-class-add"),
+    path("classes/<int:pk>/", timetable_views.class_detail, name="management-class-detail"),
+    path("classes/<int:pk>/edit/", timetable_views.class_edit, name="management-class-edit"),
+    path("classes/<int:pk>/enrol/", timetable_views.enrol, name="management-class-enrol"),
+    path("enrolments/<int:pk>/end/", timetable_views.end_enrolment, name="management-enrolment-end"),
+    path("timetable/", timetable_views.timetable, name="management-timetable"),
+    path("timetable/import/", timetable_views.import_timetable, name="management-timetable-import"),
+    path("timetable/template/", timetable_views.csv_template, name="management-timetable-template"),
+    path("timetable/add/", timetable_views.slot_edit, name="management-slot-add"),
+    path("timetable/<int:pk>/edit/", timetable_views.slot_edit, name="management-slot-edit"),
+    path("timetable/<int:pk>/archive/", timetable_views.slot_cancel, name="management-slot-cancel"),
+    path("rooms/add/", timetable_views.room_edit, name="management-room-add"),
+    path("rooms/<int:pk>/edit/", timetable_views.room_edit, name="management-room-edit"),
+    path("periods/add/", timetable_views.period_edit, name="management-period-add"),
+    path("periods/<int:pk>/edit/", timetable_views.period_edit, name="management-period-edit"),
     path("<str:section>/", staff_views.section, name="management-section"),
 ]
