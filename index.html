@@ -1168,7 +1168,7 @@ function osStrictCsv(raw){
 }
 function osDateValid(d){return typeof d==='string'&&d>='1900-01-01'&&d<='2099-12-31'&&!!d&&studentDateValid(d)}
 function osResetFilters(){osQuery='';osYear='';osStaff='';osRoom='';osCollapsed.clear()}
-function osSetView(personal){if(osPersonal!==personal){osPersonal=personal;osResetFilters();osWide=false}}
+function osSetView(personal){if(osPersonal!==personal){osPersonal=personal;osResetFilters();osWide=false;osHideBreaks=false}}
 function osCoverage(v){const today=brisbaneToday();return today>v.summary.last_date?'Published timetable has expired. Import a timetable covering today.':today<v.summary.first_date?'Published timetable starts in the future.':!v.days[today]?'No imported lessons for today (possibly a non-school day).':''}
 function osCoverageNotice(v){const msg=osCoverage(v);return msg?'<p class="rf-coverage" role="status">'+esc(msg)+'</p>':''}
 const OS_SIGNAL='rollflow_timetable_change_v344';
@@ -1184,7 +1184,7 @@ async function osSync(){
 }
 
 function osParse(raw){
- const rows=osStrictCsv(raw.replace(/^\uFEFF/,'')),header=rows.shift();if(!header||header.join(',')!==osHeader.join(','))throw Error('Column headings do not match the OneSchool Timetable Export.');
+ const rows=osStrictCsv(raw.replace(/^\uFEFF/,'')),header=rows.shift();if(!header||header.length!==osHeader.length||header.some((value,i)=>value!==osHeader[i]))throw Error('Column headings do not match the OneSchool Timetable Export.');
  if(!rows.length||rows.length>150000)throw Error('Imports must contain 1–150,000 rows.');
  const days={},seen=new Set(),classes=new Set(),staff=new Set(),rooms=new Set(),periods=new Set(),codes=new Map(),ids=new Map();const warnings={duplicate_rows:0,missing_staff:0,missing_room:0,staff_overlap:0,room_overlap:0,staff_id_code_conflicts:0};
  function mapSet(map,key,value){if(!map.has(key))map.set(key,new Set());map.get(key).add(value)}
@@ -1280,8 +1280,8 @@ document.addEventListener('click',e=>{
  else if(a==='today'){osDate=brisbaneToday()}
  else if(a==='first-day'){osDate=osPublished()?.summary.first_date||brisbaneToday()}
  else if(a==='staff-lookup'){osStaff=id;osRoom='';osQuery='';osYear='';osHighlight=false}
- else if(a==='room-lookup'){osRoom=id;osStaff='';osQuery='';osYear='';osHighlight=false}
- else if(a==='clear-filters'){osQuery='';osYear='';osStaff='';osRoom=''}
+ else if(a==='room-lookup'){osRoom=id;if(!osPersonal)osStaff='';osQuery='';osYear='';osHighlight=false}
+ else if(a==='clear-filters'){osResetFilters();osHighlight=false}
  else if(a==='compact'){osCompact=!osCompact;polishPrefs.compact=osCompact;polishSave()}
  else if(a==='highlight'){osHighlight=!osHighlight;polishPrefs.highlight=osHighlight;polishSave()}
  else if(a==='wide'){osWide=!osWide}
@@ -1405,7 +1405,7 @@ function setDemoRole(role){
 }
 
 function showPreviewTeacherPlan(){
- if(osPublished()){osSetView(true);state.page='master';render();return}
+ if(osPublished()){osSetView(true);osResetFilters();state.page='master';render();return}
  const slots=planning.slots.filter(x=>x.active&&x.teacher==='teacher'&&planning.classes.some(c=>c.code===x.classCode&&c.active)&&planning.rooms.some(r=>r.code===x.room&&r.active)&&planning.periods.some(p=>p.code===x.period&&p.active!==false));
  const body='<p>Read-only weekly schedule from the administration planning preview. Roll marking still uses the original fictional timetable.</p>'+planDays.map((day,i)=>{
  const entries=slots.filter(x=>x.day===i+1).sort((a,b)=>(planning.periods.find(p=>p.code===a.period)?.start||'').localeCompare(planning.periods.find(p=>p.code===b.period)?.start||''));
