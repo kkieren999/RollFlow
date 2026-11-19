@@ -1,5 +1,11 @@
 # RollFlow — Teacher Edition
 
+## V3.3.1 — Master Timetable
+
+Open **Master Timetable** immediately below My Timetable (teacher) or Timetable Management (administrator). The school-wide grid is generated from the existing fictional planning records, with weekday tabs, period columns, expandable Years 7–12, class/teacher/room search, year filtering, class details, clash flags, free-resource counts and printing. The default day is the current Brisbane weekday, or Monday on weekends. Break columns can be hidden when their period names contain Break, Recess, Lunch or Interval. Removed periods and inactive allocations are excluded. Counts are based on the full day's known active planning resources, not filtered search results.
+
+Administrators can open a class or edit a lesson from its details. Teachers can pin a matching fictional attendance fixture as today's supervision only when the selected lesson matches today's fixture day, period and room; other planning records remain read-only. The browser-local planning preview is separate from attendance. No real school timetable data is included.
+
 ## V3.3 — Class & Timetable Management preview
 
 Sign in with admin / admin and open Class Management or Timetable Management. The fictional planning directory starts with 34 classes and 34 recurring lesson slots. Create/edit classes, select a primary teacher, manage dated student enrolments, schedule lessons, manage rooms and periods, archive slots, and import timetable CSV. Existing sample teachers without a matching staff account retain their fixture display names. New allocations require an active fictional teacher account. Teacher / teacher can view the automatically filtered planning timetable under My Timetable → View planned timetable.
