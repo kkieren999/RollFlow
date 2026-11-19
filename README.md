@@ -1,12 +1,14 @@
 # RollFlow — Teacher Edition
 
-## V3.4.1 — Full-size test import and hosted publishing
+## V3.4.2 — Timetable publication
 
-The public OneSchool Import Centre now supports temporary full-size Test Import (20 MB / 150,000 rows) with masked timetable preview. Only use data your school authorises for local testing. Results are not published or written to localStorage. The public publishing workflow remains fictional. Direct publication of an original school CSV is implemented in the private server version and requires school ICT approval, private HTTPS hosting, PostgreSQL and individual accounts. See the [server branch](https://github.com/kkieren999/RollFlow/tree/v3.0-foundation).
+Open **OneSchool Import Centre** and import the original 15-column CSV (up to 20 MB / 150,000 rows). Enter a version name, confirm authorised use and replacement, and click **Import & publish timetable**. The browser edition validates and masks class, staff and room identifiers and nonstandard period labels before saving a persistent version in IndexedDB. It does not upload the CSV or save the original identities, names, subjects or MISIDs. The dates and bell times are retained. This is a local masked timetable, not a shared school database or full anonymisation guarantee. Use only data approved for this purpose. Previous versions can be reviewed, republished or removed. The former temporary import and sample publishing controls have been removed.
+
+The Master Timetable uses the active local import and the staff timetable filter uses masked aliases; staff-account mapping and attendance remain separate. Individual accounts, original identifiers and school-wide data sharing require the [protected server installation](https://github.com/kkieren999/RollFlow/tree/v3.0-foundation). GitHub Pages cannot host the application server.
 
 ## V3.4 — OneSchool integration and advanced timetable management
 
-Open the public preview with admin / admin, then **OneSchool Import Centre → Load fictional sample**. Review counts/warnings and publish the draft. The Master Timetable changes to the published dated snapshot and the teacher's View planned timetable opens a fictional personal schedule. Try Monday and Tuesday to see different bell times. **Never upload real OneSchool data to the public demo.** Only DEMO-prefixed identifiers and the synthetic names are accepted, with at most 500 rows and five versions. The generated sample has 144 rows across five days. The original staff/student/class management and roll marking workflows remain separate.
+Superseded by the V3.4.2 persistent masked import workflow above. The original fictional attendance fixtures remain separate from imported planning.
 
 Timetable Management now has Overview, Lesson allocations, School periods, Rooms, Versions and Import tabs. The Versions and Import tabs link to the same review/import workflow. Manual periods and slots are separate from imported date-specific periods and allocations; publishing replaces the full imported snapshot, including its date coverage, without changing manual records.
 
