@@ -1,6 +1,7 @@
 from collections import Counter
 from datetime import date, timedelta
 from django import forms
+from django.conf import settings
 from django.contrib import messages
 from django.db import transaction, IntegrityError
 from django.http import HttpResponse, HttpResponseForbidden, HttpResponseBadRequest
@@ -18,6 +19,11 @@ class ImportForm(forms.Form):
     csv=forms.FileField(label="OneSchool timetable CSV")
     fictional=forms.BooleanField(label="I confirm this file contains only fictional or approved de-identified development data.")
 
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args,**kwargs)
+        if settings.ROLLFLOW_LIVE_TIMETABLE:
+            self.fields["fictional"].label="I am authorised to import and publish this OneSchool export in the school-hosted installation."
+
 @administrator
 @require_http_methods(["GET","POST"])
 def centre(request):
@@ -28,18 +34,31 @@ def centre(request):
             if upload.size>MAX_BYTES:
                 raise ValueError("Choose a CSV up to 20 MB.")
             days,summary,digest=parse(upload.read(MAX_BYTES+1))
+            publish_now=request.POST.get("publish_now")=="yes"
+            if publish_now and not settings.ROLLFLOW_LIVE_TIMETABLE:
+                raise ValueError("Direct publication is available only in approved live timetable mode.")
+            if publish_now and request.POST.get("replace_ack")!="yes":
+                raise ValueError("Confirm that this import replaces the entire published timetable.")
             with transaction.atomic():
+                if publish_now:
+                    list(ImportedTimetable.objects.select_for_update().order_by("pk"))
                 version,created=ImportedTimetable.objects.get_or_create(digest=digest,defaults={"name":form.cleaned_data["name"],"summary":summary,"created_by":request.user})
                 if created:
                     ImportedTimetableDay.objects.bulk_create([ImportedTimetableDay(version=version,date=day,allocations=rows) for day,rows in days.items()],batch_size=100)
                     SecurityEvent.objects.create(actor=request.user,event="timetable_import_draft",subject=str(version.pk))
-            messages.success(request,"Draft created." if created else "Identical import already exists. No duplicate version created.")
+                if publish_now and version.status!="published":
+                    ImportedTimetable.objects.filter(status="published").update(status="archived")
+                    version.status="published"
+                    version.published_at=timezone.now()
+                    version.save(update_fields=["status","published_at"])
+                    SecurityEvent.objects.create(actor=request.user,event="timetable_import_publish",subject=str(version.pk))
+            messages.success(request,"Timetable imported and published." if publish_now else ("Draft created." if created else "Identical import already exists. No duplicate version created."))
             return redirect("oneschool-review",pk=version.pk)
         except ValueError as exc:
             form.add_error("csv",str(exc))
         except IntegrityError:
             form.add_error("csv","A concurrent import conflicted. Please retry.")
-    return page(request,"oneschool",import_form=form,versions=ImportedTimetable.objects.all()[:50])
+    return page(request,"oneschool",import_form=form,live_timetable=settings.ROLLFLOW_LIVE_TIMETABLE,versions=ImportedTimetable.objects.all()[:50])
 
 @administrator
 @require_http_methods(["GET"])
@@ -95,7 +114,13 @@ def dated(request, personal=False,admin_only=False):
     version=current_version()
     if not version:
         return redirect("teacher-timetable" if personal else ("management-master" if role=="admin" else "teacher-master"))
-    requested=request.GET.get("date",timezone.localdate().isoformat())
+    today=timezone.localdate()
+    fallback=today.isoformat()
+    if not version.days.filter(date=today).exists():
+        next_day=version.days.filter(date__gte=today).first() or version.days.last()
+        if next_day:
+            fallback=next_day.date.isoformat()
+    requested=request.GET.get("date",fallback)
     try:
         day=date.fromisoformat(requested)
     except ValueError:
@@ -112,7 +137,7 @@ def dated(request, personal=False,admin_only=False):
     filtered=[r for r in rows if (not year or str(r["year"])==year) and query.casefold() in " ".join(str(r[k]) for k in ("code","subject","staff_code","room","period")).casefold()]
     hide=request.GET.get("breaks")=="hide"
     import re
-    periods=sorted({(r["start"],r["end"],r["period"]) for r in all_rows if not hide or not re.search(r"\\b(break|recess|lunch|interval)\\b",r["period"],re.I)})
+    periods=sorted({(r["start"],r["end"],r["period"]) for r in all_rows if not hide or not re.search(r"\b(break|recess|lunch|interval)\b",r["period"],re.I)})
     visible=set(periods)
     filtered=[r for r in filtered if (r["start"],r["end"],r["period"]) in visible]
     groups=[]
