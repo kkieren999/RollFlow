@@ -40,7 +40,7 @@ def consume_attempt(key):
 @require_http_methods(["GET", "POST"])
 def portal_login(request, mode="teacher"):
     if request.method == "GET" and role_for(request.user) == mode:
-        return redirect("rollflow_admin:index" if mode == "admin" else "teacher")
+        return redirect("management-dashboard" if mode == "admin" else "teacher")
     error = ""
     if request.method == "POST":
         username = request.POST.get("username", "").strip()[:150]
@@ -54,7 +54,7 @@ def portal_login(request, mode="teacher"):
             login(request, user)
             LoginWindow.objects.filter(key=key).delete()
             SecurityEvent.objects.create(actor=user, event="login", subject=mode)
-            return redirect("rollflow_admin:index" if mode == "admin" else "teacher")
+            return redirect("management-dashboard" if mode == "admin" else "teacher")
         error = "Incorrect username or password for this portal."
     return render(request, "login.html", {"mode": mode, "error": error})
 
