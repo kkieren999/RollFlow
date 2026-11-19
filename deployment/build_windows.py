@@ -13,18 +13,18 @@ ROOT = Path(__file__).resolve().parents[1]
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--python-runtime", required=True, type=Path,
-                   help="Extracted official CPython 3.12 x64 embeddable distribution")
+                   help="Extracted official CPython 3.13 x64 embeddable distribution")
     p.add_argument("--postgres-runtime", required=True, type=Path,
                    help="Extracted Windows x64 PostgreSQL binary distribution (bin/lib/share)")
     p.add_argument("--output", required=True, type=Path)
     args = p.parse_args()
-    if sys.platform != "win32" or sys.version_info[:2] != (3, 12) or struct.calcsize("P") != 8:
-        p.error("Build using Windows x64 CPython 3.12.")
+    if sys.platform != "win32" or sys.version_info[:2] != (3, 13) or struct.calcsize("P") != 8:
+        p.error("Build using Windows x64 CPython 3.13.")
     out = args.output.resolve()
     if out.exists():
         p.error("Output directory already exists.")
-    if not (args.python_runtime / "python312._pth").is_file():
-        p.error("Expected official CPython 3.12 embeddable runtime.")
+    if not (args.python_runtime / "python313._pth").is_file():
+        p.error("Expected official CPython 3.13 embeddable runtime.")
     if not all((args.postgres_runtime / name).is_dir() for name in ("bin", "lib", "share")):
         p.error("Expected PostgreSQL binary distribution.")
     out.mkdir(parents=True)
@@ -46,8 +46,8 @@ def main():
                     str(wheelhouse), "--only-binary=:all:", "--target",
                     str(out / "python" / "Lib" / "site-packages"),
                     "-r", str(app / "requirements.txt")], check=True)
-    (out / "python" / "python312._pth").write_text(
-        "python312.zip\n.\nLib/site-packages\n../app\nimport site\n", encoding="ascii")
+    (out / "python" / "python313._pth").write_text(
+        "python313.zip\n.\nLib/site-packages\n../app\nimport site\n", encoding="ascii")
     subprocess.run([str(out / "python" / "python.exe"), "-c",
                     "import django, psycopg, waitress, whitenoise, PIL, argon2; print(django.get_version())"],
                    cwd=out, check=True)

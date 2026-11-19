@@ -6,7 +6,7 @@ A local PostgreSQL cluster, Django local accounts, Argon2 password hashes, exist
 
 ## Windows x64 distribution build (release engineer only)
 
-On Windows x64 with full CPython 3.12 and Git, obtain and verify the approved CPython 3.12 x64 embeddable ZIP and the approved PostgreSQL x64 binary distribution; extract each. Use security-supported runtimes and include upstream licence notices and any Microsoft runtime prerequisites. If suitable patched redistributables are not available, qualify another Python version before distribution. Run:
+On Windows x64 with full CPython 3.13 and Git, obtain and verify the approved CPython 3.13 x64 embeddable ZIP and the approved PostgreSQL x64 binary distribution; extract each. Use security-supported runtimes and include upstream licence notices and any Microsoft runtime prerequisites. If suitable patched redistributables are not available, qualify another Python version before distribution. Run:
 
 ```powershell
 python deployment/build_windows.py --python-runtime C:\build\python-embed --postgres-runtime C:\build\pgsql --output C:\build\RollFlow
@@ -25,7 +25,7 @@ Copy the built directory to local storage, not a network share or USB for runnin
 .\python\python.exe -m deployment.native --state D:\RollFlowData start
 ```
 
-School mode requires DEBUG off, specific allowed hostname, PostgreSQL, a per-instance random secret, live timetable mode and a trusted HTTPS gateway. The launcher starts PostgreSQL and Waitress on 127.0.0.1 only; ICT must provide internal DNS, TLS certificate, reverse proxy, network ACLs and dedicated least-privilege OS account. The proxy must overwrite forwarded headers (including X-Forwarded-Proto), preserve the approved Host header and be the only allowed HTTP ingress. Do not expose the application port or database port. Restrict local access because loopback is not a boundary against untrusted local users. Use approved encrypted disks and backups. The private state directory contains credentials, including a distinct database-owner credential; protect with restricted ACLs and never share or commit it. Do not run extracts or use actual student information until departmental approval, security testing and operational features are complete.
+School mode requires DEBUG off, specific allowed hostname, PostgreSQL, a per-instance random secret, live timetable mode and a trusted HTTPS gateway. The launcher starts PostgreSQL and Waitress on 127.0.0.1 only; ICT must provide internal DNS, TLS certificate, reverse proxy, network ACLs and dedicated least-privilege OS account. The proxy must overwrite forwarded headers (including X-Forwarded-Proto), preserve the approved Host header and be the only allowed HTTP ingress. Do not expose the application port or database port. Restrict local access because loopback is not a boundary against untrusted local users. Use approved encrypted disks and backups. The private state directory contains credentials, including a distinct database-owner credential; protect with restricted ACLs and never share or commit it. Restrict access to the state parent before running initialization. The school HTTPS gateway remains a separate ICT-managed component. Do not run extracts or use actual student information until departmental approval, security testing and operational features are complete.
 
 ## Backup and upgrade foundation
 

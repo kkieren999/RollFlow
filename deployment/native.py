@@ -110,6 +110,8 @@ def init(args, state):
     write_private(state / "database-owner.txt", admin_password + "\n")
     with (state / "postgres" / "postgresql.conf").open("a", encoding="utf-8") as f:
         f.write("\nlisten_addresses = '127.0.0.1'\nport = " + str(args.db_port) + "\n")
+        if os.name != "nt":
+            f.write("unix_socket_directories = ''\n")
     with database(cfg):
         import psycopg
         from psycopg import sql
