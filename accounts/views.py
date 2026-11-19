@@ -101,6 +101,9 @@ def teacher_timetable(request):
         return redirect("teacher-login")
     if role != "teacher":
         return HttpResponseForbidden("Teacher access required.")
+    from .oneschool_views import current_version, dated
+    if current_version():
+        return dated(request, personal=True)
     from .timetable_views import active_slots
     from .models import TimetableSlot
     slots = list(active_slots().filter(teacher=request.user))
