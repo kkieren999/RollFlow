@@ -267,11 +267,7 @@ class TimetableManagementTests(TestCase):
         period=SchoolPeriod.objects.get(code="EXTRA")
         slot=TimetableSlot.objects.create(school_class=self.klass,teacher=self.teacher,room=self.room,weekday=1,period=period)
         url=f"/manage/periods/{period.pk}/remove/"
-        self.assertContains(self.client.get(url),"active lesson")
-        self.assertRedirects(self.client.post(url),"/manage/timetable/")
-        period.refresh_from_db()
-        self.assertTrue(period.active)
-        self.client.post(f"/manage/timetable/{slot.pk}/archive/")
+        self.assertContains(self.client.get(url),"1 scheduled lesson(s) will be archived")
         self.assertRedirects(self.client.post(url),"/manage/timetable/")
         period.refresh_from_db()
         self.assertFalse(period.active)
