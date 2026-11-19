@@ -66,7 +66,7 @@ def set_role(user, role):
 @require_http_methods(["GET"])
 def dashboard(request):
     users = User.objects.all()
-    from .oneschool_views import current_version
+    from .oneschool_views import current_version, coverage_message
     version=current_version()
     imported_stats=[]
     if version:
@@ -74,7 +74,7 @@ def dashboard(request):
         current=version.days.filter(date=timezone.localdate()).first()
         rows=current.allocations if current else []
         imported_stats=[("Imported allocations",a.get("lessons",0)),("Imported classes",a.get("classes",0)),("Imported staff IDs",a.get("staff",0)),("Imported rooms",a.get("rooms",0)),("Imported school days",a.get("days",0)),("Today’s allocations",len(rows)),("Today’s classes",len({r["code"] for r in rows}))]
-    return page(request, "dashboard", published_import=version, imported_stats=imported_stats, stats=[
+    return page(request, "dashboard", published_import=version, coverage_warning=coverage_message(version,timezone.localdate()) if version else "", imported_stats=imported_stats, stats=[
         ("Staff accounts", users.count()),
         ("Active staff", users.filter(is_active=True).count()),
         ("Teachers", users.filter(groups__name="Teacher", is_staff=False, is_superuser=False).distinct().count()),
