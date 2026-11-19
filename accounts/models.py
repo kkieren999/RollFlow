@@ -81,6 +81,7 @@ class SchoolPeriod(models.Model):
     label = models.CharField(max_length=50)
     start_time = models.TimeField()
     end_time = models.TimeField()
+    active = models.BooleanField(default=True)
     class Meta:
         ordering = ["start_time"]
         constraints = [models.CheckConstraint(condition=models.Q(end_time__gt=models.F("start_time")), name="school_period_time_order")]
