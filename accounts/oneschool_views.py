@@ -1,5 +1,18 @@
 from collections import Counter
 from datetime import date, timedelta
+MIN_DAY=date(1900,1,1)
+MAX_DAY=date(2099,12,31)
+
+def shift_date(day,days):
+    return min(MAX_DAY,max(MIN_DAY,day+timedelta(days=days)))
+
+def coverage_message(version,today):
+    value=today.isoformat()
+    if value>version.summary["last_date"]:
+        return "Published timetable has expired. Import a timetable covering today."
+    if value<version.summary["first_date"]:
+        return "Published timetable starts in the future."
+    return ""
 from django import forms
 from django.conf import settings
 from django.contrib import messages
@@ -125,6 +138,8 @@ def dated(request, personal=False,admin_only=False):
     requested=request.GET.get("date",fallback)
     try:
         day=date.fromisoformat(requested)
+        if not MIN_DAY<=day<=MAX_DAY:
+            raise ValueError("Date outside supported range")
     except ValueError:
         day=timezone.localdate()
     record=version.days.filter(date=day).first()
@@ -136,7 +151,8 @@ def dated(request, personal=False,admin_only=False):
     year=request.GET.get("year","")
     if year not in [str(y) for y in range(7,13)]:
         year=""
-    staff=request.GET.get("staff","").strip()[:250] if not personal else ""
+    staff=request.GET.get("staff","").strip().upper()[:250] if not personal else ""
+    staff_key=request.GET.get("staff_id","").strip().upper()[:250] if not personal else ""
     room=request.GET.get("room","").strip()[:250]
     highlight=request.GET.get("highlight")=="1" and not personal
     hide=request.GET.get("breaks")=="hide"
@@ -145,18 +161,18 @@ def dated(request, personal=False,admin_only=False):
     periods=sorted({(r["start"],r["end"],r["period"]) for r in rows if not hide or not re.search(r"\b(break|recess|lunch|interval)\b",r["period"],re.I)})
     visible=set(periods)
     def matches(r):
-        return ((not year or str(r["year"])==year) and (not staff or r["staff_code"]==staff) and (not room or r["room"]==room) and query.casefold() in " ".join(str(r[k]) for k in ("code","subject","staff_code","room","period")).casefold())
+        return ((not year or str(r["year"])==year) and (not staff or r["staff_code"].upper()==staff) and (not staff_key or r["staff_id"].upper()==staff_key) and (not room or r["room"]==room) and query.casefold() in " ".join(str(r[k]) for k in ("code","subject","staff_code","room","period")).casefold())
     filtered=[r for r in rows if (r["start"],r["end"],r["period"]) in visible and matches(r)]
     shown=[dict(r,match=matches(r)) for r in rows if (r["start"],r["end"],r["period"]) in visible and (highlight or matches(r))]
     current_time=timezone.localtime().strftime("%H:%M")
     is_today=day==today
     def params(**kwargs):
-        base={"date":day.isoformat(),"q":query,"year":year,"staff":staff,"room":room,"breaks":"hide" if hide else "","highlight":"1" if highlight else ""}
+        base={"date":day.isoformat(),"q":query,"year":year,"staff":staff,"staff_id":staff_key,"room":room,"breaks":"hide" if hide else "","highlight":"1" if highlight else ""}
         base.update(kwargs)
         return "?"+urlencode({k:v for k,v in base.items() if v})
     for r in shown:
-        r["staff_url"]=params(staff=r["staff_code"],room="",q="",year="",highlight="")
-        r["room_url"]=params(room=r["room"],staff="",q="",year="",highlight="")
+        r["staff_url"]=params(staff="" if r["staff_id"] else r["staff_code"],staff_id=r["staff_id"],room="",q="",year="",highlight="")
+        r["room_url"]=params(room=r["room"],staff="",staff_id="",q="",year="",highlight="")
         r["current"]=is_today and r["start"]<=current_time<r["end"]
     groups=[]
     period_headers=[dict(start=p[0],end=p[1],label=p[2],current=is_today and p[0]<=current_time<p[1]) for p in periods]
@@ -167,11 +183,11 @@ def dated(request, personal=False,admin_only=False):
         for p,h in zip(periods,period_headers):
             cells.append(dict(current=h["current"],entries=[r for r in shown if r["year"]==y and (r["start"],r["end"],r["period"])==p]))
         groups.append({"year":y,"cells":cells})
-    monday=day-timedelta(days=day.weekday())
-    tabs=[{"date":(monday+timedelta(days=i)).isoformat(),"label":["Monday","Tuesday","Wednesday","Thursday","Friday"][i],"url":params(date=(monday+timedelta(days=i)).isoformat())} for i in range(5)]
+    monday=shift_date(day,-day.weekday())
+    tabs=[{"date":shift_date(monday,i).isoformat(),"label":["Monday","Tuesday","Wednesday","Thursday","Friday"][i],"url":params(date=shift_date(monday,i).isoformat())} for i in range(5)]
     current_periods=[p for p in period_headers if p["current"]]
     next_period=next((p for p in period_headers if is_today and p["start"]>current_time),None)
-    context=dict(live_timetable=settings.ROLLFLOW_LIVE_TIMETABLE,version=version,selected_date=day.isoformat(),day=day,tabs=tabs,periods=period_headers,groups=groups,rows=shown if personal else filtered,query=query,year=year,years=range(7,13),hide=hide,personal=personal,unlinked=personal and not staff_id,record_exists=record is not None,admin=role=="admin",staff=staff,room=room,highlight=highlight,has_filter=bool(query or year or staff or room),staff_choices=sorted({r["staff_code"] for r in rows if r["staff_code"]}|({staff} if staff else set())),room_choices=sorted({r["room"] for r in rows if r["room"]}|({room} if room else set())),today_url=params(date=today.isoformat()),prev_url=params(date=(day-timedelta(days=7)).isoformat()),next_url=params(date=(day+timedelta(days=7)).isoformat()),first_url=params(date=version.summary["first_date"]),clear_url=params(q="",year="",staff="",room=""),break_url=params(breaks="" if hide else "hide"),highlight_url=params(highlight="" if highlight else "1"),is_today=is_today,current_periods=current_periods,next_period=next_period)
+    context=dict(live_timetable=settings.ROLLFLOW_LIVE_TIMETABLE,version=version,selected_date=day.isoformat(),day=day,tabs=tabs,periods=period_headers,groups=groups,rows=shown if personal else filtered,query=query,year=year,years=range(7,13),hide=hide,personal=personal,unlinked=personal and not staff_id,record_exists=record is not None,admin=role=="admin",staff=staff,room=room,highlight=highlight,has_filter=bool(query or year or staff or staff_key or room),staff_key=staff_key,visible_count=sum(1 for r in rows if (r["start"],r["end"],r["period"]) in visible),coverage_warning=coverage_message(version,today),staff_choices=sorted({r["staff_code"] for r in rows if r["staff_code"]}|({staff} if staff else set())),room_choices=sorted({r["room"] for r in rows if r["room"]}|({room} if room else set())),today_url=params(date=today.isoformat()),prev_url=params(date=shift_date(day,-7).isoformat()),next_url=params(date=shift_date(day,7).isoformat()),first_url=params(date=version.summary["first_date"]),clear_url=params(q="",year="",staff="",staff_id="",room=""),break_url=params(breaks="" if hide else "hide"),highlight_url=params(highlight="" if highlight else "1"),is_today=is_today,current_periods=current_periods,next_period=next_period)
     if role=="admin":
         return page(request,"master",dated_import=True,**context)
     return render(request,"imported_teacher.html",context)
