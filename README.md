@@ -1,5 +1,13 @@
 # RollFlow — Teacher Edition
 
+## V3.4 — OneSchool integration and advanced timetable management
+
+Open the public preview with admin / admin, then **OneSchool Import Centre → Load fictional sample**. Review counts/warnings and publish the draft. The Master Timetable changes to the published dated snapshot and the teacher's View planned timetable opens a fictional personal schedule. Try Monday and Tuesday to see different bell times. **Never upload real OneSchool data to the public demo.** Only DEMO-prefixed identifiers and the synthetic names are accepted, with at most 500 rows and five versions. The generated sample has 144 rows across five days. The original staff/student/class management and roll marking workflows remain separate.
+
+Timetable Management now has Overview, Lesson allocations, School periods, Rooms, Versions and Import tabs. The Versions and Import tabs link to the same review/import workflow. Manual periods and slots are separate from imported date-specific periods and allocations; publishing replaces the full imported snapshot, including its date coverage, without changing manual records.
+
+See the [V3 development branch](https://github.com/kkieren999/RollFlow/tree/v3.0-foundation) for the full-size server importer and setup instructions.
+
 ## V3.3.1 — Master Timetable
 
 Open **Master Timetable** immediately below My Timetable (teacher) or Timetable Management (administrator). The school-wide grid is generated from the existing fictional planning records, with weekday tabs, period columns, expandable Years 7–12, class/teacher/room search, year filtering, class details, clash flags, free-resource counts and printing. The default day is the current Brisbane weekday, or Monday on weekends. Break columns can be hidden when their period names contain Break, Recess, Lunch or Interval. Removed periods and inactive allocations are excluded. Counts are based on the full day's known active planning resources, not filtered search results.
