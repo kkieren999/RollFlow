@@ -1,5 +1,13 @@
 # RollFlow — Teacher Edition
 
+## V3.1 — Administration Portal preview
+
+Select the settings cog on the public login screen and enter `admin / admin`. The admin dashboard and permanent navigation include staff management, local activity, CSV import and role descriptions. Other school-management modules are labelled as planned.
+
+Staff directory changes (add, edit, activate/deactivate, draft class allocations and simulated password resets) persist only in this browser. Fixed demo logins remain protected and additional fictional records do not create working logins. CSV imports use the exact UTF-8 header `staff_id,username,first_name,last_name,faculty,campus` and create inactive fictional teacher records. No passwords are stored by the preview. The teacher login remains `teacher / teacher`.
+
+For the database-backed staff interface, see the [V3 development branch](https://github.com/kkieren999/RollFlow/tree/v3.0-foundation). Never enter real staff or student information into this demonstration.
+
 ## V3 — Demo sign-in preview
 
 The public GitHub Pages demonstration now opens with a sign-in page. Use **teacher / teacher** for the Teacher Portal, or select the settings cog and use **admin / admin** for the separate administrator overview. Sign out to switch accounts. A tab-local session flag is stored in sessionStorage; existing fictional records remain in localStorage.
