@@ -1,5 +1,13 @@
 # RollFlow V3.0 — School application foundation
 
+## V3.4.1 — Direct timetable publishing
+
+The GitHub Pages site remains fictional. Its temporary Test Import accepts the original CSV structure up to 20 MB/150,000 rows, displays masked identifiers and does not publish or retain test results. Use school-approved data only.
+
+For actual school timetable publishing, school ICT must provision a private HTTPS application host and PostgreSQL database, approve access, confidentiality and retention controls, run the migrations and entire test suite, and provision individual staff accounts. Set the non-debug configuration variables documented below, a randomly generated secret of at least 50 characters, and `ROLLFLOW_LIVE_TIMETABLE=1` only on that approved installation. Never use the demo credentials or commit real exports. The new flag rejects debug/SQLite configurations. It does not itself establish approval, secure hosting or production readiness.
+
+Administrators can then select OneSchool Import Centre, enter a version name, choose the original full-size CSV, confirm authorisation and acknowledge full-snapshot replacement, and select Import & publish timetable. The original rows are validated before any publication; earlier published snapshots are retained. Review mode remains available. Teachers see the published timetable rather than fictional attendance when live mode is enabled. Class memberships, live roll marking and OneSchool write-back are not implemented. This release is a timetable-only pilot candidate, not a certified attendance system.
+
 ## V3.4 — OneSchool integration and advanced timetable management
 
 Install requirements and run `python manage.py migrate` and `python manage.py test accounts`. Sign in as an administrator and open OneSchool Import Centre. Download the synthetic sample or use an approved de-identified CSV. The importer supports the 15-column OneSchool Timetable Export (UTF-8 CSV, DD/MM/YYYY, Mon–Fri, 24-hour HH:MM; 20 MB/150,000 rows maximum). No original export, MISID or staff names are retained; class/subject/year, date, period/times, staff ID/code and room code/name are stored in a protected date-indexed snapshot. Overlapping allocations and missing resources are warned about, not automatically rejected. Exact normalized duplicates are dropped; repeat identical snapshots reuse the existing version.
