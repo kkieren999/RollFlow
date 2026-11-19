@@ -183,3 +183,79 @@ class StudentManagementTests(TestCase):
         c = Client(enforce_csrf_checks=True)
         c.force_login(self.admin)
         self.assertEqual(c.post("/manage/students/add/", self.details()).status_code, 403)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, SESSION_COOKIE_SECURE=False, CSRF_COOKIE_SECURE=False)
+class TimetableManagementTests(TestCase):
+    def setUp(self):
+        from .models import SchoolClass, SchoolPeriod, Room, Student
+        self.admin = User.objects.create_superuser("planadmin", password="Fictional-admin-passphrase-99")
+        self.teacher = User.objects.create_user("planteacher", password="Fictional-teacher-passphrase-98")
+        self.other = User.objects.create_user("otherteacher", password="Fictional-teacher-passphrase-97")
+        group = Group.objects.get(name="Teacher")
+        self.teacher.groups.add(group)
+        self.other.groups.add(group)
+        self.klass = SchoolClass.objects.create(code="DEMO101",name="Mathematics",subject="Maths",year_level=10,teacher=self.teacher)
+        self.other_class = SchoolClass.objects.create(code="DEMO102",name="Science",subject="Science",year_level=10,teacher=self.other)
+        self.room = Room.objects.create(code="M01")
+        self.room2 = Room.objects.create(code="S01")
+        self.period = SchoolPeriod.objects.get(code="1")
+        self.student = Student.objects.create(student_id="PLAN1",first_name="Sample",last_name="Learner",year_level=10)
+        self.client.force_login(self.admin)
+
+    def slot(self, **extra):
+        return {"school_class":self.klass.pk,"teacher":self.teacher.pk,"room":self.room.pk,"weekday":"1","period":self.period.pk,"active":"on",**extra}
+
+    def test_class_directory_and_edit(self):
+        self.assertContains(self.client.get("/manage/classes/"),"DEMO101")
+        self.assertRedirects(self.client.post(f"/manage/classes/{self.klass.pk}/edit/",{"code":"CHANGED","name":"Maths A","subject":"Maths","year_level":"10","teacher":self.teacher.pk,"active":"on"}),f"/manage/classes/{self.klass.pk}/")
+        self.klass.refresh_from_db()
+        self.assertEqual(self.klass.code,"DEMO101")
+        self.assertEqual(self.klass.name,"Maths A")
+
+    def test_enrolment_history(self):
+        from .models import ClassEnrolment
+        url=f"/manage/classes/{self.klass.pk}/enrol/"
+        data={"student":self.student.pk,"start_date":"2026-01-27"}
+        self.assertRedirects(self.client.post(url,data),f"/manage/classes/{self.klass.pk}/")
+        e=ClassEnrolment.objects.get(school_class=self.klass,student=self.student)
+        self.assertEqual(self.client.post(url,data).status_code,200)
+        self.assertRedirects(self.client.post(f"/manage/enrolments/{e.pk}/end/",{"end_date":"2026-06-30"}),f"/manage/classes/{self.klass.pk}/")
+        self.assertRedirects(self.client.post(url,{"student":self.student.pk,"start_date":"2026-07-01"}),f"/manage/classes/{self.klass.pk}/")
+        self.assertEqual(ClassEnrolment.objects.filter(student=self.student).count(),2)
+
+    def test_conflicts_and_archive(self):
+        from .models import TimetableSlot
+        url="/manage/timetable/add/"
+        self.assertRedirects(self.client.post(url,self.slot()),"/manage/timetable/")
+        for data in (self.slot(school_class=self.other_class.pk,room=self.room2.pk),self.slot(school_class=self.other_class.pk,teacher=self.other.pk),self.slot(teacher=self.other.pk,room=self.room2.pk)):
+            self.assertEqual(self.client.post(url,data).status_code,200)
+        self.assertEqual(TimetableSlot.objects.count(),1)
+        slot=TimetableSlot.objects.get()
+        self.assertRedirects(self.client.post(f"/manage/timetable/{slot.pk}/archive/"),"/manage/timetable/")
+        self.assertRedirects(self.client.post(url,self.slot()),"/manage/timetable/")
+        self.assertEqual(TimetableSlot.objects.count(),2)
+
+    def test_teacher_read_only_timetable(self):
+        from .models import TimetableSlot
+        TimetableSlot.objects.create(school_class=self.klass,teacher=self.teacher,room=self.room,weekday=1,period=self.period)
+        TimetableSlot.objects.create(school_class=self.other_class,teacher=self.other,room=self.room2,weekday=1,period=self.period)
+        self.client.force_login(self.teacher)
+        response=self.client.get("/teacher/timetable/")
+        self.assertContains(response,"DEMO101")
+        self.assertNotContains(response,"DEMO102")
+        self.assertEqual(self.client.get("/manage/classes/").status_code,403)
+        self.assertEqual(self.client.post("/manage/timetable/add/",self.slot()).status_code,403)
+
+    def test_csv_rejects_entire_import_on_unknown_reference(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from .models import TimetableSlot
+        data=b"class_code,teacher_username,room_code,weekday,period_code\nDEMO101,planteacher,M01,1,1\nUNKNOWN,planteacher,M01,2,1\n"
+        self.assertEqual(self.client.post("/manage/timetable/import/",{"csv":SimpleUploadedFile("timetable.csv",data)}).status_code,200)
+        self.assertEqual(TimetableSlot.objects.count(),0)
+
+    def test_csrf_and_period_overlap(self):
+        c=Client(enforce_csrf_checks=True)
+        c.force_login(self.admin)
+        self.assertEqual(c.post("/manage/timetable/add/",self.slot()).status_code,403)
+        self.assertEqual(self.client.post("/manage/periods/add/",{"code":"EXTRA","label":"Extra","start_time":"09:30","end_time":"10:00"}).status_code,200)
