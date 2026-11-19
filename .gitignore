@@ -1,0 +1,14 @@
+.env
+.env.*
+!.env.example
+.local-data/
+.collected-static/
+*.sqlite3
+*.db
+*.pem
+*.key
+__pycache__/
+*.py[cod]
+.venv/
+backups/
+private-data/
