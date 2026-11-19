@@ -446,3 +446,49 @@ class OneSchoolImportTests(TestCase):
         self.assertEqual(self.client.get("/manage/staff/?sort=not_a_field").status_code,200)
         self.assertEqual(self.client.get("/manage/students/?sort=not_a_field").status_code,200)
         self.assertEqual(self.client.get("/manage/classes/?sort=not_a_field").status_code,200)
+
+
+    def test_v344_identity_and_strict_quoting(self):
+        from .oneschool_csv import parse
+        source=self.csv()
+        _,summary,digest=parse(source)
+        self.assertEqual(summary["source_rows"],2)
+        self.assertEqual(parse(source)[2],digest)
+        self.assertNotEqual(parse(source.replace(b"DEMO071A",b"DEMO071B"))[2],digest)
+        repeated=source+source.splitlines(keepends=True)[1]
+        _,repeat_summary,repeat_digest=parse(repeated)
+        self.assertEqual(repeat_summary["source_rows"],3)
+        self.assertEqual(repeat_summary["lessons"],2)
+        self.assertEqual(repeat_summary["warnings"]["duplicate_rows"],1)
+        self.assertNotEqual(repeat_digest,digest)
+        with self.assertRaises(ValueError):
+            parse(source.replace(b"DEMO071A",b'DEMO"071A"'))
+        with self.assertRaises(ValueError):
+            parse(source.replace(b"DEMO071A",b'"DEMO071A"x'))
+        with self.assertRaises(ValueError):
+            parse(source.replace(b"23/11/2026",b"23/11/9999"))
+
+    def test_v344_date_limits_and_visible_counts(self):
+        from .models import ImportedTimetable
+        self.upload(self.csv("DEMO072B,Science,07,Mon,23/11/2026,FIRST BREAK 1,10:00,10:15,DEMO03,,DEMOC,Example,Teacher,M03,Sample room\\n".replace("\\n","\n")))
+        v=ImportedTimetable.objects.get()
+        self.client.post(f"/manage/oneschool/{v.pk}/publish/",{"ack":"yes"})
+        response=self.client.get("/manage/master/?date=2026-11-23&breaks=hide")
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(response.context["visible_count"],1)
+        self.assertContains(response,"1 of 1 visible allocations match")
+        self.assertEqual(self.client.get("/manage/master/?date=9999-12-31").status_code,200)
+        self.assertEqual(self.client.get("/manage/master/?date=0001-01-01").status_code,200)
+        self.assertEqual(self.client.get("/manage/master/?date=2099-12-31").status_code,200)
+        self.assertContains(self.client.get("/manage/master/?date=2026-11-23&staff_id=DEMO01"),"DEMO071A")
+        self.assertNotContains(self.client.get("/manage/master/?date=2026-11-23&staff_id=DEMO02"),"DEMO071A")
+
+    def test_v344_coverage_message(self):
+        from datetime import date
+        from types import SimpleNamespace
+        from .oneschool_views import coverage_message,shift_date
+        v=SimpleNamespace(summary={"first_date":"2026-02-02","last_date":"2026-10-30"})
+        self.assertIn("expired",coverage_message(v,date(2026,11,20)))
+        self.assertIn("future",coverage_message(v,date(2026,1,1)))
+        self.assertEqual(coverage_message(v,date(2026,3,1)),"")
+        self.assertEqual(shift_date(date(2099,12,31),7),date(2099,12,31))
