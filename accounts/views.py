@@ -66,6 +66,8 @@ def teacher(request):
         return redirect("teacher-login")
     if role != "teacher":
         return HttpResponseForbidden("Use a teacher account to open the Teacher Portal.")
+    if settings.ROLLFLOW_LIVE_TIMETABLE:
+        return redirect("teacher-timetable")
     user = request.user
     profile = getattr(user, "staff_profile", None)
     identity = {
