@@ -280,3 +280,27 @@ class TimetableManagementTests(TestCase):
         self.assertFalse(slot.active)
         self.client.force_login(self.teacher)
         self.assertEqual(self.client.post(url).status_code,403)
+
+
+    def test_master_timetable_access_filters_and_resources(self):
+        from .models import TimetableSlot, SchoolPeriod
+        slot=TimetableSlot.objects.create(school_class=self.klass,teacher=self.teacher,room=self.room,weekday=1,period=self.period)
+        TimetableSlot.objects.create(school_class=self.other_class,teacher=self.other,room=self.room2,weekday=2,period=self.period)
+        response=self.client.get("/manage/master/?day=1")
+        self.assertContains(response,"Master Timetable")
+        self.assertContains(response,"DEMO101")
+        self.assertNotContains(response,"DEMO102")
+        self.assertContains(response,"Staff clashes")
+        self.assertContains(response,"Free resources")
+        self.assertContains(self.client.get("/manage/master/?day=1&year=10&slot="+str(slot.pk)),"Edit lesson")
+        self.assertNotContains(self.client.get("/manage/master/?day=1&q=nomatch"),"DEMO101")
+        self.assertNotContains(self.client.get("/manage/master/?day=1&year=7"),"DEMO101")
+        break_period=SchoolPeriod.objects.create(code="BREAKX",label="First break",start_time="08:50",end_time="09:00")
+        self.assertContains(self.client.get("/manage/master/?day=1"),"First break")
+        self.assertNotContains(self.client.get("/manage/master/?day=1&breaks=hide"),"<strong>First break</strong>",html=True)
+        self.client.force_login(self.teacher)
+        self.assertContains(self.client.get("/teacher/master/?day=2"),"DEMO102")
+        self.assertNotContains(self.client.get("/teacher/master/?day=1&slot="+str(slot.pk)),"Edit lesson")
+        self.assertEqual(self.client.get("/manage/master/").status_code,403)
+        self.client.logout()
+        self.assertRedirects(self.client.get("/teacher/master/"),"/")
