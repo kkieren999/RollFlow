@@ -104,13 +104,17 @@ def dated(request, personal=False,admin_only=False):
     all_rows=record.allocations if record else []
     profile=getattr(request.user,"staff_profile",None)
     staff_id=profile.staff_id if personal and profile else None
-    rows=[r for r in all_rows if not personal or bool(staff_id) and r["staff_id"]==staff_id]
+    rows=[r for r in all_rows if not personal or bool(staff_id) and r["staff_id"].casefold()==staff_id.casefold()]
     query=request.GET.get("q","").strip()[:150]
     year=request.GET.get("year","")
     if year not in [str(y) for y in range(7,13)]:
         year=""
     filtered=[r for r in rows if (not year or str(r["year"])==year) and query.casefold() in " ".join(str(r[k]) for k in ("code","subject","staff_code","room","period")).casefold()]
-    periods=sorted({(r["start"],r["end"],r["period"]) for r in all_rows})
+    hide=request.GET.get("breaks")=="hide"
+    import re
+    periods=sorted({(r["start"],r["end"],r["period"]) for r in all_rows if not hide or not re.search(r"\\b(break|recess|lunch|interval)\\b",r["period"],re.I)})
+    visible=set(periods)
+    filtered=[r for r in filtered if (r["start"],r["end"],r["period"]) in visible]
     groups=[]
     for y in range(7,13):
         if year and year!=str(y):
@@ -121,7 +125,7 @@ def dated(request, personal=False,admin_only=False):
         groups.append({"year":y,"cells":cells})
     monday=day-timedelta(days=day.weekday())
     tabs=[{"date":(monday+timedelta(days=i)).isoformat(),"label":["Monday","Tuesday","Wednesday","Thursday","Friday"][i]} for i in range(5)]
-    context=dict(version=version,selected_date=day.isoformat(),day=day,tabs=tabs,periods=periods,groups=groups,rows=filtered,query=query,year=year,years=range(7,13),personal=personal,unlinked=personal and not staff_id,record_exists=record is not None,admin=role=="admin")
+    context=dict(version=version,selected_date=day.isoformat(),day=day,tabs=tabs,periods=periods,groups=groups,rows=filtered,query=query,year=year,years=range(7,13),hide=hide,personal=personal,unlinked=personal and not staff_id,record_exists=record is not None,admin=role=="admin")
     if role=="admin":
         return page(request,"master",dated_import=True,**context)
     return render(request,"imported_teacher.html",context)
