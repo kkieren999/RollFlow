@@ -1,7 +1,7 @@
 <script>
 (function(){
  document.querySelectorAll('.table-wrap > table').forEach((table,index)=>{
-  if(table.closest('.rf-dated')||!table.tHead||table.tHead.rows.length!==1||table.tBodies.length!==1)return;
+  if(table.querySelector('thead a.rf-sort')||table.closest('.rf-dated')||!table.tHead||table.tHead.rows.length!==1||table.tBodies.length!==1)return;
   const body=table.tBodies[0],rows=Array.from(body.rows),heads=Array.from(table.tHead.rows[0].cells);
   if(!rows.length||rows.some(r=>r.cells.length!==heads.length||Array.from(r.cells).some(c=>c.colSpan!==1)))return;
   let q='',sort=-1,dir=1,page=0,size=25;
