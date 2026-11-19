@@ -94,12 +94,12 @@ def end_enrolment(request,pk):
 def timetable(request):
     teacher=request.GET.get("teacher","")
     weekday=request.GET.get("day","")
-    slots=TimetableSlot.objects.select_related("school_class","teacher","room","period")
+    slots=TimetableSlot.objects.filter(period__active=True).select_related("school_class","teacher","room","period")
     if teacher.isdigit():
         slots=slots.filter(teacher_id=int(teacher))
     if weekday in ["1","2","3","4","5"]:
         slots=slots.filter(weekday=int(weekday))
-    return page(request,"timetable",slots=slots,rooms=Room.objects.order_by("code"),periods=SchoolPeriod.objects.all(),teacher_options=teachers(),teacher_filter=teacher,day_filter=weekday,days=TimetableSlot._meta.get_field("weekday").choices,import_form=TimetableImportForm())
+    return page(request,"timetable",slots=slots,rooms=Room.objects.order_by("code"),periods=SchoolPeriod.objects.filter(active=True),teacher_options=teachers(),teacher_filter=teacher,day_filter=weekday,days=TimetableSlot._meta.get_field("weekday").choices,import_form=TimetableImportForm())
 
 def save_editor(request,form_class,model,pk,title,section="timetable",initial=None):
     record=get_object_or_404(model,pk=pk) if pk else None
