@@ -35,6 +35,6 @@ urlpatterns = [
     path("periods/<int:pk>/edit/", timetable_views.period_edit, name="management-period-edit"),
     path("periods/<int:pk>/remove/", timetable_views.period_remove, name="management-period-remove"),
     path("periods/<int:pk>/restore/", timetable_views.period_restore, name="management-period-restore"),
-    path("master/", master_views.master, name="management-master"),
+    path("master/", master_views.master, {"admin_only": True}, name="management-master"),
     path("<str:section>/", staff_views.section, name="management-section"),
 ]
