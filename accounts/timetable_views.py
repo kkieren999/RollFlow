@@ -94,9 +94,10 @@ def end_enrolment(request,pk):
 def timetable(request):
     teacher=request.GET.get("teacher","")
     weekday=request.GET.get("day","")
-    tab=request.GET.get("tab","lessons" if "day" in request.GET or "teacher" in request.GET else "overview")
+    tab=request.GET.get("tab","lessons" if "day" in request.GET or "teacher" in request.GET else request.session.get("timetable_tab","overview"))
     if tab not in ("overview","lessons","rooms","periods","versions","import"):
         tab="overview"
+    request.session["timetable_tab"]=tab
     from .oneschool_views import current_version
     version=current_version()
     slots=TimetableSlot.objects.filter(period__active=True).select_related("school_class","teacher","room","period")
