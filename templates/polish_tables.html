@@ -1,0 +1,15 @@
+<script>
+(function(){
+ document.querySelectorAll('.table-wrap > table').forEach((table,index)=>{
+  if(table.closest('.rf-dated')||!table.tHead||table.tHead.rows.length!==1||table.tBodies.length!==1)return;
+  const body=table.tBodies[0],rows=Array.from(body.rows),heads=Array.from(table.tHead.rows[0].cells);
+  if(!rows.length||rows.some(r=>r.cells.length!==heads.length||Array.from(r.cells).some(c=>c.colSpan!==1)))return;
+  let q='',sort=-1,dir=1,page=0,size=25;
+  const bar=document.createElement('div');bar.className='rf-table-controls';bar.innerHTML='<label>Filter displayed records<input type="search" placeholder="Search records"></label><label>Rows per page<select><option value="25">25</option><option value="50">50</option><option value="100">100</option></select></label><span class="rf-table-count" role="status"></span><button class="btn" type="button" data-prev>Previous</button><button class="btn" type="button" data-next>Next</button>';
+  table.parentElement.before(bar);const input=bar.querySelector('input'),select=bar.querySelector('select'),prev=bar.querySelector('[data-prev]'),next=bar.querySelector('[data-next]'),count=bar.querySelector('.rf-table-count');
+  heads.forEach((th,j)=>{const label=th.textContent.trim();if(!label||/action|edit/i.test(label))return;const b=document.createElement('button');b.type='button';b.className='rf-sort';b.textContent=label;b.addEventListener('click',()=>{if(sort===j)dir*=-1;else{sort=j;dir=1}page=0;apply()});th.replaceChildren(b)});
+  function apply(){const matching=rows.filter(r=>!q||r.textContent.toLowerCase().includes(q));if(sort>=0)matching.sort((a,b)=>a.cells[sort].textContent.trim().localeCompare(b.cells[sort].textContent.trim(),'en-AU',{numeric:true,sensitivity:'base'})*dir);const last=Math.max(0,Math.ceil(matching.length/size)-1);page=Math.min(Math.max(0,page),last);const visible=matching.slice(page*size,(page+1)*size),set=new Set(visible);rows.forEach(r=>r.hidden=!set.has(r));visible.forEach(r=>body.appendChild(r));heads.forEach((h,j)=>{h.removeAttribute('aria-sort');if(j===sort)h.setAttribute('aria-sort',dir===1?'ascending':'descending')});count.textContent=matching.length?(page*size+1)+'–'+Math.min((page+1)*size,matching.length)+' of '+matching.length+' displayed records':'0 matching displayed records';prev.disabled=page===0;next.disabled=page===last}
+  input.addEventListener('input',()=>{q=input.value.trim().toLowerCase();page=0;apply()});select.addEventListener('change',()=>{size=Number(select.value);page=0;apply()});prev.addEventListener('click',()=>{page--;apply()});next.addEventListener('click',()=>{page++;apply()});apply();
+ });
+})();
+</script>
