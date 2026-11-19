@@ -415,3 +415,34 @@ class OneSchoolImportTests(TestCase):
         self.client.force_login(self.teacher)
         self.assertContains(self.client.get("/teacher/master/"),"No timetable published")
         self.assertContains(self.client.get("/teacher/timetable/"),"No timetable published")
+
+
+    def test_published_dashboard_and_master_lookup(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from .models import ImportedTimetable
+        self.upload(self.csv())
+        v=ImportedTimetable.objects.get()
+        self.client.post(f"/manage/oneschool/{v.pk}/publish/",{"ack":"yes"})
+        dashboard=self.client.get("/manage/")
+        self.assertContains(dashboard,"Imported allocations")
+        self.assertContains(dashboard,"Imported rooms")
+        self.assertContains(dashboard,v.name)
+        response=self.client.get("/manage/master/?date=2026-11-23")
+        self.assertContains(response,"Previous week")
+        self.assertContains(response,"Next week")
+        self.assertContains(response,"Compact view")
+        self.assertContains(response,"DEMO071A")
+        self.assertNotContains(self.client.get("/manage/master/?date=2026-11-23&room=UNKNOWN"),"DEMO071A")
+        self.assertNotContains(self.client.get("/manage/master/?date=2026-11-23&staff=UNKNOWN"),"DEMO071A")
+        self.assertContains(self.client.get("/manage/master/?date=2026-11-23&staff=DEMOA"),"DEMO071A")
+        self.client.force_login(self.teacher)
+        self.assertContains(self.client.get("/teacher/timetable/?date=2026-11-23&staff=DEMOB"),"DEMO071A")
+        self.assertNotContains(self.client.get("/teacher/timetable/?date=2026-11-24&staff=DEMOB"),"DEMO071A")
+
+    def test_remember_management_tab_and_safe_sort(self):
+        self.client.get("/manage/timetable/?tab=periods")
+        response=self.client.get("/manage/timetable/")
+        self.assertEqual(response.context["tab"],"periods")
+        self.assertEqual(self.client.get("/manage/staff/?sort=not_a_field").status_code,200)
+        self.assertEqual(self.client.get("/manage/students/?sort=not_a_field").status_code,200)
+        self.assertEqual(self.client.get("/manage/classes/?sort=not_a_field").status_code,200)
