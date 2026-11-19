@@ -1,5 +1,13 @@
 # RollFlow — Teacher Edition
 
+## V3.4.4 — Import reliability and timetable bug fixes
+
+Browser import fingerprints are based on the original decoded CSV content, not masked timetable structure. Only the fingerprint and masked schedule are stored. Exact repeated source text reuses a version; changed source text (including row order or duplicate rows) creates a new version. Existing V3.4.2/3 versions remain intact; the first reimport under V3.4.4 may create a new version. The original file is not stored or uploaded. Use approved data only; masking is not a guarantee of anonymity.
+
+Strict quote validation, safe date bounds (1900–2099), correct visible allocation counts, staff selection in the staff timetable, filter reset on view switching, and expiry warnings are included. Committed changes notify other open tabs in the same browser/origin; focus/visibility reloads reconcile missed notifications. In-progress imports defer refreshes. Publish a replacement before deleting any active version. Date sorting and keyboard focus have been improved. This is still a local masked timetable and not an operational attendance system.
+
+Focused synthetic regression checks passed for both branch previews; the supplied CSV passed equivalent local structural validation (42,793 rows). Actual browser multi-tab/device testing and the Django integration suite remain unverified.
+
 ## V3.4.3 — Usability and stability
 
 Dashboard metrics reflect the published local imported timetable. Master Timetable now supports previous/next week, Today, first imported day, live search, year/staff/room filtering, click-to-lookup aliases, highlighted matches, expand/collapse, compact and expanded viewing, and current bell-period indicators in Brisbane time. Management tables support local sorting, live table search and 25/50/100-row pages; selected management tabs and compact/highlight preferences are remembered. The browser edition remains masked and local; attendance and individual accounts are not linked.
