@@ -1,61 +1,73 @@
-# RollFlow — Teacher Edition
+# RollFlow V3.0 — School application foundation
 
-## V3 — Demo sign-in preview
+**Development branch: v3.0-foundation.** This is an application foundation for fictional testing, not a production release or authorised school attendance system.
 
-The public GitHub Pages demonstration now opens with a sign-in page. Use **teacher / teacher** for the Teacher Portal, or select the settings cog and use **admin / admin** for the separate administrator overview. Sign out to switch accounts. A tab-local session flag is stored in sessionStorage; existing fictional records remain in localStorage.
+The existing public GitHub Pages site on the main branch continues to use the fixed public demo credentials (teacher / teacher and admin / admin). The Django server does not accept those credentials unless an administrator deliberately creates such an account; do not do that. Real school credentials, photographs and records must not be used here.
 
-These fixed, publicly visible credentials are UI demonstrations only, not real authentication or authorisation. The administrator overview is a starting page, not a functioning staff-management system. Never enter actual school passwords or personal information. Production requires a school-approved backend, secure sessions, server-enforced permissions and central storage outside GitHub.
+## Run the development server
 
-## V2.1 — Teacher Experience & Reliability
+Prerequisites: Python 3.12, Git and access to install the dependencies. Run on your own computer, bound to loopback only.
 
-RollFlow is a single-page, browser-based teacher attendance demonstration designed around a Queensland teaching day. All information is fictional.
+```sh
+git clone --branch v3.0-foundation https://github.com/kkieren999/RollFlow.git
+cd RollFlow
+python -m venv .venv
+# macOS/Linux:
+source .venv/bin/activate
+# Windows PowerShell instead:
+# .venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+```
 
-### Everyday teacher workflow
+macOS/Linux: `export ROLLFLOW_DEBUG=1`
 
-- Select the **RollFlow logo** to return to today's schedule. Home is no longer a separate sidebar item.
-- **My Timetable** provides day and week views, using the same date-aware schedule as the daily overview. The supplied assigned-class example data defines Wednesday lessons only; other weekdays have no invented lessons. Temporary cover plans and today's pinned supervisions appear on their applicable dates.
-- Unsubmitted scheduled rolls receive a red outline 10 minutes after their lesson begins, using Australia/Brisbane time. Submission removes the overdue outline.
-- **Take Attendance** uses a minimal student photo grid (30 photo controls for the example Mathematics class). Tap a photo to cycle `? → P (Present) → A (Absent) → L (Late) → ?`. Letter and outline indicate the status. Activity is not a new marking option; legacy records are retained.
-- The attendance class dropdown contains assigned classes and supervision classes pinned today. Other fictional classes can be reached through Class Finder.
-- Undo, Save, mandatory confirmation and submission are retained. A receipt summarises the submitted roll. Browser-storage errors produce a warning and a retry action rather than reporting successful submission.
-- Submitted scheduled rolls can be corrected by opening a student's details, choosing a new attendance status and supplying a reason. The roll stays submitted and the correction is logged locally. Attendance History under School Tools also supports reviewing submitted rolls, CSV export, and reason-required reopening of a roll.
+Windows PowerShell: `$env:ROLLFLOW_DEBUG="1"`
 
-### Students and movements
+```sh
+python manage.py migrate
+python manage.py createsuperuser
+python manage.py runserver 127.0.0.1:8000
+```
 
-- **My Classes** lists assigned teaching groups; **Class Finder** searches the directory of 34 fictional classes across Years 7–12. View class details, rosters, sample timetables and attendance.
-- **Student Search** and the student details panel link to the student's own sample class memberships, timetable, submitted attendance history, movement history and attendance comments.
-- Tap a student's name, right-click their portrait or long-press a portrait to open details without navigating away from the roll.
-- Movement passes prevent a second active pass for the same student. New passes record departure and return timestamps and calculate elapsed minutes; old records without timestamps show duration not recorded. Active passes remain visible until returned.
-- **My Cover Plan** records sample relief allocations, temporary timetable changes, supervision and handover notes.
+Choose a unique administrator username and strong password at the prompts. Open http://127.0.0.1:8000/ and select the Admin login cog. The administrator overview is Django's database-backed administration interface. Under Users, add a fictional teacher with a strong password, first and last name; on the user's change page ensure Active is checked, Staff and Superuser are unchecked, and assign the Teacher group. Add an optional Staff Profile to set faculty, campus and staff ID. Sign out, then sign in through the teacher login. Account names are assigned by the administrator, not editable in the teacher workspace. Disable accounts instead of deleting them.
 
-### Profile and preferences
+## What is implemented
 
-My Profile presents the teacher's details in a clean view, with an explicit Edit Profile action. My Preferences has 11 settings grouped under Appearance & accessibility, Teaching & attendance, and Reminders & notices. Submission confirmation, totals, overdue indicators, stable student positions and today's initial date are automatic. The day/week selector lives in My Timetable. Preferences are saved in this browser; resetting them does not remove attendance, notes, favourites or cover plans.
+- Django database-backed user accounts, Teacher group and administrator authentication.
+- Separate login routes, Cog link, server-side role checks, POST-only CSRF-protected logout, database sessions, Argon2 password hashing and database-backed login throttling.
+- Login/logout events and Django's administration change log; these logs are not a complete or tamper-resistant attendance audit.
+- Admin management of users, account activation, passwords, groups and optional staff profiles.
+- The existing teacher UI receives its authenticated identity from the server. The public demo mode is retained when opening the static file alone.
+- The teacher workspace is explicitly a fictional browser sandbox, with distinct localStorage keys per server account. Local browser keys are **not a security boundary**. Student/class data is still synthetic and hardcoded, and live roll submission, student access permissions, supervision authorisation, profile/preferences synchronisation and attendance data APIs are not implemented. The teacher page is server-authenticated but records are not centrally persisted.
+- An initial schema/migrations for accounts and security events, with PostgreSQL configuration for later multi-user work.
+- An automated test suite and a GitHub Actions workflow.
 
-Earlier workspace data (favourites, recent history, teaching notes and links) is preserved. The simplified sidebar does not expose all of those optional tools. There is no global Search portal button. Help & Support explains the current workflow.
+## Test
 
-## Run locally
+With the same development environment configured:
 
-Open `index.html` in a modern browser. There are no dependencies or build commands.
+```sh
+python manage.py check
+python manage.py makemigrations --check --dry-run
+python manage.py test accounts
+```
 
-## Host on GitHub Pages
+The checks cover login, role restrictions, account deactivation, logout, CSRF and rate limiting. Run browser tests on laptops and iPad Safari separately.
 
-1. Push `index.html`, `.nojekyll` and this README to the root of the `main` branch.
-2. Open repository **Settings → Pages**.
-3. Under **Build and deployment**, choose **Deploy from a branch**.
-4. Choose branch **main** and folder **/(root)**, then Save.
-5. Once published, GitHub shows the website link in the Pages section.
+## School ICT configuration — not a release procedure
 
-## Pin for Today — manual supervisions
+For non-development configuration, leave ROLLFLOW_DEBUG unset and supply the following variables through an approved secret/configuration manager:
 
-From Class Finder → Class Details or Take Attendance, select Pin for Today on a class not already assigned to you. Pinned classes appear on the daily schedule and My Timetable. Pins are bound to the current Australia/Brisbane date, invalidated after midnight and do not change the permanent timetable. A manually entered cover plan can specify a date and period instead.
+- ROLLFLOW_SECRET_KEY (unique secret with sufficient entropy)
+- ROLLFLOW_ALLOWED_HOSTS (specific internal hostnames; no wildcard)
+- ROLLFLOW_DB_NAME, ROLLFLOW_DB_USER, ROLLFLOW_DB_PASSWORD, ROLLFLOW_DB_HOST, ROLLFLOW_DB_PORT
 
-## Security and product status
+Use an approved PostgreSQL server, a restricted OS service account, TLS, an approved WSGI server/reverse proxy, private network access, secure static-file serving after `python manage.py collectstatic`, and encrypted backups. Only enable ROLLFLOW_TRUST_HTTPS_PROXY=1 behind a proxy that strips untrusted forwarding headers. Review rate limiting for shared school IPs and expire old LoginWindow rows under an approved retention policy. Run `python manage.py check --deploy` and remediate findings. Do not expose Django's development server to a school network.
 
-**Demonstration only.** The attendance and workspace stores remain browser-local (`rollflow_teacher_2026_v1` and `rollflow_workspace_v2`). Local history is not a secure or tamper-resistant audit trail. There is no staff authentication, secure database, OneSchool integration, SMS delivery or school data transfer. There is no real school authorisation for class access or attendance corrections. Do not use RollFlow for genuine student attendance, live school records or sensitive personal information.
+Before production: integrate school-approved SSO/MFA, separate administrative permissions, secure student/class/session data models, central attendance transactions and corrections, server-enforced teacher and supervision permissions, tamper-resistant audit, authorised imports, cross-device synchronisation, security/accessibility testing, records retention and backup restore testing. Confirm with departmental ICT whether and how RollFlow may operate alongside OneSchool.
 
-Before a real deployment, implement authorised staff access, server-side class and relief permissions, validated timetable data, secure storage and synchronisation, a durable audit trail, backups and privacy/security review. Do not add real student data or private keys to this public demonstration.
+GitHub stores application code and fictional test fixtures only. Databases, secrets, backups and real school information never belong in the repository. .gitignore is a safeguard, not a data protection boundary.
 
-## Verification checklist
+## Previous teacher demo
 
-Test photo marking, Undo, Save, certification and correction; date navigation and overdue highlighting; pinned and planned cover; student-specific timetables; duplicate movement passes and elapsed durations; persistence and storage errors; dark mode, keyboard navigation and responsive layouts. Logic and rendering checks do not replace testing in real browsers and on school devices.
+The original minimal portrait grid, photo-tap marking, single Save button, date-aware timetable, Class Finder supervision pins, Student Movements, accessible preferences, permanent navigation and teacher profile are retained. Static demo behaviour on GitHub Pages remains on main.
