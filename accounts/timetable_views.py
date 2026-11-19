@@ -1,6 +1,7 @@
 import csv
 import io
 from django.contrib import messages
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import IntegrityError, transaction
@@ -11,7 +12,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_http_methods, require_POST
 from .models import SchoolClass, ClassEnrolment, Room, SchoolPeriod, TimetableSlot, SecurityEvent
 from .staff_views import administrator, page
-from .timetable_forms import ClassForm, EnrolmentForm, EndEnrolmentForm, RoomForm, PeriodForm, SlotForm, TimetableImportForm
+from .timetable_forms import ClassForm, EnrolmentForm, EndEnrolmentForm, RoomForm, PeriodForm, SlotForm, TimetableImportForm, teachers
 
 def event(request, action, subject):
     SecurityEvent.objects.create(actor=request.user,event=action,subject=str(subject)[:150])
@@ -98,7 +99,6 @@ def timetable(request):
         slots=slots.filter(teacher_id=int(teacher))
     if weekday in ["1","2","3","4","5"]:
         slots=slots.filter(weekday=int(weekday))
-    from .timetable_forms import teachers
     return page(request,"timetable",slots=slots,rooms=Room.objects.order_by("code"),periods=SchoolPeriod.objects.all(),teacher_options=teachers(),teacher_filter=teacher,day_filter=weekday,days=TimetableSlot._meta.get_field("weekday").choices,import_form=TimetableImportForm())
 
 def save_editor(request,form_class,model,pk,title,section="timetable",initial=None):
@@ -174,11 +174,10 @@ def import_timetable(request):
                     r={k:v.strip() for k,v in row.items()}
                     try:
                         klass=SchoolClass.objects.get(code__iexact=r["class_code"],active=True)
-                        from .timetable_forms import teachers
                         teacher=teachers().get(username__iexact=r["teacher_username"])
                         room=Room.objects.get(code__iexact=r["room_code"],active=True)
                         period=SchoolPeriod.objects.get(code__iexact=r["period_code"])
-                    except (SchoolClass.DoesNotExist,Room.DoesNotExist,SchoolPeriod.DoesNotExist,teachers().model.DoesNotExist) as exc:
+                    except (SchoolClass.DoesNotExist,Room.DoesNotExist,SchoolPeriod.DoesNotExist,User.DoesNotExist) as exc:
                         raise ValidationError(f"Unknown or inactive reference on row {number}.") from exc
                     slot_form=SlotForm({"school_class":klass.pk,"teacher":teacher.pk,"room":room.pk,"weekday":r["weekday"],"period":period.pk,"active":"on"})
                     if not slot_form.is_valid():
@@ -191,5 +190,5 @@ def import_timetable(request):
             messages.success(request,f"Imported {count} slots.")
             return redirect("management-timetable")
         except (ValidationError,UnicodeError,csv.Error,IntegrityError) as error:
-            form.add_error("csv",str(error))
+            form.add_error("csv","Import rejected because of conflicting or invalid records." if isinstance(error, IntegrityError) else str(error))
     return page(request,"timetable",import_error_form=form)
