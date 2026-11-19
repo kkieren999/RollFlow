@@ -1,5 +1,9 @@
 # RollFlow — Teacher Edition
 
+## V3.4.3 — Usability and stability
+
+Dashboard metrics reflect the published local imported timetable. Master Timetable now supports previous/next week, Today, first imported day, live search, year/staff/room filtering, click-to-lookup aliases, highlighted matches, expand/collapse, compact and expanded viewing, and current bell-period indicators in Brisbane time. Management tables support local sorting, live table search and 25/50/100-row pages; selected management tabs and compact/highlight preferences are remembered. The browser edition remains masked and local; attendance and individual accounts are not linked.
+
 ## V3.4.2 — Timetable publication
 
 Open **OneSchool Import Centre** and import the original 15-column CSV (up to 20 MB / 150,000 rows). Enter a version name, confirm authorised use and replacement, and click **Import & publish timetable**. The browser edition validates and masks class, staff and room identifiers and nonstandard period labels before saving a persistent version in IndexedDB. It does not upload the CSV or save the original identities, names, subjects or MISIDs. The dates and bell times are retained. This is a local masked timetable, not a shared school database or full anonymisation guarantee. Use only data approved for this purpose. Previous versions can be reviewed, republished or removed. The former temporary import and sample publishing controls have been removed.
