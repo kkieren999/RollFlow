@@ -12,7 +12,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods, require_POST
-from .models import SecurityEvent, StaffProfile, Student
+from .models import SecurityEvent, StaffProfile, Student, SchoolClass, TimetableSlot
 from .staff_forms import StaffForm, ResetPasswordForm, StaffImportForm
 from .views import role_for
 
@@ -67,6 +67,8 @@ def dashboard(request):
         ("Administrators", users.filter(is_staff=True, is_superuser=True).count()),
         ("Enrolled students", Student.objects.filter(status=Student.Status.ACTIVE).count()),
         ("Student records", Student.objects.count()),
+        ("Active classes", SchoolClass.objects.filter(active=True).count()),
+        ("Active timetable slots", TimetableSlot.objects.filter(active=True).count()),
     ], events=SecurityEvent.objects.select_related("actor").all()[:6])
 
 @administrator
@@ -78,6 +80,10 @@ def section(request, section):
         return HttpResponseBadRequest("Unknown section.")
     if section == "students":
         return redirect("management-student-directory")
+    if section == "classes":
+        return redirect("management-class-directory")
+    if section == "timetable":
+        return redirect("management-timetable")
     if section == "staff":
         q = request.GET.get("q", "").strip()[:150]
         status = request.GET.get("status", "all")
