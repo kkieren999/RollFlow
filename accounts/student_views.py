@@ -34,7 +34,12 @@ def directory(request):
         students = students.filter(home_group__iexact=group)
     if status in Student.Status.values:
         students = students.filter(status=status)
-    return page(request, "students", student_page=Paginator(students, 50).get_page(request.GET.get("page")), q=q, year=year, group=group, status=status,
+    sort=request.GET.get("sort","name")
+    orders={"name":("last_name","first_name"),"id":("student_id",),"year":("year_level","home_group"),"status":("status",)}
+    sort=sort if sort in orders else "name"
+    direction="desc" if request.GET.get("dir")=="desc" else "asc"
+    students=students.order_by(*[("-" if direction=="desc" else "")+f for f in orders[sort]],"pk")
+    return page(request, "students", student_page=Paginator(students, 50).get_page(request.GET.get("page")), q=q, year=year, group=group, status=status, sort=sort, direction=direction,
         years=range(7, 13), statuses=Student.Status.choices, home_groups=Student.objects.exclude(home_group="").order_by("home_group").values_list("home_group", flat=True).distinct())
 
 @administrator
