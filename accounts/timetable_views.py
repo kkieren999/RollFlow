@@ -30,7 +30,12 @@ def classes(request):
         records = records.filter(Q(code__icontains=q)|Q(name__icontains=q)|Q(subject__icontains=q)|Q(teacher__username__icontains=q))
     if year in [str(x) for x in range(7,13)]:
         records = records.filter(year_level=int(year))
-    return page(request,"classes",class_page=Paginator(records,50).get_page(request.GET.get("page")),q=q,year=year,years=range(7,13))
+    sort=request.GET.get("sort","code")
+    orders={"code":("code",),"year":("year_level","subject"),"teacher":("teacher__last_name","teacher__first_name","teacher__username"),"roster":("roster_count",),"status":("active",)}
+    sort=sort if sort in orders else "code"
+    direction="desc" if request.GET.get("dir")=="desc" else "asc"
+    records=records.order_by(*[("-" if direction=="desc" else "")+f for f in orders[sort]],"pk")
+    return page(request,"classes",class_page=Paginator(records,50).get_page(request.GET.get("page")),q=q,year=year,years=range(7,13),sort=sort,direction=direction)
 
 @administrator
 @require_http_methods(["GET","POST"])
