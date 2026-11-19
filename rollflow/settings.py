@@ -5,6 +5,7 @@ from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DEBUG = os.environ.get("ROLLFLOW_DEBUG") == "1"
+ROLLFLOW_SCHOOL_MODE = os.environ.get("ROLLFLOW_SCHOOL_MODE") == "1"
 SECRET_KEY = os.environ.get("ROLLFLOW_SECRET_KEY", "")
 if not SECRET_KEY and not DEBUG:
     raise ImproperlyConfigured("Set ROLLFLOW_SECRET_KEY before starting the server.")
@@ -22,6 +23,8 @@ INSTALLED_APPS = [
 ]
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+    "rollflow.school_security.LocalOnlyResourcesMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -69,7 +72,7 @@ TIME_ZONE = "Australia/Brisbane"
 USE_I18N = True
 USE_TZ = True
 STATIC_URL = "/static/"
-STATIC_ROOT = BASE_DIR / ".collected-static"
+STATIC_ROOT = Path(os.environ.get("ROLLFLOW_STATIC_ROOT", BASE_DIR / ".collected-static"))
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGIN_URL = "/login/"
 SESSION_COOKIE_NAME = "rollflow_session"
@@ -92,3 +95,17 @@ if os.environ.get("ROLLFLOW_TRUST_HTTPS_PROXY") == "1":
 ROLLFLOW_LIVE_TIMETABLE = os.environ.get("ROLLFLOW_LIVE_TIMETABLE") == "1"
 if ROLLFLOW_LIVE_TIMETABLE and (DEBUG or DATABASES["default"]["ENGINE"] != "django.db.backends.postgresql" or len(SECRET_KEY) < 50):
     raise ImproperlyConfigured("Live timetable requires DEBUG off, PostgreSQL and a secret key of at least 50 characters.")
+
+# A school installation must never silently fall back to sample attendance or SQLite.
+if ROLLFLOW_SCHOOL_MODE:
+    if DEBUG or not ROLLFLOW_LIVE_TIMETABLE or len(SECRET_KEY) < 50:
+        raise ImproperlyConfigured("School mode requires DEBUG off, live timetable mode and a strong secret.")
+    if any(h.startswith(".") or "*" in h for h in ALLOWED_HOSTS):
+        raise ImproperlyConfigured("School mode requires exact approved hostnames.")
+    if not os.environ.get("ROLLFLOW_DATA_DIR") or not os.environ.get("ROLLFLOW_STATIC_ROOT"):
+        raise ImproperlyConfigured("School mode requires explicit private state and static directories.")
+    if os.environ.get("ROLLFLOW_TRUST_HTTPS_PROXY") != "1":
+        raise ImproperlyConfigured("School mode requires an approved local HTTPS gateway.")
+    FILE_UPLOAD_TEMP_DIR = str(Path(os.environ["ROLLFLOW_DATA_DIR"]) / "uploads")
+    Path(FILE_UPLOAD_TEMP_DIR).mkdir(parents=True, exist_ok=True)
+    # Apply HSTS to this host only; ICT owns policy for its parent domain.

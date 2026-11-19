@@ -3,3 +3,5 @@ argon2-cffi>=23.1,<26
 psycopg[binary]>=3.2,<4
 
 Pillow>=11.3,<13
+waitress>=3.0.2,<4
+whitenoise>=6.9,<7

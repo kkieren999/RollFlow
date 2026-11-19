@@ -1,4 +1,8 @@
-# RollFlow V3.0 — School application foundation
+# RollFlow V3.5 — Self-contained school architecture foundation
+
+## V3.5 — Portable school installation foundation
+
+The [deployment guide](deployment/README.md) documents the new offline Windows distribution builder, local PostgreSQL instance runner, separate private instance state, native administrator creation, local static serving, loopback WSGI service, database backup and stricter school configuration. The runtime builder requires verified Windows binaries on a build machine; the finished distribution is intended to require no separate Python or PostgreSQL installation on compatible targets. No signed USB installer or approved production deployment exists yet. Use fictional data only. GitHub Actions adds PostgreSQL and offline dependency checks; consult the actual run results.
 
 ## V3.4.4 — Import reliability and timetable bug fixes
 

@@ -18,3 +18,9 @@ ExportTimetable*.csv
 TTLineAlignmentExport*.xlsx
 ClassList*.pdf
 oneschool-exports/
+
+# Generated offline distribution and private installation state
+/dist/
+/wheelhouse/
+/instance/
+*.dump
