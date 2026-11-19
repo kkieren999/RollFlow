@@ -48,7 +48,7 @@ def portal_login(request, mode="teacher"):
         key = limit_key(request, username)
         ip_key = limit_key(request, "__all_usernames__")
         if not consume_attempt(ip_key) or not consume_attempt(key):
-            return render(request, "login.html", {"mode": mode, "error": "Too many attempts. Try again in 15 minutes."}, status=429)
+            return render(request, "login.html", {"live_timetable": settings.ROLLFLOW_LIVE_TIMETABLE, "mode": mode, "error": "Too many attempts. Try again in 15 minutes."}, status=429)
         user = authenticate(request, username=username, password=password)
         if user is not None and role_for(user) == mode:
             login(request, user)
@@ -56,7 +56,7 @@ def portal_login(request, mode="teacher"):
             SecurityEvent.objects.create(actor=user, event="login", subject=mode)
             return redirect("management-dashboard" if mode == "admin" else "teacher")
         error = "Incorrect username or password for this portal."
-    return render(request, "login.html", {"mode": mode, "error": error})
+    return render(request, "login.html", {"live_timetable": settings.ROLLFLOW_LIVE_TIMETABLE, "mode": mode, "error": error})
 
 @never_cache
 @require_http_methods(["GET"])
