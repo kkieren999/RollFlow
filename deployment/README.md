@@ -6,13 +6,13 @@ A local PostgreSQL cluster, Django local accounts, Argon2 password hashes, exist
 
 ## Windows x64 distribution build (release engineer only)
 
-On Windows x64 with full CPython 3.13 and Git, obtain and verify the approved CPython 3.13 x64 embeddable ZIP and the approved PostgreSQL x64 binary distribution; extract each. Use security-supported runtimes and include upstream licence notices and any Microsoft runtime prerequisites. If suitable patched redistributables are not available, qualify another Python version before distribution. Run:
+On Windows x64 with full CPython 3.14 and Git, obtain and verify the approved CPython 3.14 x64 embeddable ZIP and the approved PostgreSQL x64 binary distribution; extract each. Use security-supported runtimes and include upstream licence notices and any Microsoft runtime prerequisites. If suitable patched redistributables are not available, qualify another Python version before distribution. Run:
 
 ```powershell
 python deployment/build_windows.py --python-runtime C:\build\python-embed --postgres-runtime C:\build\pgsql --output C:\build\RollFlow
 ```
 
-The builder copies the runtimes, fetches binary wheels on the build machine only, installs from the local wheelhouse, checks imports with the bundled Python, and creates a SHA-256 file manifest. The manifest is not a digital signature. Verify upstream distribution licences, provenance, checksums and vulnerability status before releasing or signing any package. The target must have a compatible OS and Microsoft runtime libraries. A full clean-machine test is mandatory; copying the distribution does not establish ICT approval.
+The builder copies the runtimes, fetches binary wheels on the build machine only, installs from the local wheelhouse, checks imports with the bundled Python, and creates a SHA-256 file manifest. The manifest is not a digital signature. GitHub Actions also attempts a Windows x64 staging artifact using the pinned Python 3.14.10 archive checksum and PostgreSQL 18.7 binary archive with the vendor-provided checksum. Only a successful build and native smoke test uploads the artifact. Vendor checksums do not replace independent release signing or security review. Verify upstream distribution licences, provenance, checksums and vulnerability status before releasing or signing any package. The target must have a compatible OS and Microsoft runtime libraries. A full clean-machine test is mandatory; copying the distribution does not establish ICT approval.
 
 ## Offline synthetic staging
 

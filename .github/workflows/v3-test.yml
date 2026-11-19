@@ -34,4 +34,57 @@ jobs:
       - run: |
           sudo apt-get update
           sudo apt-get install -y postgresql-16
+      - run: python -m compileall -q deployment rollflow accounts
       - run: python deployment/ci_smoke.py
+
+  windows-offline-bundle:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/v3.0-foundation'
+    runs-on: windows-2025
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14.10"
+          architecture: x64
+      - name: Download and verify runtime archives on the build machine
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = Join-Path $env:RUNNER_TEMP 'rf-runtime'
+          New-Item -ItemType Directory -Path $root | Out-Null
+          $py = 'https://www.python.org/ftp/python/3.14.10/python-3.14.10-embed-amd64.zip'
+          $pg = 'https://get.enterprisedb.com/postgresql/postgresql-18.7-1-windows-x64-binaries.zip'
+          Invoke-WebRequest $py -OutFile "$root/python.zip"
+          $expectedPython = '90905e64a840557d8c1bc4f5b74db3d7ee85e3ffb217611cac1c7813acea4159'
+          if ((Get-FileHash "$root/python.zip" -Algorithm SHA256).Hash.ToLower() -ne $expectedPython) { throw 'Python archive checksum mismatch' }
+          Invoke-WebRequest "$pg.sha256" -OutFile "$root/postgres.sha256"
+          $expectedPg = [regex]::Match((Get-Content "$root/postgres.sha256" -Raw), '\b[0-9A-Fa-f]{64}\b').Value.ToLower()
+          if ($expectedPg.Length -ne 64) { throw 'Vendor PostgreSQL checksum unavailable' }
+          Invoke-WebRequest $pg -OutFile "$root/postgres.zip"
+          if ((Get-FileHash "$root/postgres.zip" -Algorithm SHA256).Hash.ToLower() -ne $expectedPg) { throw 'PostgreSQL archive checksum mismatch' }
+          Expand-Archive "$root/python.zip" "$root/python"
+          Expand-Archive "$root/postgres.zip" "$root/postgres"
+          $pgRoot = Get-ChildItem "$root/postgres" -Directory -Recurse | Where-Object { (Test-Path (Join-Path $_.FullName 'bin/postgres.exe')) -and (Test-Path (Join-Path $_.FullName 'share')) } | Select-Object -First 1
+          if (!$pgRoot -and (Test-Path "$root/postgres/bin/postgres.exe")) { $pgRoot = Get-Item "$root/postgres" }
+          if (!$pgRoot) { throw 'PostgreSQL bin/lib/share layout not found' }
+          python deployment/build_windows.py --python-runtime "$root/python" --postgres-runtime $pgRoot.FullName --output "$env:RUNNER_TEMP/RollFlow"
+          if ($LASTEXITCODE -ne 0) { throw 'Bundle build failed' }
+      - name: Smoke-test bundled runtime, database and backup
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $bundle = "$env:RUNNER_TEMP/RollFlow"
+          $state = "$env:RUNNER_TEMP/rf-test-state"
+          & "$bundle/python/python.exe" -m deployment.native --state $state init --no-admin
+          if ($LASTEXITCODE -ne 0) { throw 'Native setup failed' }
+          & "$bundle/python/python.exe" -m deployment.native --state $state manage check
+          if ($LASTEXITCODE -ne 0) { throw 'Django system check failed' }
+          & "$bundle/python/python.exe" -m deployment.native --state $state backup "$env:RUNNER_TEMP/rf-test-backup.dump"
+          if ($LASTEXITCODE -ne 0) { throw 'Database backup failed' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RollFlow-V3.5-Windows-x64-STAGING
+          path: ${{ runner.temp }}/RollFlow/
+          if-no-files-found: error
+          retention-days: 14

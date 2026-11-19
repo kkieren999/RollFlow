@@ -40,7 +40,7 @@ def main():
             env.update(DJANGO_SUPERUSER_USERNAME="ci_local_admin", DJANGO_SUPERUSER_EMAIL="ci@example.invalid",
                        DJANGO_SUPERUSER_PASSWORD=secrets.token_urlsafe(32))
             call("manage.py", "createsuperuser", "--noinput", env=env)
-            call("manage.py", "shell", "-c", "import os; from django.test import Client; from django.contrib.auth import get_user_model; u=get_user_model().objects.get(username='ci_local_admin'); assert u.password.startswith('argon2
+            call("manage.py", "shell", "-c", "import os; from django.test import Client; from django.contrib.auth import get_user_model; from django.contrib.auth.hashers import identify_hasher; u=get_user_model().objects.get(username='ci_local_admin'); assert identify_hasher(u.password).algorithm == 'argon2'; assert Client().login(username=u.username,password=os.environ['DJANGO_SUPERUSER_PASSWORD']); print('Local hashed accounts verified')", env=env)
             child = subprocess.Popen([sys.executable, "-m", "deployment.serve_instance", str(state)],
                                      cwd=ROOT, env=config_env(cfg))
             try:
@@ -76,44 +76,6 @@ def main():
         call("-m", "deployment.native", "--state", state, "manage", "migrate", "--check")
         call("-m", "deployment.native", "--state", state, "manage", "shell", "-c",
              "from django.contrib.auth import get_user_model; assert get_user_model().objects.filter(username='ci_local_admin',is_superuser=True).exists()")
-        print("Native PostgreSQL initialization, restart, backup and HTTP smoke passed")
-
-if __name__ == "__main__":
-    main()
-); assert Client().login(username=u.username,password=os.environ['DJANGO_SUPERUSER_PASSWORD']); print('Local hashed accounts verified')", env=env)
-            child = subprocess.Popen([sys.executable, "-m", "deployment.serve_instance", str(state)],
-                                     cwd=ROOT, env=config_env(cfg))
-            try:
-                for _ in range(40):
-                    try:
-                        with urlopen("http://localhost:18080/login/", timeout=2) as response:
-                            assert response.status == 200
-                        break
-                    except OSError:
-                        if child.poll() is not None:
-                            raise RuntimeError("WSGI server exited")
-                        time.sleep(.25)
-                else:
-                    raise RuntimeError("WSGI server did not answer")
-            finally:
-                child.terminate()
-                child.wait(timeout=15)
-            school = dict(cfg, mode="school", host="rollflow.school.example")
-            env = config_env(school)
-            call("manage.py", "check", env=env)
-            call("manage.py", "check", "--deploy", env=env)
-            call("manage.py", "shell", "-c",
-                 "from django.test import Client; r=Client().get('/login/', secure=True, HTTP_HOST='rollflow.school.example'); assert r.status_code==200; assert 'connect-src' in r['Content-Security-Policy']; assert Client().get('/login/', HTTP_HOST='rollflow.school.example').status_code == 301; print('School security smoke passed')",
-                 env=env)
-            env["ROLLFLOW_DEBUG"] = "1"
-            bad = subprocess.run([sys.executable, "manage.py", "check"], cwd=ROOT, env=env,
-                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            assert bad.returncode != 0, "School configuration must reject debug"
-        dump = Path(tmp) / "backup.dump"
-        call("-m", "deployment.native", "--state", state, "backup", dump)
-        assert dump.read_bytes().startswith(b"PGDMP")
-        # Reopen an existing instance and verify migrations survive stop/start.
-        call("-m", "deployment.native", "--state", state, "manage", "migrate", "--check")
         print("Native PostgreSQL initialization, restart, backup and HTTP smoke passed")
 
 if __name__ == "__main__":
