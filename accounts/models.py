@@ -47,3 +47,57 @@ class StudentPhoto(models.Model):
     student = models.OneToOneField(Student, on_delete=models.PROTECT, related_name="portrait")
     image = models.BinaryField()
     updated_at = models.DateTimeField(auto_now=True)
+
+class SchoolClass(models.Model):
+    code = models.CharField(max_length=30, unique=True)
+    name = models.CharField(max_length=100)
+    subject = models.CharField(max_length=100)
+    year_level = models.PositiveSmallIntegerField(choices=[(i, f"Year {i}") for i in range(7, 13)])
+    teacher = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="teaching_classes")
+    active = models.BooleanField(default=True)
+    def __str__(self):
+        return f"{self.code} — {self.name}"
+
+class ClassEnrolment(models.Model):
+    school_class = models.ForeignKey(SchoolClass, on_delete=models.PROTECT, related_name="enrolments")
+    student = models.ForeignKey(Student, on_delete=models.PROTECT, related_name="class_enrolments")
+    start_date = models.DateField()
+    end_date = models.DateField(null=True, blank=True, help_text="Last enrolled day")
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["school_class", "student"], condition=models.Q(end_date__isnull=True), name="unique_open_class_enrolment"),
+            models.CheckConstraint(condition=models.Q(end_date__isnull=True) | models.Q(end_date__gte=models.F("start_date")), name="class_enrolment_date_order"),
+        ]
+
+class Room(models.Model):
+    code = models.CharField(max_length=30, unique=True)
+    name = models.CharField(max_length=100, blank=True)
+    active = models.BooleanField(default=True)
+    def __str__(self):
+        return self.code
+
+class SchoolPeriod(models.Model):
+    code = models.CharField(max_length=20, unique=True)
+    label = models.CharField(max_length=50)
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    class Meta:
+        ordering = ["start_time"]
+        constraints = [models.CheckConstraint(condition=models.Q(end_time__gt=models.F("start_time")), name="school_period_time_order")]
+    def __str__(self):
+        return self.label
+
+class TimetableSlot(models.Model):
+    school_class = models.ForeignKey(SchoolClass, on_delete=models.PROTECT, related_name="slots")
+    teacher = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="timetable_slots")
+    room = models.ForeignKey(Room, on_delete=models.PROTECT, related_name="slots")
+    weekday = models.PositiveSmallIntegerField(choices=[(1,"Monday"),(2,"Tuesday"),(3,"Wednesday"),(4,"Thursday"),(5,"Friday")])
+    period = models.ForeignKey(SchoolPeriod, on_delete=models.PROTECT, related_name="slots")
+    active = models.BooleanField(default=True)
+    class Meta:
+        ordering = ["weekday", "period__start_time", "school_class__code"]
+        constraints = [
+            models.UniqueConstraint(fields=["weekday","period","school_class"], condition=models.Q(active=True), name="unique_active_class_slot"),
+            models.UniqueConstraint(fields=["weekday","period","teacher"], condition=models.Q(active=True), name="unique_active_teacher_slot"),
+            models.UniqueConstraint(fields=["weekday","period","room"], condition=models.Q(active=True), name="unique_active_room_slot"),
+        ]
