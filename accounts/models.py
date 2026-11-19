@@ -23,3 +23,27 @@ class LoginWindow(models.Model):
     key = models.CharField(max_length=64, primary_key=True)
     count = models.PositiveIntegerField(default=0)
     started_at = models.DateTimeField()
+
+class Student(models.Model):
+    class Status(models.TextChoices):
+        ACTIVE = "active", "Enrolled"
+        INACTIVE = "inactive", "Inactive"
+        LEFT = "left", "Left school"
+    student_id = models.CharField(max_length=40, unique=True)
+    first_name = models.CharField(max_length=100)
+    last_name = models.CharField(max_length=100)
+    preferred_name = models.CharField(max_length=100, blank=True)
+    year_level = models.PositiveSmallIntegerField(choices=[(i, f"Year {i}") for i in range(7, 13)])
+    home_group = models.CharField(max_length=30, blank=True)
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.ACTIVE)
+    enrolled_on = models.DateField(blank=True, null=True)
+    left_on = models.DateField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    def __str__(self):
+        return self.student_id
+
+class StudentPhoto(models.Model):
+    student = models.OneToOneField(Student, on_delete=models.PROTECT, related_name="portrait")
+    image = models.BinaryField()
+    updated_at = models.DateTimeField(auto_now=True)
