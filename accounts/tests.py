@@ -101,3 +101,85 @@ class StaffManagementTests(TestCase):
         c = Client(enforce_csrf_checks=True)
         c.force_login(self.admin)
         self.assertEqual(c.post(f"/manage/staff/{self.teacher.pk}/status/", {"active":"0"}).status_code, 403)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, SESSION_COOKIE_SECURE=False, CSRF_COOKIE_SECURE=False)
+class StudentManagementTests(TestCase):
+    def setUp(self):
+        from .models import Student
+        self.admin = User.objects.create_superuser("studentadmin", password="Fictional-admin-passphrase-64")
+        self.teacher = User.objects.create_user("sampleteacher", password="Fictional-teacher-passphrase-65")
+        self.teacher.groups.add(Group.objects.get(name="Teacher"))
+        self.student = Student.objects.create(student_id="SAMPLE1", first_name="Fictional", last_name="Student", year_level=10)
+        self.client.force_login(self.admin)
+
+    def details(self, **extra):
+        return {"student_id":"SAMPLE2", "first_name":"Example", "last_name":"Learner", "preferred_name":"", "year_level":"7", "home_group":"7A", "status":"active", "enrolled_on":"2026-01-27", "left_on":"", **extra}
+
+    def test_student_directory_and_permissions(self):
+        self.assertContains(self.client.get("/manage/students/"), "SAMPLE1")
+        self.client.force_login(self.teacher)
+        self.assertEqual(self.client.get("/manage/students/").status_code, 403)
+        self.assertEqual(self.client.get(f"/manage/students/{self.student.pk}/").status_code, 403)
+        self.assertEqual(self.client.post("/manage/students/add/", self.details()).status_code, 403)
+
+    def test_create_and_stable_identifier(self):
+        from .models import Student
+        response = self.client.post("/manage/students/add/", self.details())
+        record = Student.objects.get(student_id="SAMPLE2")
+        self.assertRedirects(response, f"/manage/students/{record.pk}/")
+        self.client.post(f"/manage/students/{record.pk}/edit/", self.details(student_id="CHANGED", year_level="8"))
+        record.refresh_from_db()
+        self.assertEqual(record.student_id, "SAMPLE2")
+        self.assertEqual(record.year_level, 8)
+        self.assertTrue(SecurityEvent.objects.filter(event="student_updated", subject="SAMPLE2").exists())
+
+    def test_validation_and_leaving_dates(self):
+        from .models import Student
+        for bad in (self.details(student_id="sample1"), self.details(year_level="6"), self.details(status="left"), self.details(status="active", left_on="2026-02-01"), self.details(status="left", left_on="2025-01-01")):
+            self.assertEqual(self.client.post("/manage/students/add/", bad).status_code, 200)
+        self.assertEqual(Student.objects.count(), 1)
+        self.client.post("/manage/students/add/", self.details(status="left", left_on="2026-11-01"))
+        self.assertEqual(Student.objects.get(student_id="SAMPLE2").status, "left")
+
+    def test_csv_atomic_duplicate_and_filter(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from .models import Student
+        header = b"student_id,first_name,last_name,preferred_name,year_level,home_group,status,enrolled_on,left_on\n"
+        valid = b"SAMPLE3,Sample,Learner,,8,8A,active,2026-01-27,\n"
+        duplicate = b"SAMPLE3,Another,Learner,,8,8A,active,,\n"
+        self.assertEqual(self.client.post("/manage/students/import/", {"csv":SimpleUploadedFile("students.csv", header+valid+duplicate)}).status_code, 200)
+        self.assertFalse(Student.objects.filter(student_id="SAMPLE3").exists())
+        self.assertRedirects(self.client.post("/manage/students/import/", {"csv":SimpleUploadedFile("students.csv",header+valid)}), "/manage/students/")
+        response = self.client.get("/manage/students/?year=8&group=8A")
+        self.assertContains(response, "SAMPLE3")
+        self.assertNotContains(response, "SAMPLE1")
+
+    def test_photo_validation_and_protection(self):
+        import io
+        from PIL import Image
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from .models import StudentPhoto
+        pk = self.student.pk
+        bad = SimpleUploadedFile("bad.png", b"not an image", content_type="image/png")
+        self.assertEqual(self.client.post(f"/manage/students/{pk}/photo/upload/", {"photo":bad}).status_code, 200)
+        self.assertFalse(StudentPhoto.objects.filter(student=self.student).exists())
+        buffer = io.BytesIO()
+        Image.new("RGB", (800, 1000), "green").save(buffer, format="PNG")
+        good = SimpleUploadedFile("sample.png", buffer.getvalue(), content_type="image/png")
+        self.assertRedirects(self.client.post(f"/manage/students/{pk}/photo/upload/", {"photo":good}), f"/manage/students/{pk}/")
+        response = self.client.get(f"/manage/students/{pk}/photo/")
+        self.assertEqual(response["Content-Type"], "image/jpeg")
+        with Image.open(io.BytesIO(response.content)) as portrait:
+            self.assertLessEqual(portrait.width, 480)
+            self.assertLessEqual(portrait.height, 640)
+        self.client.force_login(self.teacher)
+        self.assertEqual(self.client.get(f"/manage/students/{pk}/photo/").status_code, 403)
+        self.client.force_login(self.admin)
+        self.assertRedirects(self.client.post(f"/manage/students/{pk}/photo/remove/"), f"/manage/students/{pk}/")
+        self.assertFalse(StudentPhoto.objects.filter(student=self.student).exists())
+
+    def test_mutation_csrf(self):
+        c = Client(enforce_csrf_checks=True)
+        c.force_login(self.admin)
+        self.assertEqual(c.post("/manage/students/add/", self.details()).status_code, 403)
