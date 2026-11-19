@@ -15,7 +15,7 @@ from .views import role_for
 from .oneschool_csv import parse, HEADER, MAX_BYTES
 
 class ImportForm(forms.Form):
-    name=forms.CharField(label="Draft name",max_length=100)
+    name=forms.CharField(label="Timetable version name",max_length=100)
     csv=forms.FileField(label="OneSchool timetable CSV")
     fictional=forms.BooleanField(label="I confirm this file contains only fictional or approved de-identified development data.")
 
@@ -34,7 +34,7 @@ def centre(request):
             if upload.size>MAX_BYTES:
                 raise ValueError("Choose a CSV up to 20 MB.")
             days,summary,digest=parse(upload.read(MAX_BYTES+1))
-            publish_now=request.POST.get("publish_now")=="yes"
+            publish_now=settings.ROLLFLOW_LIVE_TIMETABLE or request.POST.get("publish_now")=="yes"
             if publish_now and not settings.ROLLFLOW_LIVE_TIMETABLE:
                 raise ValueError("Direct publication is available only in approved live timetable mode.")
             if publish_now and request.POST.get("replace_ack")!="yes":
@@ -65,7 +65,7 @@ def centre(request):
 def review(request,pk):
     version=get_object_or_404(ImportedTimetable,pk=pk)
     first=version.days.first()
-    return page(request,"oneschool",review_version=version,example_rows=(first.allocations[:15] if first else []),published=ImportedTimetable.objects.filter(status="published").first())
+    return page(request,"oneschool",live_timetable=settings.ROLLFLOW_LIVE_TIMETABLE,review_version=version,example_rows=(first.allocations[:15] if first else []),published=ImportedTimetable.objects.filter(status="published").first())
 
 @administrator
 @require_POST
@@ -95,6 +95,8 @@ def publish(request,pk):
 @administrator
 @require_http_methods(["GET"])
 def sample(request):
+    if settings.ROLLFLOW_LIVE_TIMETABLE:
+        return HttpResponseForbidden("Sample exports are not available in the operational installation.")
     text=",".join(HEADER)+"\nDEMO071A,Mathematics,07,Mon,23/11/2026,PERIOD 1,08:50,10:00,DEMO01,,DEMOA,Example,Teacher,M01,Sample room\nDEMO071A,Mathematics,07,Tue,24/11/2026,PERIOD 1,09:00,10:10,DEMO02,,DEMOB,Example,Teacher,M02,Sample room\n"
     response=HttpResponse(text,content_type="text/csv; charset=utf-8")
     response["Content-Disposition"]='attachment; filename="fictional-oneschool-timetable.csv"'
