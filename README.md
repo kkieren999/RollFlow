@@ -1,5 +1,11 @@
 # RollFlow — Teacher Edition
 
+## V3 — Demo sign-in preview
+
+The public GitHub Pages demonstration now opens with a sign-in page. Use **teacher / teacher** for the Teacher Portal, or select the settings cog and use **admin / admin** for the separate administrator overview. Sign out to switch accounts. A tab-local session flag is stored in sessionStorage; existing fictional records remain in localStorage.
+
+These fixed, publicly visible credentials are UI demonstrations only, not real authentication or authorisation. The administrator overview is a starting page, not a functioning staff-management system. Never enter actual school passwords or personal information. Production requires a school-approved backend, secure sessions, server-enforced permissions and central storage outside GitHub.
+
 ## V2.1 — Teacher Experience & Reliability
 
 RollFlow is a single-page, browser-based teacher attendance demonstration designed around a Queensland teaching day. All information is fictional.
