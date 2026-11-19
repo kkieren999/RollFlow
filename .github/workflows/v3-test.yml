@@ -1,5 +1,6 @@
 name: V3 foundation tests
 on:
+  workflow_dispatch:
   push:
     branches: [v3.0-foundation]
   pull_request:
