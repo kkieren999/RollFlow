@@ -1,5 +1,13 @@
 # RollFlow — Teacher Edition
 
+## V3.2 — Student Management preview
+
+Sign in with the public admin / admin demonstration account and select Student Management. The directory starts with 240 fictional fixture students. Search by name or ID, filter by year, home group or enrolment status, add or edit student records, view profiles, toggle synthetic portraits and import a fictional CSV. Student IDs are stable; leaving dates are required when marking a student as left. Records are kept rather than deleted.
+
+The demo uses synthetic illustrations only. Do not upload or enter real student information. Student changes are stored in this browser and do not update the Teacher Portal's fixture rosters. Existing fixture home groups and class memberships are illustrative; only unambiguous fixture home groups are prefilled. Actual class allocation comes in V3.3.
+
+CSV header: `student_id,first_name,last_name,preferred_name,year_level,home_group,status,enrolled_on,left_on`. Use years 7–12, active/inactive/left status and ISO dates (YYYY-MM-DD). Import up to 500 rows, 250 KB, with duplicate checking. Download the template from Student Management → Import CSV. The server version is on the [V3 development branch](https://github.com/kkieren999/RollFlow/tree/v3.0-foundation).
+
 ## V3.1 — Administration Portal preview
 
 Select the settings cog on the public login screen and enter `admin / admin`. The admin dashboard and permanent navigation include staff management, local activity, CSV import and role descriptions. Other school-management modules are labelled as planned.
