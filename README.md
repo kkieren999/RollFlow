@@ -1,5 +1,15 @@
 # RollFlow V3.0 — School application foundation
 
+## V3.2 — Student Management
+
+Install updated requirements and apply migrations with `python manage.py migrate`. The server's administrator-only Student Management module includes a central database model and directory, student profile editing, year/home group/status filtering, enrolment and leaving dates, photo upload/removal and a transactional CSV import. New server databases start with no student records; import fictional samples using the supplied CSV template. The public demonstration has 240 fictional fixture students.
+
+Photos accept JPEG or PNG up to 5 MB and 16 megapixels, are resized to fit 480 × 640 and re-encoded as JPEG without preserving original metadata. The image is stored in the school-hosted development database, not GitHub, and delivered through an administrator-authorised no-store endpoint. Neither the public demo nor the server development installation is approved for real student records. Teachers cannot query this central directory yet.
+
+CSV header: `student_id,first_name,last_name,preferred_name,year_level,home_group,status,enrolled_on,left_on`. Year levels 7–12; status active, inactive or left; dates YYYY-MM-DD. Duplicate or invalid rows reject the entire import (500 rows/250 KB maximum). Student identifiers are immutable in the form. Status and enrolment dates can be changed without deleting the student. Staff/student events appear in management activity history; this is not a complete enrolment-history or tamper-resistant attendance audit.
+
+Teaching-class enrolments and historical transfers, teacher access rules, central timetable integration and attendance records remain planned. The V3.2 code adds student administration tests and migration files; run the Django checks and test suite before further deployment.
+
 ## V3.1 — Staff management
 
 After running `python manage.py migrate`, sign in through Admin login. The authenticated administrator is directed to `/manage/`, the RollFlow-branded staff portal. The existing Django administration site remains at `/admin/` for advanced administrative tasks. The new portal includes dashboard account counts, searchable/paginated staff directory, account creation and editing, Teacher/Administrator role changes, password reset, activation/deactivation, staff profile information, draft class allocations, CSV import and recent account activity.
