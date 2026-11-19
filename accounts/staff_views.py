@@ -17,7 +17,7 @@ from .staff_forms import StaffForm, ResetPasswordForm, StaffImportForm
 from .views import role_for
 
 NAVIGATION = (
-    ("SCHOOL MANAGEMENT", (("dashboard", "Dashboard"), ("staff", "Staff Management"), ("students", "Student Management"), ("classes", "Class Management"), ("timetable", "Timetable Management"), ("relief", "Relief & Supervision"))),
+    ("SCHOOL MANAGEMENT", (("dashboard", "Dashboard"), ("staff", "Staff Management"), ("students", "Student Management"), ("classes", "Class Management"), ("timetable", "Timetable Management"), ("master", "Master Timetable"), ("relief", "Relief & Supervision"))),
     ("OPERATIONS", (("attendance", "Attendance Monitoring"), ("movements", "Student Movements"), ("notices", "School Notices"), ("reports", "Reports"))),
     ("SYSTEM", (("roles", "Roles & Permissions"), ("data", "Data Management"), ("audit", "Audit Logs"), ("settings", "School Settings"))),
 )
@@ -84,6 +84,8 @@ def section(request, section):
         return redirect("management-class-directory")
     if section == "timetable":
         return redirect("management-timetable")
+    if section == "master":
+        return redirect("management-master")
     if section == "staff":
         q = request.GET.get("q", "").strip()[:150]
         status = request.GET.get("status", "all")
