@@ -1,5 +1,9 @@
 # RollFlow — Teacher Edition
 
+## V3.4.1 — Full-size test import and hosted publishing
+
+The public OneSchool Import Centre now supports temporary full-size Test Import (20 MB / 150,000 rows) with masked timetable preview. Only use data your school authorises for local testing. Results are not published or written to localStorage. The public publishing workflow remains fictional. Direct publication of an original school CSV is implemented in the private server version and requires school ICT approval, private HTTPS hosting, PostgreSQL and individual accounts. See the [server branch](https://github.com/kkieren999/RollFlow/tree/v3.0-foundation).
+
 ## V3.4 — OneSchool integration and advanced timetable management
 
 Open the public preview with admin / admin, then **OneSchool Import Centre → Load fictional sample**. Review counts/warnings and publish the draft. The Master Timetable changes to the published dated snapshot and the teacher's View planned timetable opens a fictional personal schedule. Try Monday and Tuesday to see different bell times. **Never upload real OneSchool data to the public demo.** Only DEMO-prefixed identifiers and the synthetic names are accepted, with at most 500 rows and five versions. The generated sample has 144 rows across five days. The original staff/student/class management and roll marking workflows remain separate.
