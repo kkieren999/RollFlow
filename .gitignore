@@ -12,3 +12,9 @@ __pycache__/
 .venv/
 backups/
 private-data/
+
+# Do not commit school exports
+ExportTimetable*.csv
+TTLineAlignmentExport*.xlsx
+ClassList*.pdf
+oneschool-exports/
