@@ -1175,7 +1175,7 @@ document.addEventListener('click',e=>{
  else if(a==='year'){const y=Number(id);if(osCollapsed.has(y))osCollapsed.delete(y);else osCollapsed.add(y)}
  else if(a==='personal'&&demoRole==='teacher'){osPersonal=true;state.page='master'}
  else if(a==='master'){osPersonal=false;state.page='master'}
- else if(a==='tab'&&demoRole==='admin'){osTab=id;planMode='list';planId=''}
+ else if(a==='tab'&&demoRole==='admin'){osTab=id;osReviewId='';planMode='list';planId=''}
  render();
  }catch(err){adminMessage=String(err.message||err);render()}
 },true);
