@@ -1,5 +1,11 @@
 # RollFlow V3.0 — School application foundation
 
+## V3.3.1 — Master Timetable
+
+The database-backed whole-school timetable is available from /manage/master/ for administrators and /teacher/master/ for authenticated teachers. It displays active recurring slots, periods ordered by start time, weekday tabs, year-level groups, class/teacher/room search, hide/show breaks (recognised by the period label or code), slot details, staff and room clash counts, and available-resource counts. Administrators can navigate to class and slot editing; teacher access is read-only and does not expose student rosters. Removed periods and inactive allocations are excluded. Resource counts use active teaching accounts and rooms for the full selected day, not filtered search results.
+
+The master timetable is recurring weekly planning rather than an effective-dated, published timetable version. Date-specific changes, shared-resource exceptions, authorised relief and timetable publication/version management remain planned. Backend regression tests are included; run migrations and the Django test suite before deployment. The separate public demo uses fictional browser-local planning only.
+
 ## V3.3 — Class & Timetable Management
 
 Apply migrations with `python manage.py migrate`. Administrator-only Class Management and Timetable Management create relational school classes, primary teacher allocations, dated student class enrolments (end instead of delete), rooms, school periods and recurring weekly lesson slots. Six example periods are seeded, using the previous fictional RollFlow teaching day. Staff and student records must be created before class allocations. Primary teacher changes do not silently reassign existing timetable slots. Class codes stay stable. Draft codes on staff profiles remain legacy planning notes, not permissions.
