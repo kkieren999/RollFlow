@@ -2,6 +2,7 @@
 from collections import Counter
 import re
 from django.shortcuts import redirect, render
+from django.conf import settings
 from django.http import HttpResponseForbidden
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
@@ -77,6 +78,10 @@ def master(request, admin_only=False):
     from .oneschool_views import current_version, dated
     if current_version():
         return dated(request, admin_only=admin_only)
+    if settings.ROLLFLOW_LIVE_TIMETABLE:
+        if role == "admin":
+            return page(request,"master",no_published_timetable=True)
+        return render(request,"live_timetable_pending.html")
     data = context(request)
     if role == "admin":
         return page(request, "master", master_admin=True, **data)
