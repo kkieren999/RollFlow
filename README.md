@@ -1,5 +1,15 @@
 # RollFlow V3.0 — School application foundation
 
+## V3.3 — Class & Timetable Management
+
+Apply migrations with `python manage.py migrate`. Administrator-only Class Management and Timetable Management create relational school classes, primary teacher allocations, dated student class enrolments (end instead of delete), rooms, school periods and recurring weekly lesson slots. Six example periods are seeded, using the previous fictional RollFlow teaching day. Staff and student records must be created before class allocations. Primary teacher changes do not silently reassign existing timetable slots. Class codes stay stable. Draft codes on staff profiles remain legacy planning notes, not permissions.
+
+Add a room, create a class, enrol students, and create or import lesson slots. The CSV template uses `class_code,teacher_username,room_code,weekday,period_code`; 1–5 are weekdays, all references must exist and be active where applicable. Maximum 500 rows/250 KB. Transactions reject invalid imports, and database constraints prevent active teacher/class/room double-booking within a period. Period time overlaps are validated in the form. Student timetable clashes, term calendars, date-specific exceptions, period-edit concurrency controls, full timetable history and relief allocations remain planned.
+
+A signed-in teacher can open School timetable from the Teacher Portal, a protected read-only weekly view based on assigned active database slots. Teachers cannot modify the planning records or see other teachers' slots through this endpoint. Central student rosters and attendance saving are not connected to the existing fictional roll workflow yet. New development databases begin without staff/student/class/room records other than seeded periods and the initial role group. The public Pages demo continues to use fictional browser-local planning and attendance data.
+
+Backend regression tests are committed for class editing, enrolment history, conflicts, transactional import, access control and teacher timetable filtering; run the Django checks and tests before deployment. Do not use actual school data.
+
 ## V3.2 — Student Management
 
 Install updated requirements and apply migrations with `python manage.py migrate`. The server's administrator-only Student Management module includes a central database model and directory, student profile editing, year/home group/status filtering, enrolment and leaving dates, photo upload/removal and a transactional CSV import. New server databases start with no student records; import fictional samples using the supplied CSV template. The public demonstration has 240 fictional fixture students.
