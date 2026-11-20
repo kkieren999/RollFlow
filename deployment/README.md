@@ -18,6 +18,19 @@ The builder copies the runtimes, fetches binary wheels on the build machine only
 
 Copy the built directory to local storage, not a network share or USB for running the database. Run under a standard dedicated account, not Administrator/root. Configure restrictive access (Windows NTFS ACLs) to the application and private data directories. Double-click First Setup.cmd once; create the initial admin at the prompt using a unique password. Start RollFlow.cmd and browse http://localhost:8080/. The default data directory is %LOCALAPPDATA%/RollFlow-Staging on Windows. Ctrl+C stops the application and the database it started. Application files and persistent state are separate. Do not use real records in staging. For a different state directory, call the bundled Python directly with --state before the command. Do not run two launchers against the same instance.
 
+### Windows PostgreSQL initialization permissions (V3.5.1)
+
+First setup now removes inherited NTFS permissions on the new instance directory and
+grants access explicitly to the Windows account performing setup. The short-lived
+`initial-password.txt` file receives a separate current-user SID grant so
+PostgreSQL `initdb` can read it even when its Windows token does not retain
+access through the Administrators group. The file is deleted after setup or a
+failed `initdb` attempt. ACL changes fail closed; do not work around failures
+with `Everyone`, `Users`, or broad administrator-group access. Use a local
+NTFS volume and the same dedicated standard account to set up and run RollFlow.
+Windows CI covers the bundled `initdb`, migration and backup path; a clean-machine
+test is still required before any release.
+
 ## Private school profile (future approved pilot only)
 
 ```powershell
