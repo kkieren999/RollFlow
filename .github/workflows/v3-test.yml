@@ -23,6 +23,7 @@ jobs:
       - run: python manage.py check
       - run: python manage.py makemigrations --check --dry-run
       - run: python manage.py test accounts
+      - run: python -m unittest deployment.test_native_permissions -v
   postgres-and-native:
     runs-on: ubuntu-24.04
     steps:
@@ -70,6 +71,8 @@ jobs:
           if (!$pgRoot) { throw 'PostgreSQL bin/lib/share layout not found' }
           python deployment/build_windows.py --python-runtime "$root/python" --postgres-runtime $pgRoot.FullName --output "$env:RUNNER_TEMP/RollFlow"
           if ($LASTEXITCODE -ne 0) { throw 'Bundle build failed' }
+      - name: Unit-test Windows password-file ACL handling
+        run: python -m unittest deployment.test_native_permissions -v
       - name: Smoke-test bundled runtime, database and backup
         shell: pwsh
         run: |
@@ -78,6 +81,7 @@ jobs:
           $state = "$env:RUNNER_TEMP/rf-test-state"
           & "$bundle/python/python.exe" -m deployment.native --state $state init --no-admin
           if ($LASTEXITCODE -ne 0) { throw 'Native setup failed' }
+          if (Test-Path (Join-Path $state 'initial-password.txt')) { throw 'Temporary initdb password was not deleted' }
           & "$bundle/python/python.exe" -m deployment.native --state $state manage check
           if ($LASTEXITCODE -ne 0) { throw 'Django system check failed' }
           & "$bundle/python/python.exe" -m deployment.native --state $state backup "$env:RUNNER_TEMP/rf-test-backup.dump"
