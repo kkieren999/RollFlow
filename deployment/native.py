@@ -40,7 +40,7 @@ def harden_windows_acl(path, *, directory=False):
     if len(rows) != 1 or len(rows[0]) != 2:
         raise RuntimeError("Could not determine the Windows user SID.")
     sid = rows[0][1].strip()
-    if not re.fullmatch(r"S-\\d+(?:-\\d+)+", sid):
+    if not re.fullmatch(r"S-\d+(?:-\d+)+", sid):
         raise RuntimeError("Invalid Windows user SID; refusing to loosen access.")
 
     # Remove inherited access (which can be group-only on CI runners), and
