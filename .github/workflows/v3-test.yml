@@ -39,7 +39,7 @@ jobs:
       - run: python deployment/ci_smoke.py
 
   windows-offline-bundle:
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/v3.0-foundation'
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/v3.0-foundation'
     runs-on: windows-2025
     timeout-minutes: 25
     steps:
