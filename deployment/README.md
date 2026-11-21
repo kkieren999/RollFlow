@@ -1,3 +1,19 @@
+# V3.6.4.2 — Staff PDF empty-legend fix
+
+This is a code-only bugfix for V3.6.4.1. A staff page with no classes can
+contain only Class Code and Class Name headings followed by a report footer;
+the parser now counts this as empty instead of failing. Nonempty malformed
+tables still fail validation. Missing/empty legends require administrator
+acknowledgement before approval.
+
+The schema and V3.6.4.1 state path/ports are unchanged deliberately. Do not
+run First Setup again on an existing instance. Stop the old instance,
+back up its database, archive and key, and start the corrected code from
+a separately extracted folder with Start RollFlow.cmd. Do not start both
+copies concurrently. A previously staged PDF can be reviewed again directly.
+
+---
+
 # V3.6.4.1 — Fix for OneSchool Excel worksheets without dimension metadata
 
 Some genuine OneSchool TTLineAlignmentExport XLSX files omit the optional

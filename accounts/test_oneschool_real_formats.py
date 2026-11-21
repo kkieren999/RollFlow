@@ -100,6 +100,41 @@ def fictional_staff_pdf(version=186054, empty_legend=False):
 
 
 
+
+def fictional_mixed_staff_pdf(*, damaged=False):
+    """One normal legend, an empty two-heading legend, and no legend."""
+    writer = PdfWriter()
+    for number, legend in enumerate([
+        ["Legend:", "Class Code", "Class Name", "Line",
+         "DEMO071", "Fictional English", "Line 1"],
+        ["Legend:", "Class Code", "Class Name"] +
+        (["DEMO072", "Incomplete row"] if damaged else []),
+        [],
+    ], 1):
+        page = writer.add_blank_page(width=595, height=842)
+        font = DictionaryObject({
+            NameObject("/Type"): NameObject("/Font"),
+            NameObject("/Subtype"): NameObject("/Type1"),
+            NameObject("/BaseFont"): NameObject("/Helvetica"),
+        })
+        page[NameObject("/Resources")] = DictionaryObject({
+            NameObject("/Font"): DictionaryObject({NameObject("/F1"): writer._add_object(font)})
+        })
+        parts = [f"DEMO{number}", "-", "Fictional staff",
+                 "Unavailable"] + legend + [
+                     "Monday, January 5, 2026 9:00:00 AM",
+                     "User: Fictional", "Ref-TTStaffTimetable-V5.36-1000-999123- Sort-S",
+                 ]
+        stream = DecodedStreamObject()
+        stream.set_data(("BT /F1 12 Tf 45 790 Td 14 TL " +
+                         " ".join(f"({item}) Tj T*" for item in parts) +
+                         " ET").encode("ascii"))
+        page[NameObject("/Contents")] = writer._add_object(stream)
+    out = io.BytesIO()
+    writer.write(out)
+    return out.getvalue()
+
+
 def without_excel_dimensions(original):
     """Simulate OneSchool files whose XML omits sheet <dimension ref=.../>."""
     result = io.BytesIO()
@@ -252,6 +287,32 @@ class ActualOneSchoolLayoutTests(TestCase):
         repeated = files[:-1] + [("repeated.xlsx", fictional_line(6))]
         with self.assertRaisesRegex(ValueError,"more than one file"):
             parse_alignment_batch(repeated)
+
+    def test_pdf_mixed_empty_and_populated_legends_can_be_approved(self):
+        raw = fictional_mixed_staff_pdf()
+        rows, summary = parse_staff_pdf(raw)
+        self.assertEqual(summary["pages"], 3)
+        self.assertEqual(summary["staff_codes"], 3)
+        self.assertEqual(summary["pages_without_legend"], 2)
+        self.assertEqual(summary["staff_class_references"], 1)
+        self.assertEqual(rows[0]["class_code"], "DEMO071")
+        self.assertEqual(self.stage("staff_pdf", [("fictional.pdf", raw)]).status_code, 302)
+        batch = OneSchoolArchiveBatch.objects.get()
+        preview = self.client.get(f"/manage/oneschool/documents/{batch.pk}/").context["staff_review"]
+        self.assertEqual(preview["pages_without_legend"], 2)
+        url = f"/manage/oneschool/documents/{batch.pk}/apply-staff-evidence/"
+        data = {"confirm_apply": "yes", "source_signature": preview["source_signature"]}
+        self.client.post(url, data)
+        self.assertEqual(OneSchoolStaffClassReference.objects.count(), 0)
+        data["acknowledge_empty_pages"] = "yes"
+        self.client.post(url, data)
+        self.assertEqual(OneSchoolStaffClassReference.objects.count(), 1)
+        batch.refresh_from_db()
+        self.assertEqual(batch.status, "applied")
+
+    def test_nonempty_two_heading_legend_is_not_treated_as_empty(self):
+        with self.assertRaisesRegex(ValueError, "Page 2: unexpected timetable legend headings"):
+            parse_staff_pdf(fictional_mixed_staff_pdf(damaged=True))
 
     def test_pdf_legend_parser_and_review_no_login_permission(self):
         raw = fictional_staff_pdf()
