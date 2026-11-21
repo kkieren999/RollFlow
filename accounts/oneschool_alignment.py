@@ -24,11 +24,23 @@ def parse_alignment_file(raw):
         if "Sheet1" not in wb.sheetnames or "ReportCriteria" not in wb.sheetnames:
             raise ValueError("Expected the Sheet1 and ReportCriteria worksheets.")
         ws, criteria = wb["Sheet1"], wb["ReportCriteria"]
-        if ws.max_row > MAX_ROWS or ws.max_column > 9 or criteria.max_row > 30:
+        # OneSchool leaves <dimension> out of several real XLSX worksheets.
+        # openpyxl's read-only worksheets then report max_row/max_column=None.
+        # Always bound parsed rows independently of optional dimensions.
+        if (ws.max_row is not None and ws.max_row > MAX_ROWS
+                or ws.max_column is not None and ws.max_column > 9
+                or criteria.max_row is not None and criteria.max_row > 30):
             raise ValueError("TTLineAlignmentExport workbook dimensions exceed safe limits.")
-        details = {str(row[0]).strip(): row[1] for row in
-                   criteria.iter_rows(min_row=1, max_col=2, values_only=True)
-                   if row[0] is not None}
+        details = {}
+        for index, row in enumerate(
+            criteria.iter_rows(min_row=1, max_col=3, values_only=True), 1
+        ):
+            if index > 30:
+                raise ValueError("TTLineAlignmentExport criteria exceed 30 rows.")
+            if row[2] is not None:
+                raise ValueError("TTLineAlignmentExport criteria have unexpected columns.")
+            if row[0] is not None:
+                details[str(row[0]).strip()] = row[1]
         if str(details.get("Report", "")).strip() != "TTLineAlignmentExport":
             raise ValueError("ReportCriteria must identify TTLineAlignmentExport.")
         try:
@@ -39,7 +51,15 @@ def parse_alignment_file(raw):
             raise ValueError("Missing or invalid OneSchool line/record/version criteria.") from None
         if line_no not in REQUIRED_LINES or not version_id or claimed_count < 0:
             raise ValueError("Unrecognised OneSchool timetable line or record count.")
-        raw_rows = list(ws.iter_rows(min_row=1, max_col=9, values_only=True))
+        raw_rows = []
+        for index, row in enumerate(
+            ws.iter_rows(min_row=1, max_col=10, values_only=True), 1
+        ):
+            if index > MAX_ROWS:
+                raise ValueError("TTLineAlignmentExport has too many worksheet rows.")
+            if row[9] is not None:
+                raise ValueError("TTLineAlignmentExport has unexpected columns.")
+            raw_rows.append(row[:9])
         if len(raw_rows) < 3:
             raise ValueError("TTLineAlignmentExport has no day-period blocks.")
         headers, labels, data = raw_rows[0], raw_rows[1], raw_rows[2:]
