@@ -125,7 +125,8 @@ class ConnectedSchoolTests(TestCase):
         p = self.publish()
         self.assertEqual(OneSchoolArchiveBatch.objects.count(),4)
         self.assertEqual(OneSchoolClassMembership.objects.count(),3)
-        self.assertEqual(read_encrypted(self.sm.files.get().storage_token), read_encrypted(self.sm.files.get().storage_token))
+        original = read_encrypted(self.sm.files.get().storage_token)
+        self.assertEqual(hashlib.sha256(original).hexdigest(), self.sm.files.get().sha256)
         self.assertRedirects(self.client.get("/manage/classes/"),"/manage/connected/classes/",fetch_redirect_response=False)
         self.assertContains(self.client.get("/manage/connected/classes/"),"LEGENDONLY")
         self.assertContains(self.client.get("/manage/connected/roster/DEMO07A/"),"Learner")
@@ -197,4 +198,8 @@ class ConnectedSchoolTests(TestCase):
         self.student.status=Student.Status.INACTIVE
         self.student.save(update_fields=["status"])
         self.client.force_login(self.a)
+        self.assertNotContains(self.client.get("/teacher/roster/DEMO07A/"),"Learner")
+        self.student.status=Student.Status.ACTIVE
+        self.student.student_id="CHANGED-ID"
+        self.student.save(update_fields=["status","student_id"])
         self.assertNotContains(self.client.get("/teacher/roster/DEMO07A/"),"Learner")
