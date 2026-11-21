@@ -466,3 +466,40 @@ def class_rosters(request):
     return render(request, "oneschool_class_rosters.html", {
         "overview": overview, "class_code": q, "members": members,
     })
+
+
+
+@administrator
+@never_cache
+@require_GET
+def timetable_evidence(request):
+    """Browse approved line slots or PDF legend evidence; never public."""
+    kind = request.GET.get("source", "lines")
+    class_code = request.GET.get("class", "").strip().upper()[:30]
+    if class_code and not all(x.isascii() and (x.isalnum() or x in "_-") for x in class_code):
+        return HttpResponseBadRequest("Invalid class filter.")
+    if kind not in ("lines", "staff_pdf"):
+        return HttpResponseBadRequest("Unknown timetable source.")
+    source_kind = (OneSchoolArchiveBatch.Kind.TT_ALIGNMENT
+                   if kind == "lines" else OneSchoolArchiveBatch.Kind.STAFF_PDF)
+    batch = OneSchoolArchiveBatch.objects.filter(
+        kind=source_kind, status="applied"
+    ).order_by("-applied_at", "-pk").first()
+    data = []
+    if batch:
+        if kind == "lines":
+            data = OneSchoolLineAllocation.objects.filter(batch=batch).order_by(
+                "weekday", "period", "class_code"
+            )
+        else:
+            data = OneSchoolStaffClassReference.objects.filter(batch=batch).order_by(
+                "class_code", "staff_code"
+            )
+        if class_code:
+            data = data.filter(class_code=class_code)
+    return render(request, "oneschool_schedule_review.html", {
+        "batch": batch,
+        "source": kind,
+        "class_code": class_code,
+        "entries": Paginator(data, 50).get_page(request.GET.get("page")),
+    })
