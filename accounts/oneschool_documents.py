@@ -154,13 +154,34 @@ def inspect_file(kind, name, raw):
         pairs, summary = parse_student_classes(raw)
         return common, summary
     if suffix == ".pdf":
-        return common, inspect_pdf(raw)
+        details = inspect_pdf(raw)
+        if kind == "staff_pdf":
+            from .oneschool_staff_pdf import parse_staff_pdf
+            try:
+                _, staff_summary = parse_staff_pdf(raw)
+            except ValueError:
+                details["staff_layout_recognized"] = False
+            else:
+                details.update(staff_summary)
+                details["staff_layout_recognized"] = True
+        return common, details
     if suffix == ".xlsx":
         wb = workbook_from_bytes(raw)
         try:
-            return common, {"worksheets": len(wb.sheetnames)}
+            details = {"worksheets": len(wb.sheetnames)}
+            is_alignment = kind == "tt_alignment" and "ReportCriteria" in wb.sheetnames
         finally:
             wb.close()
+        if is_alignment:
+            from .oneschool_alignment import parse_alignment_file
+            try:
+                _, alignment_summary = parse_alignment_file(raw)
+            except ValueError:
+                details["alignment_layout_recognized"] = False
+            else:
+                details.update(alignment_summary)
+                details["alignment_layout_recognized"] = True
+        return common, details
     if suffix == ".csv":
         try:
             text = raw.decode("utf-8-sig")
