@@ -73,6 +73,8 @@ USE_I18N = True
 USE_TZ = True
 STATIC_URL = "/static/"
 STATIC_ROOT = Path(os.environ.get("ROLLFLOW_STATIC_ROOT", BASE_DIR / ".collected-static"))
+# Original OneSchool exports live under private instance state, never STATIC_ROOT.
+ROLLFLOW_ARCHIVE_STATE_DIR = Path(os.environ.get("ROLLFLOW_DATA_DIR", BASE_DIR / ".local-data")).resolve()
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGIN_URL = "/login/"
 SESSION_COOKIE_NAME = "rollflow_session"
@@ -95,6 +97,13 @@ if os.environ.get("ROLLFLOW_TRUST_HTTPS_PROXY") == "1":
 ROLLFLOW_LIVE_TIMETABLE = os.environ.get("ROLLFLOW_LIVE_TIMETABLE") == "1"
 if ROLLFLOW_LIVE_TIMETABLE and (DEBUG or DATABASES["default"]["ENGINE"] != "django.db.backends.postgresql" or len(SECRET_KEY) < 50):
     raise ImproperlyConfigured("Live timetable requires DEBUG off, PostgreSQL and a secret key of at least 50 characters.")
+
+# Uploaded source files may contain identities: use a private temporary directory
+# even before they are encrypted into the offline archive.
+if os.environ.get("ROLLFLOW_DATA_DIR"):
+    private_uploads = Path(os.environ["ROLLFLOW_DATA_DIR"]) / "uploads"
+    private_uploads.mkdir(mode=0o700, parents=True, exist_ok=True)
+    FILE_UPLOAD_TEMP_DIR = str(private_uploads)
 
 # A school installation must never silently fall back to sample attendance or SQLite.
 if ROLLFLOW_SCHOOL_MODE:
