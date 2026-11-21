@@ -4,7 +4,7 @@ on:
   push:
     branches: [v3.0-foundation]
   pull_request:
-    branches: [main, v3.0-foundation, integration/v3.6.1-windows-teacher-portal, feature/v3.6.2-oneschool-import-centre, feature/v3.6.4-real-oneschool-format-support]
+    branches: [main, v3.0-foundation, integration/v3.6.1-windows-teacher-portal, feature/v3.6.2-oneschool-import-centre, feature/v3.6.4-real-oneschool-format-support, fix/v3.6.4-oneschool-unknown-worksheet-size]
 permissions:
   contents: read
 jobs:
@@ -107,11 +107,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'V3.6.4 OneSchool staff and line evidence schema/route smoke failed' }
           & "$bundle/python/python.exe" -m deployment.native --state $state manage shell -c "from accounts.test_oneschool_real_formats import fictional_line, without_excel_dimensions; from accounts.oneschool_alignment import parse_alignment_file; rows, detail = parse_alignment_file(without_excel_dimensions(fictional_line(1))); assert detail['line_number'] == 1 and len(rows) > 0"
           if ($LASTEXITCODE -ne 0) { throw 'Windows missing-dimension OneSchool XLSX parser smoke failed' }
+          & "$bundle/python/python.exe" -m deployment.native --state $state manage shell -c "from accounts.test_oneschool_real_formats import fictional_mixed_staff_pdf; from accounts.oneschool_staff_pdf import parse_staff_pdf; rows, info = parse_staff_pdf(fictional_mixed_staff_pdf()); assert len(rows) == 1 and info['pages_without_legend'] == 2"
+          if ($LASTEXITCODE -ne 0) { throw 'Windows mixed staff PDF legend smoke test failed' }
           & "$bundle/python/python.exe" -m deployment.native --state $state backup "$env:RUNNER_TEMP/rf-test-backup.dump"
           if ($LASTEXITCODE -ne 0) { throw 'Database backup failed' }
       - uses: actions/upload-artifact@v4
         with:
-          name: RollFlow-V3.6.4.1-Windows-x64-STAGING
+          name: RollFlow-V3.6.4.2-Windows-x64-STAGING
           path: ${{ runner.temp }}/RollFlow/
           if-no-files-found: error
           retention-days: 14
