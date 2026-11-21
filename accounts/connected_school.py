@@ -167,6 +167,7 @@ def build_candidate(name, starts, ends, times, closures):
     approved = {(pk, canonical(code)) for pk, code in
                 OneSchoolClassMembership.objects.values_list("student_id", "class_code")}
     unmatched = 0
+    student_identity = {}
     for eqid, code in pairs:
         stu = student_index.get(canonical(eqid))
         code = canonical(code)
@@ -175,6 +176,7 @@ def build_candidate(name, starts, ends, times, closures):
             unmatched += 1
             continue
         classes[code]["students"].append(stu.pk)
+        student_identity[str(stu.pk)] = canonical(stu.student_id)
     for cls in classes.values():
         cls["students"] = sorted(set(cls["students"]))
         cls["years"].sort()
@@ -196,7 +198,8 @@ def build_candidate(name, starts, ends, times, closures):
              "verified_mappings": len(bindings)}
     source_ids = {k: v.pk for k, v in batches.items()}
     snapshot = {"calendar": calendar, "classes": sorted(classes.values(), key=lambda x:x["code"]),
-                "slots": slots, "bindings": bindings, "stats": stats}
+                "slots": slots, "bindings": bindings, "stats": stats,
+                "student_identity": student_identity}
     value = {"name": name, "starts": starts.isoformat(), "ends": ends.isoformat(),
              "sources": source_ids, "snapshot": snapshot}
     digest = hashlib.sha256(json.dumps(value, sort_keys=True, ensure_ascii=True,
