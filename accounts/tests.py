@@ -492,3 +492,229 @@ class OneSchoolImportTests(TestCase):
         self.assertIn("future",coverage_message(v,date(2026,1,1)))
         self.assertEqual(coverage_message(v,date(2026,3,1)),"")
         self.assertEqual(shift_date(date(2099,12,31),7),date(2099,12,31))
+
+
+
+@override_settings(
+    ROLLFLOW_LIVE_TIMETABLE=True,
+    SECURE_SSL_REDIRECT=False,
+    SESSION_COOKIE_SECURE=False,
+    CSRF_COOKIE_SECURE=False,
+)
+class ConnectedTeacherPortalTests(TestCase):
+    """Only a verified, administrator-maintained OneSchool identity may see a
+    teacher's live personal timetable. The complete import stays admin-only.
+    """
+
+    def setUp(self):
+        from datetime import date
+        from .models import ImportedTimetable, ImportedTimetableDay, StaffProfile
+        self.admin = User.objects.create_superuser(
+            "connectedadmin", password="Fictional-admin-password-46"
+        )
+        group = Group.objects.get(name="Teacher")
+        self.teacher = User.objects.create_user(
+            "teachera", first_name="Teacher", last_name="A",
+            password="Fictional-teacher-password-46",
+        )
+        self.teacher.groups.add(group)
+        self.other = User.objects.create_user(
+            "teacherb", password="Fictional-teacher-password-47",
+        )
+        self.other.groups.add(group)
+        self.link = StaffProfile.objects.create(
+            user=self.teacher, staff_id="TEACH01", timetable_link_verified=False
+        )
+        StaffProfile.objects.create(
+            user=self.other, staff_id="TEACH02", timetable_link_verified=True
+        )
+        self.version = ImportedTimetable.objects.create(
+            name="Fictional published term", digest="a" * 64,
+            status="published", created_by=self.admin,
+            summary={
+                "first_date": "2026-11-23", "last_date": "2026-11-24",
+                "lessons": 3, "days": 2,
+            },
+        )
+        def row(code, staff_id, staff_code, start):
+            return {
+                "code": code, "subject": "Fictional mathematics",
+                "year": 7, "period": "PERIOD 1",
+                "start": start, "end": "10:00", "room": "R01",
+                "room_name": "Example room", "staff_id": staff_id,
+                "staff_code": staff_code,
+            }
+        ImportedTimetableDay.objects.create(
+            version=self.version, date=date(2026, 11, 23),
+            allocations=[
+                row("MY-CLASS", "TEACH01", "SHARED-CODE", "08:50"),
+                row("PRIVATE-OTHER-CLASS", "TEACH02", "SHARED-CODE", "08:50"),
+                row("UNALLOCATED-CLASS", "", "SHARED-CODE", "08:50"),
+            ],
+        )
+        ImportedTimetableDay.objects.create(
+            version=self.version, date=date(2026, 11, 24),
+            allocations=[row("OTHER-TUESDAY-CLASS", "TEACH02", "SHARED-CODE", "09:00")],
+        )
+
+    def test_anonymous_and_admin_cannot_open_personal_week(self):
+        self.assertRedirects(self.client.get("/teacher/week/"), "/")
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.get("/teacher/week/").status_code, 403)
+        self.assertEqual(self.client.get("/teacher/timetable/").status_code, 403)
+        self.client.force_login(self.teacher)
+        self.assertEqual(self.client.post("/teacher/week/").status_code, 405)
+
+    def test_unverified_link_cannot_display_imported_teaching(self):
+        self.client.force_login(self.teacher)
+        day = self.client.get("/teacher/timetable/?date=2026-11-23")
+        week = self.client.get("/teacher/week/?date=2026-11-23")
+        self.assertContains(day, "not been verified")
+        self.assertNotContains(day, "MY-CLASS")
+        self.assertContains(week, "not been verified")
+        self.assertNotContains(week, "MY-CLASS")
+        self.assertNotContains(week, "PRIVATE-OTHER-CLASS")
+
+    def test_verified_teacher_sees_only_own_day_and_week(self):
+        self.link.timetable_link_verified = True
+        self.link.save(update_fields=["timetable_link_verified"])
+        self.client.force_login(self.teacher)
+        day = self.client.get(
+            "/teacher/timetable/?date=2026-11-23&staff_id=TEACH02&staff=SHARED-CODE"
+        )
+        self.assertContains(day, "MY-CLASS")
+        self.assertNotContains(day, "PRIVATE-OTHER-CLASS")
+        self.assertNotContains(day, "UNALLOCATED-CLASS")
+        week = self.client.get(
+            "/teacher/week/?date=2026-11-23&staff_id=TEACH02&username=teacherb"
+        )
+        self.assertContains(week, "MY-CLASS")
+        self.assertNotContains(week, "PRIVATE-OTHER-CLASS")
+        self.assertNotContains(week, "UNALLOCATED-CLASS")
+        self.assertNotContains(week, "OTHER-TUESDAY-CLASS")
+        self.assertNotContains(week, "TEACH02")
+        self.assertContains(week, "No assigned lessons on this day")
+        self.assertContains(week, "My day")
+        self.assertContains(week, "My week")
+        self.assertNotContains(week, "Fictional master timetable")
+
+    def test_other_teacher_can_only_see_their_own(self):
+        self.client.force_login(self.other)
+        response = self.client.get("/teacher/week/?date=2026-11-23")
+        self.assertContains(response, "PRIVATE-OTHER-CLASS")
+        self.assertContains(response, "OTHER-TUESDAY-CLASS")
+        self.assertNotContains(response, "MY-CLASS")
+
+    def test_live_master_route_cannot_disclose_school_wide_data(self):
+        self.link.timetable_link_verified = True
+        self.link.save(update_fields=["timetable_link_verified"])
+        self.client.force_login(self.teacher)
+        self.assertRedirects(
+            self.client.get("/teacher/master/?date=2026-11-23"),
+            "/teacher/timetable/", fetch_redirect_response=False,
+        )
+        self.client.force_login(self.admin)
+        self.assertContains(
+            self.client.get("/manage/master/?date=2026-11-23"),
+            "PRIVATE-OTHER-CLASS",
+        )
+
+    def test_missing_mapping_and_ambiguous_mapping_fail_closed(self):
+        from .models import StaffProfile
+        self.client.force_login(self.teacher)
+        self.link.staff_id = None
+        self.link.timetable_link_verified = True
+        self.link.save(update_fields=["staff_id", "timetable_link_verified"])
+        self.assertContains(
+            self.client.get("/teacher/week/?date=2026-11-23"),
+            "no linked OneSchool staff ID",
+        )
+        self.link.staff_id = "TEACH01"
+        self.link.save(update_fields=["staff_id"])
+        # The database's unique index is case-sensitive; reject ambiguous
+        # legacy IDs even when they differ only in case.
+        extra = User.objects.create_user("duplicate", password="Fictional-password-73")
+        StaffProfile.objects.create(
+            user=extra, staff_id="teach01", timetable_link_verified=True
+        )
+        response = self.client.get("/teacher/week/?date=2026-11-23")
+        self.assertContains(response, "ambiguous")
+        self.assertNotContains(response, "MY-CLASS")
+
+    def test_switching_publication_updates_week_immediately(self):
+        from datetime import date
+        from .models import ImportedTimetable, ImportedTimetableDay
+        self.link.timetable_link_verified = True
+        self.link.save(update_fields=["timetable_link_verified"])
+        self.client.force_login(self.teacher)
+        self.assertContains(self.client.get("/teacher/week/?date=2026-11-23"), "MY-CLASS")
+        self.version.status = "archived"
+        self.version.save(update_fields=["status"])
+        latest = ImportedTimetable.objects.create(
+            name="Replacement snapshot", digest="b" * 64,
+            status="published", created_by=self.admin,
+            summary={"first_date": "2026-11-23", "last_date": "2026-11-23"},
+        )
+        ImportedTimetableDay.objects.create(
+            version=latest, date=date(2026, 11, 23),
+            allocations=[
+                {
+                    "code": "REPLACEMENT-LESSON", "subject": "New fictional lesson",
+                    "year": 8, "period": "PERIOD 2", "start": "11:00",
+                    "end": "12:00", "room": "R02", "staff_id": "TEACH01",
+                    "staff_code": "SHARED-CODE",
+                }
+            ],
+        )
+        response = self.client.get("/teacher/week/?date=2026-11-23")
+        self.assertContains(response, "REPLACEMENT-LESSON")
+        self.assertNotContains(response, "MY-CLASS")
+        self.assertNotContains(response, "PRIVATE-OTHER-CLASS")
+
+    def test_invalid_week_date_is_bounded(self):
+        self.link.timetable_link_verified = True
+        self.link.save(update_fields=["timetable_link_verified"])
+        self.client.force_login(self.teacher)
+        for value in ("invalid", "0001-01-01", "9999-12-31"):
+            with self.subTest(date=value):
+                self.assertEqual(
+                    self.client.get("/teacher/week/", {"date": value}).status_code,
+                    200,
+                )
+
+    def test_admin_verification_is_explicit_and_revoked_on_id_change(self):
+        from .models import SecurityEvent
+        self.client.force_login(self.admin)
+        endpoint = f"/manage/staff/{self.teacher.pk}/edit/"
+        def save(staff_id, verified=False):
+            return self.client.post(endpoint, {
+                "staff_id": staff_id,
+                "username": self.teacher.username,
+                "first_name": "Teacher", "last_name": "A",
+                "faculty": "Maths", "campus": "Test",
+                "role": "teacher", "active": "on",
+                **({"verify_timetable_link": "on"} if verified else {}),
+            })
+        self.assertEqual(save("TEACH01").status_code, 302)
+        self.link.refresh_from_db()
+        self.assertFalse(self.link.timetable_link_verified)
+        self.assertEqual(save("TEACH01", verified=True).status_code, 302)
+        self.link.refresh_from_db()
+        self.assertTrue(self.link.timetable_link_verified)
+        self.assertTrue(
+            SecurityEvent.objects.filter(
+                actor=self.admin, subject="teachera", event="staff_link_verified"
+            ).exists()
+        )
+        self.assertEqual(save("TEACH01").status_code, 302)
+        self.link.refresh_from_db()
+        self.assertTrue(self.link.timetable_link_verified)
+        self.assertEqual(save("NEWSTAFF").status_code, 302)
+        self.link.refresh_from_db()
+        self.assertFalse(self.link.timetable_link_verified)
+        self.assertEqual(self.link.staff_id, "NEWSTAFF")
+        self.client.force_login(self.teacher)
+        response = self.client.get("/teacher/week/?date=2026-11-23")
+        self.assertContains(response, "not been verified")
+        self.assertNotContains(response, "MY-CLASS")
+        self.assertEqual(save("TEACH01", verified=True).status_code, 403)
