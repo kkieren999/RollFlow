@@ -698,9 +698,11 @@ class ConnectedTeacherPortalTests(TestCase):
         self.assertEqual(save("TEACH01").status_code, 302)
         self.link.refresh_from_db()
         self.assertFalse(self.link.timetable_link_verified)
+        self.assertContains(self.client.get("/manage/staff/"), "OneSchool timetable link: unverified")
         self.assertEqual(save("TEACH01", verified=True).status_code, 302)
         self.link.refresh_from_db()
         self.assertTrue(self.link.timetable_link_verified)
+        self.assertContains(self.client.get("/manage/staff/"), "OneSchool timetable link: verified")
         self.assertTrue(
             SecurityEvent.objects.filter(
                 actor=self.admin, subject="teachera", event="staff_link_verified"
