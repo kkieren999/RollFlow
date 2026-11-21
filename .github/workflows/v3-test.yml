@@ -79,6 +79,16 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $bundle = "$env:RUNNER_TEMP/RollFlow"
           $state = "$env:RUNNER_TEMP/rf-test-state"
+          # Regression: the actual Windows shortcuts must not silently reuse
+          # a previous version's default RollFlow-Staging instance.
+          $setupLauncher = Get-Content (Join-Path $bundle 'First Setup.cmd') -Raw
+          $startLauncher = Get-Content (Join-Path $bundle 'Start RollFlow.cmd') -Raw
+          foreach ($launcher in @($setupLauncher, $startLauncher)) {
+            if ($launcher -notmatch 'RollFlow-V361-Staging') { throw 'V3.6.1 shortcuts must have a dedicated instance state' }
+            if ($launcher -notmatch '--state') { throw 'Shortcut state override missing' }
+          }
+          if ($setupLauncher -notmatch '--db-port 55433 --web-port 18081') { throw 'V3.6.1 setup must use independent database and web ports' }
+          if ($startLauncher -notmatch 'start') { throw 'Start shortcut must use configured V3.6.1 state' }
           & "$bundle/python/python.exe" -m deployment.native --state $state init --no-admin
           if ($LASTEXITCODE -ne 0) { throw 'Native setup failed' }
           if (Test-Path (Join-Path $state 'initial-password.txt')) { throw 'Temporary initdb password was not deleted' }
