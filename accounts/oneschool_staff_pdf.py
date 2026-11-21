@@ -13,6 +13,17 @@ STAFF_CODE = re.compile(r"^[A-Z0-9_-]{3,40}$")
 CLASS_CODE = re.compile(r"^[A-Z0-9_-]{3,30}$")
 VERSION = re.compile(r"TTStaffTimetable\s*-\s*V\d+\.\d+\s*-\s*\d+\s*-\s*(\d{3,12})\s*-")
 LINE = re.compile(r"^Line\s*([1-7])?$", re.I)
+# OneSchool prints this timestamp immediately after the legend table.
+FOOTER_DATE = re.compile(
+    r"^(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s+"
+    r"[A-Za-z]+\s+\d{1,2},\s+\d{4}\s+\d{1,2}:\d{2}:\d{2}\s+(?:AM|PM)$",
+    re.I,
+)
+
+
+def is_footer_start(line):
+    return bool(FOOTER_DATE.fullmatch(line) or VERSION.search(line))
+
 
 
 def parse_staff_pdf(raw):
@@ -46,12 +57,27 @@ def parse_staff_pdf(raw):
                 unreadable_legends += 1
                 continue
             begin = lines.index("Legend:")
-            if lines[begin+1:begin+4] != ["Class Code", "Class Name", "Line"]:
+            tail = lines[begin+1:]
+            # When no classes are allocated OneSchool prints only the first
+            # two column headings, followed immediately by the report footer.
+            # Do not mistake a damaged two-column nonempty table for an empty one.
+            if (tail[:2] == ["Class Code", "Class Name"]
+                    and len(tail) >= 3 and is_footer_start(tail[2])):
+                unreadable_legends += 1
+                continue
+            if tail[:3] != ["Class Code", "Class Name", "Line"]:
                 raise ValueError(f"Page {page_no}: unexpected timetable legend headings.")
-            for col in range(begin + 4, len(lines)-2, 3):
-                class_code, subject, label = lines[col:col+3]
+            end = next((index for index, value in enumerate(tail[3:], 3)
+                        if is_footer_start(value)), None)
+            if end is None or (end - 3) % 3:
+                raise ValueError(f"Page {page_no}: malformed class legend or missing footer.")
+            if end == 3:
+                unreadable_legends += 1
+                continue
+            for col in range(3, end, 3):
+                class_code, subject, label = tail[col:col+3]
                 if not CLASS_CODE.fullmatch(class_code):
-                    break
+                    raise ValueError(f"Page {page_no}: invalid class code in legend.")
                 match = LINE.fullmatch(label)
                 if match is None or len(subject) > 100:
                     raise ValueError(f"Page {page_no}: malformed class legend.")
