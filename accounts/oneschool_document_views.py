@@ -4,13 +4,16 @@ from django import forms
 from django.conf import settings
 from django.contrib import messages
 from django.db import IntegrityError, transaction
+from django.db.models import Count
+from django.core.paginator import Paginator
 from django.http import Http404, HttpResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.http import content_disposition_header
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
+from django.views.decorators.cache import never_cache
 
-from .models import OneSchoolArchiveBatch, OneSchoolArchivedFile, Student, SecurityEvent
+from .models import OneSchoolArchiveBatch, OneSchoolArchivedFile, OneSchoolClassMembership, Student, SecurityEvent
 from .oneschool_documents import (
     ALLOWED, MAX_BATCH_SIZE, MAX_FILE_SIZE, MAX_FILES, file_name,
     inspect_file, parse_students,
@@ -319,3 +322,24 @@ def purge(request, pk):
             transaction.on_commit(lambda: forget_encrypted(tokens))
     messages.success(request, "Encrypted source copies deleted. Audit metadata retained.")
     return redirect("oneschool-documents-review", pk=pk)
+
+
+
+@administrator
+@never_cache
+@require_GET
+def class_rosters(request):
+    """Admin-only read-only check of imported student/class relationships."""
+    q = request.GET.get("class", "").strip().upper()[:30]
+    overview = OneSchoolClassMembership.objects.values("class_code").annotate(
+        member_count=Count("student_id")
+    ).order_by("class_code")[:200]
+    members = None
+    if q and all(x.isascii() and (x.isalnum() or x in "_-") for x in q):
+        matches = OneSchoolClassMembership.objects.filter(class_code=q).select_related(
+            "student", "source_batch"
+        ).order_by("student__last_name", "student__first_name", "student__student_id")
+        members = Paginator(matches, 50).get_page(request.GET.get("page"))
+    return render(request, "oneschool_class_rosters.html", {
+        "overview": overview, "class_code": q, "members": members,
+    })
