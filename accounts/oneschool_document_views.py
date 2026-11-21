@@ -15,6 +15,8 @@ from .oneschool_documents import (
     ALLOWED, MAX_BATCH_SIZE, MAX_FILE_SIZE, MAX_FILES, file_name,
     inspect_file, parse_students,
 )
+from .oneschool_class_csv import parse_student_classes
+from .oneschool_class_service import preview_links, apply_links
 from .oneschool_storage import save_encrypted, read_encrypted, forget_encrypted
 from .staff_views import administrator
 
@@ -47,6 +49,8 @@ def event(request, kind, batch):
 
 def archive_page(request, **kwargs):
     return render(request, "oneschool_documents.html", {
+        "class_preview": kwargs.get("class_preview"),
+        "preview_error": kwargs.get("preview_error"),
         "form": kwargs.get("form") or SourceForm(),
         "batch": kwargs.get("batch"),
         "batches": OneSchoolArchiveBatch.objects.select_related("created_by").all()[:50],
@@ -66,8 +70,8 @@ def centre(request):
         kind = form.cleaned_data["kind"]
         if not uploaded or len(uploaded) > MAX_FILES:
             form.add_error(None, f"Select 1 to {MAX_FILES} export files.")
-        elif kind == "students" and len(uploaded) != 1:
-            form.add_error(None, "The SM110 student list needs exactly one XLSX workbook.")
+        elif kind in ("students", "class_members") and len(uploaded) != 1:
+            form.add_error(None, "Select exactly one file for the student list or student-class membership export.")
         elif sum(x.size for x in uploaded) > MAX_BATCH_SIZE:
             form.add_error(None, "Total upload size must be below 48 MB.")
         else:
@@ -93,8 +97,13 @@ def centre(request):
                     "automatic_teacher_assignment": False,
                     "subject_student_enrolment": False,
                 }
-                if kind == "students":
+                if kind in ("students", "class_members"):
                     metadata.update(files[0][2])
+                    if kind == "class_members":
+                        metadata["note"] = (
+                            "Review EQID/Class_Name matches before applying. "
+                            "Unmatched IDs or classes will never be fabricated."
+                        )
                 else:
                     metadata["note"] = (
                         "Archive and format review only. No staff IDs, class allocations "
@@ -131,6 +140,21 @@ def review(request, pk):
     batch = get_object_or_404(
         OneSchoolArchiveBatch.objects.select_related("created_by").prefetch_related("files"), pk=pk
     )
+    if batch.kind == OneSchoolArchiveBatch.Kind.CLASS_MEMBERS and batch.status == "staged":
+        if batch.source_purged_at:
+            return archive_page(request, batch=batch, preview_error="The original file has been purged.")
+        try:
+            source = batch.files.get()
+            raw = read_encrypted(source.storage_token)
+            if hashlib.sha256(raw).hexdigest() != source.sha256:
+                raise ValueError("Archive integrity check failed.")
+            pairs, _ = parse_student_classes(raw)
+            preview = preview_links(pairs)
+        except (ValueError, OSError, OneSchoolArchivedFile.DoesNotExist,
+                OneSchoolArchivedFile.MultipleObjectsReturned) as exc:
+            return archive_page(request, batch=batch,
+                                preview_error="Unable to validate archived source: " + str(exc))
+        return archive_page(request, batch=batch, class_preview=preview)
     return archive_page(request, batch=batch)
 
 
@@ -193,6 +217,63 @@ def apply_students(request, pk):
     messages.success(
         request, f"Student directory updated: {created} new, {updated} changed, {unchanged} unchanged. "
                  "Subject class enrolments were not modified."
+    )
+    return redirect("oneschool-documents-review", pk=pk)
+
+
+@administrator
+@require_POST
+def apply_class_memberships(request, pk):
+    # Confirm the exact reviewed match set, not a changed class catalogue.
+    if request.POST.get("confirm_apply") != "yes":
+        return HttpResponseBadRequest("Confirm before applying class memberships.")
+    try:
+        with transaction.atomic():
+            batch = get_object_or_404(
+                OneSchoolArchiveBatch.objects.select_for_update(), pk=pk
+            )
+            if (batch.kind != OneSchoolArchiveBatch.Kind.CLASS_MEMBERS
+                    or batch.status != "staged" or batch.source_purged_at):
+                return HttpResponseBadRequest("This is not a pending student-class export.")
+            source = get_object_or_404(OneSchoolArchivedFile, batch=batch)
+            raw = read_encrypted(source.storage_token)
+            if hashlib.sha256(raw).hexdigest() != source.sha256:
+                raise ValueError("Archived source checksum mismatch.")
+            pairs, parsed = parse_student_classes(raw)
+            preview = preview_links(pairs)
+            if request.POST.get("preview_signature") != preview["preview_signature"]:
+                messages.error(request, "The student or class records changed. Review the matches again.")
+                return redirect("oneschool-documents-review", pk=pk)
+            if preview["skipped_count"] and request.POST.get("skip_unmatched") != "yes":
+                messages.error(request, "Review and acknowledge unmatched rows before applying.")
+                return redirect("oneschool-documents-review", pk=pk)
+            if not preview["matched_count"]:
+                messages.error(request, "There are no matching student-class pairs to apply.")
+                return redirect("oneschool-documents-review", pk=pk)
+            applied = apply_links(preview["matched"], batch)
+            batch.summary = {**batch.summary, **parsed, "applied": {
+                **applied,
+                "skipped": preview["skipped_count"],
+                "matched": preview["matched_count"],
+                "unmatched_students": preview["unmatched_student_count"],
+                "inactive_students": preview["inactive_student_count"],
+                "unmatched_classes": preview["unmatched_class_count"],
+            }}
+            batch.status = OneSchoolArchiveBatch.Status.APPLIED
+            batch.applied_at = timezone.now()
+            batch.save(update_fields=["summary", "status", "applied_at"])
+            event(request, "oneschool_classes_applied", batch)
+    except (ValueError, OSError) as exc:
+        messages.error(request, str(exc))
+        return redirect("oneschool-documents-review", pk=pk)
+    except IntegrityError:
+        messages.error(request, "Student/class membership conflict. No changes were applied.")
+        return redirect("oneschool-documents-review", pk=pk)
+    messages.success(request,
+        f"Student-class links applied: {applied['created']} new, "
+        f"{applied['already_present']} already present, "
+        f"{preview['skipped_count']} unmatched rows not applied. "
+        "No student accounts or teacher assignments were changed."
     )
     return redirect("oneschool-documents-review", pk=pk)
 
