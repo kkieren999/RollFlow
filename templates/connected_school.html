@@ -48,7 +48,7 @@ input[type=checkbox]{margin-right:6px}table{width:100%;text-align:left;border-co
 {% empty %}<tr><td colspan="4">No verified code mappings yet. Unmapped lessons remain admin-only.</td></tr>{% endfor %}
 </tbody></table></div></section>
 <section class="panel"><h2>3. Configure term and lesson times</h2>
-<p>Enter the actual term dates, all four lesson times for each weekday in 24-hour format, and any closure dates. Example row: <code>Monday,1,08:50,10:00</code>. Include separate Monday and Tuesday–Friday times as needed. No dates are guessed from the export name.</p>
+<p>Enter the actual term dates, all four lesson times for each weekday in 24-hour format, and any closure dates. Example row: <code>Monday,1,08:50,10:00</code>. A blank 20-row template is provided; fill the two time columns for every row. Existing published term settings are prefilled when reviewing a replacement. Include separate Monday and Tuesday–Friday times as needed. No dates are guessed from the export name.</p>
 <form method="post">{% csrf_token %}{{ form.as_p }}
 <div class="actions"><button type="submit" name="action" value="review">Review school data</button></div>
 {% if preview %}
@@ -62,6 +62,7 @@ input[type=checkbox]{margin-right:6px}table{width:100%;text-align:left;border-co
 <div class="metric"><small>Slots with no staff</small><strong>{{ preview.stats.unassigned_slots }}</strong></div>
 <div class="metric"><small>Legend-only classes</small><strong>{{ preview.stats.legend_only }}</strong></div>
 </div>
+<h3>Example connected class rows (first 12)</h3><div class="scroll"><table><thead><tr><th>Class code</th><th>Class name</th><th>Matched students</th></tr></thead><tbody>{% for c in preview.examples %}<tr><td>{{ c.code }}</td><td>{{ c.name }}</td><td>{{ c.count }}</td></tr>{% endfor %}</tbody></table></div>
 {% if preview.stats.unmapped_codes %}<p class="note">Unmapped staff codes ({{ preview.stats.unmapped_codes|length }}): {{ preview.stats.unmapped_codes|join:", " }}. Their lessons stay admin-only.</p>{% endif %}
 <p class="note">Review skipped pairs and legend-only classes. PDF-only classes have no scheduled lesson and are admin-only. This snapshot does not include relief changes, assemblies or non-line lesson times. No attendance is written.</p>
 <input type="hidden" name="digest" value="{{ preview.digest }}">
