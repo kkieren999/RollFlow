@@ -1,3 +1,39 @@
+# V3.6.2 — Guided OneSchool Import Centre (development staging)
+
+This build extends the V3.6.1 connected teacher portal with a guided importer at
+`/manage/oneschool/documents/`. Its shortcuts use **separate** instance state
+`%LOCALAPPDATA%\RollFlow-V362-Staging`, PostgreSQL port **55434**, and local
+web port **18082**; existing V3.5 and V3.6.1 installations are untouched.
+
+For a new, empty V3.6.2 test instance, extract the downloaded ZIP to a fresh
+folder and run **First Setup.cmd** once, then **Start RollFlow.cmd** and browse
+http://localhost:18082/. To start an existing V3.6.2 instance use Start only.
+Never delete a previous version's instance directory to troubleshoot setup.
+
+Inside the Admin Portal, navigate to OneSchool Import Centre → **Guided
+OneSchool imports & offline archive**. The page explains where to find SM110
+Dynamic Student List Excel, whole-staff timetable PDF, and multiple
+TTLineAlignmentExport parts. **Only** the Excel student directory/home-group
+upsert is currently supported after explicit review. PDF and TTLine sources
+are kept in the encrypted archive pending verified field mapping. Subject-class
+enrolments remain out of scope.
+
+Archive paths under the *private* state folder:
+`oneschool-imports/` (encrypted original blobs),
+`oneschool-import.key` (separate Fernet key), and
+`uploads/` (temporary private intake area).
+The PostgreSQL backup does not include archived files or the key. Always
+maintain a suitably protected offline copy of all components, follow retention
+rules, and rehearse a restore on a separate test machine. The archive cannot be
+restored without its key. Exports must never be placed in GitHub, application
+static files or consumer-cloud backup services.
+
+Use **fictional data only** in the home/test installation. This is unsigned,
+unapproved staging software: live staff/student information requires school ICT
+authorisation, a privacy impact assessment and the approved private environment.
+
+---
+
 # V3.6.1 — Integrated Windows staging (V3.5.1 installation + V3.6 portal)
 
 ## Safe side-by-side test on a home computer
