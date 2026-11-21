@@ -3,6 +3,7 @@ from accounts.admin import admin_site
 from accounts.master_views import master
 from accounts.views import portal_login, teacher, sign_out, teacher_timetable
 from accounts.teacher_week_views import week as teacher_week
+from accounts.connected_views import roster as connected_roster
 
 urlpatterns = [
     path("", portal_login, name="teacher-login"),
@@ -12,6 +13,7 @@ urlpatterns = [
     path("teacher/timetable/", teacher_timetable, name="teacher-timetable"),
     path("teacher/week/", teacher_week, name="teacher-week"),
     path("teacher/", teacher, name="teacher"),
+    path("teacher/roster/<str:code>/", connected_roster, name="connected-teacher-roster"),
     path("logout/", sign_out, name="logout"),
     path("manage/", include("rollflow.management_urls")),
     path("admin/", admin_site.urls),
