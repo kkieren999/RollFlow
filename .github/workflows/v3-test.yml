@@ -4,7 +4,7 @@ on:
   push:
     branches: [v3.0-foundation]
   pull_request:
-    branches: [main, v3.0-foundation, integration/v3.6.1-windows-teacher-portal, feature/v3.6.2-oneschool-import-centre, feature/v3.6.4-real-oneschool-format-support, fix/v3.6.4-oneschool-unknown-worksheet-size]
+    branches: [main, v3.0-foundation, integration/v3.6.1-windows-teacher-portal, feature/v3.6.2-oneschool-import-centre, feature/v3.6.4-real-oneschool-format-support, fix/v3.6.4-oneschool-unknown-worksheet-size, fix/v3.6.4.2-empty-staff-pdf-legends]
 permissions:
   contents: read
 jobs:
@@ -113,7 +113,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Database backup failed' }
       - uses: actions/upload-artifact@v4
         with:
-          name: RollFlow-V3.6.4.2-Windows-x64-STAGING
+          name: RollFlow-V3.6.4.3-Windows-x64-STAGING
           path: ${{ runner.temp }}/RollFlow/
           if-no-files-found: error
           retention-days: 14
