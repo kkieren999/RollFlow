@@ -41,6 +41,7 @@ urlpatterns = [
     path("oneschool/documents/", oneschool_document_views.centre, name="oneschool-documents"),
     path("oneschool/documents/<int:pk>/", oneschool_document_views.review, name="oneschool-documents-review"),
     path("oneschool/documents/<int:pk>/apply/", oneschool_document_views.apply_students, name="oneschool-documents-apply"),
+    path("oneschool/documents/<int:pk>/apply-classes/", oneschool_document_views.apply_class_memberships, name="oneschool-documents-apply-classes"),
     path("oneschool/documents/<int:pk>/purge/", oneschool_document_views.purge, name="oneschool-documents-purge"),
     path("oneschool/documents/file/<int:pk>/download/", oneschool_document_views.download, name="oneschool-documents-download"),
     path("oneschool/<int:pk>/", oneschool_views.review, name="oneschool-review"),
