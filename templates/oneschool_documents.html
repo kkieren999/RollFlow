@@ -83,6 +83,7 @@ code{overflow-wrap:anywhere}
     <p>RollFlow checks each LineNr, TimetableVersionId, all Class/Teacher/Room columns and period/day blocks. Staff codes are planning evidence only and do not grant teacher account permissions.</p>
     {% if batch.status == 'applied' %}
       <p class="notice">Approved: version {{ batch.summary.applied.timetable_version_id }}, {{ batch.summary.applied.allocations }} weekly class slots and {{ batch.summary.applied.classes }} classes.</p>
+      <p><a class="btn" href="{% url 'oneschool-timetable-evidence' %}?source=lines">Review saved timetable slots</a></p>
     {% elif preview_error %}<p class="notice error">{{ preview_error }}</p>
     {% elif alignment_review %}
       <div class="meta">
@@ -109,6 +110,7 @@ code{overflow-wrap:anywhere}
     <p>Only class-code, class-name, printed staff-code and line-number evidence is extracted. Names are not copied into the database. This cannot authorise teacher login or reveal student lists.</p>
     {% if batch.status == 'applied' %}
       <p class="notice">Approved: {{ batch.summary.applied.pages }} pages, {{ batch.summary.applied.staff_codes }} staff codes, {{ batch.summary.applied.class_references }} class references, version {{ batch.summary.applied.timetable_version_id }}.</p>
+      <p><a class="btn" href="{% url 'oneschool-timetable-evidence' %}?source=staff_pdf">Review saved staff/class evidence</a></p>
     {% elif preview_error %}<p class="notice error">{{ preview_error }}</p>
       <p class="note warn">Stored for review, not applied. This staff PDF layout could not be verified, so it cannot be activated. The original remains encrypted.</p>
     {% elif staff_review %}
@@ -248,7 +250,7 @@ code{overflow-wrap:anywhere}
     <article class="card"><span class="tag">3 · Timetable line alignment</span>
       <h2>TTLineAlignmentExport</h2>
       <p><strong>Find:</strong> OneSchool's timetable/line-alignment exports. Save every relevant file for the same reporting period.</p>
-      <p><strong>Upload:</strong> <b>all seven .xlsx files together</b> (LineNr 1–7, same TimetableVersionId) with Ctrl or Shift.</p>
+      <p><strong>Upload:</strong> <b>multiple files at once — all seven .xlsx files together</b> (LineNr 1–7, same TimetableVersionId) with Ctrl or Shift.</p>
       <p><strong>RollFlow does:</strong> checks Class/Teacher/Room blocks, day/periods and source versions; approved weekly slots are saved to the local database.</p>
       <p class="help">Missing staff or rooms remain blank. Staff codes never grant teacher access.</p>
     </article>
@@ -297,7 +299,7 @@ code{overflow-wrap:anywhere}
     if(!type||!input||!tip)return;
     const hints={
       students:['.xlsx','Select exactly one SM110 Dynamic Student List (.xlsx).'],
-      staff_pdf:['.pdf','Select one or more staff timetable PDFs.'],
+      staff_pdf:['.pdf','Select one original whole-staff timetable PDF.'],
       tt_alignment:['.xlsx','Select seven TTLineAlignmentExport XLSX files (LineNr 1–7) together.'],
       class_members:['.csv','Select one ExportStudentClass CSV with EQID,Class_Name columns.']
     };
