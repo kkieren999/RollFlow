@@ -189,3 +189,35 @@ class OneSchoolClassMembership(models.Model):
             models.UniqueConstraint(fields=["student", "class_code"], name="unique_oneschool_student_class"),
         ]
 
+
+class OneSchoolLineAllocation(models.Model):
+    """Reviewed line-alignment row; a staff code is *not* a verified login ID."""
+    batch = models.ForeignKey(OneSchoolArchiveBatch, on_delete=models.PROTECT, related_name="line_allocations")
+    line_number = models.PositiveSmallIntegerField()
+    year_level = models.PositiveSmallIntegerField()
+    weekday = models.PositiveSmallIntegerField()
+    period = models.PositiveSmallIntegerField()
+    class_code = models.CharField(max_length=30)
+    staff_code = models.CharField(max_length=40, blank=True)
+    room_code = models.CharField(max_length=40, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["batch", "weekday", "period", "class_code"],
+                                    name="unique_oneschool_line_class_slot"),
+        ]
+
+
+class OneSchoolStaffClassReference(models.Model):
+    """PDF legend evidence, never automatic permission or staff-ID mapping."""
+    batch = models.ForeignKey(OneSchoolArchiveBatch, on_delete=models.PROTECT, related_name="staff_class_references")
+    staff_code = models.CharField(max_length=40)
+    class_code = models.CharField(max_length=30)
+    subject_name = models.CharField(max_length=100, blank=True)
+    line_number = models.PositiveSmallIntegerField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["batch", "staff_code", "class_code"],
+                                    name="unique_oneschool_staff_class_evidence"),
+        ]
