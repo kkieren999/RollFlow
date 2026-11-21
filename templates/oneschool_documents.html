@@ -95,6 +95,14 @@ code{overflow-wrap:anywhere}
           <div class="metric"><small>Unknown class codes</small><strong class="number">{{ class_preview.unmatched_class_count }}</strong></div>
           <div class="metric"><small>Duplicate CSV rows ignored</small><strong class="number">{{ batch.summary.duplicate_rows }}</strong></div>
         </div>
+        {% if class_preview.matched_examples %}
+          <h3>Example matched EQID and class-code pairs (first 15)</h3>
+          <p class="help">Administrator-only preview; review these alongside the counts. Full source remains in the encrypted archive.</p>
+          <div class="table-wrap"><table><thead><tr><th>EQID</th><th>Class code</th></tr></thead><tbody>
+          {% for example in class_preview.matched_examples %}
+          <tr><td>{{ example.eqid }}</td><td>{{ example.class_code }}</td></tr>
+          {% endfor %}</tbody></table></div>
+        {% endif %}
         {% if class_preview.unmatched_class_examples %}
           <p class="note warn"><strong>Unmatched classes to check:</strong> {{ class_preview.unmatched_class_examples|join:", " }}. Import/publish the matching timetable first or create an authorised school class.</p>
         {% endif %}
