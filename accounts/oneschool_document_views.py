@@ -22,6 +22,8 @@ from .oneschool_class_csv import parse_student_classes
 from .oneschool_class_service import preview_links, apply_links
 from .oneschool_storage import save_encrypted, read_encrypted, forget_encrypted
 from .staff_views import administrator
+from .oneschool_source_review import alignment_preview, staff_pdf_preview
+from .models import OneSchoolLineAllocation, OneSchoolStaffClassReference
 
 
 class SourceForm(forms.Form):
@@ -53,6 +55,8 @@ def event(request, kind, batch):
 def archive_page(request, **kwargs):
     return render(request, "oneschool_documents.html", {
         "class_preview": kwargs.get("class_preview"),
+        "alignment_review": kwargs.get("alignment_review"),
+        "staff_review": kwargs.get("staff_review"),
         "preview_error": kwargs.get("preview_error"),
         "form": kwargs.get("form") or SourceForm(),
         "batch": kwargs.get("batch"),
@@ -158,6 +162,18 @@ def review(request, pk):
             return archive_page(request, batch=batch,
                                 preview_error="Unable to validate archived source: " + str(exc))
         return archive_page(request, batch=batch, class_preview=preview)
+    if batch.status == "staged" and batch.kind == OneSchoolArchiveBatch.Kind.TT_ALIGNMENT:
+        try:
+            _, preview = alignment_preview(batch)
+            return archive_page(request, batch=batch, alignment_review=preview)
+        except (ValueError, OSError) as exc:
+            return archive_page(request, batch=batch, preview_error=str(exc))
+    if batch.status == "staged" and batch.kind == OneSchoolArchiveBatch.Kind.STAFF_PDF:
+        try:
+            _, preview = staff_pdf_preview(batch)
+            return archive_page(request, batch=batch, staff_review=preview)
+        except (ValueError, OSError) as exc:
+            return archive_page(request, batch=batch, preview_error=str(exc))
     return archive_page(request, batch=batch)
 
 
@@ -279,6 +295,111 @@ def apply_class_memberships(request, pk):
         f"{applied['already_present']} already present, "
         f"{preview['skipped_count']} unmatched rows not applied. "
         "No student accounts or teacher assignments were changed."
+    )
+    return redirect("oneschool-documents-review", pk=pk)
+
+
+@administrator
+@require_POST
+def apply_alignment(request, pk):
+    if request.POST.get("confirm_apply") != "yes":
+        return HttpResponseBadRequest("Confirm the timetable line import before applying.")
+    try:
+        with transaction.atomic():
+            batch = get_object_or_404(
+                OneSchoolArchiveBatch.objects.select_for_update(), pk=pk
+            )
+            if batch.kind != OneSchoolArchiveBatch.Kind.TT_ALIGNMENT or batch.status != "staged" or batch.source_purged_at:
+                return HttpResponseBadRequest("This is not a pending TTLine upload.")
+            rows, preview = alignment_preview(batch)
+            if not preview["complete"]:
+                messages.error(request, "Missing TTLine exports: upload all seven line files in a single batch.")
+                return redirect("oneschool-documents-review", pk=pk)
+            if request.POST.get("source_signature") != preview["source_signature"]:
+                messages.error(request, "Sources changed. Review the seven alignment files again.")
+                return redirect("oneschool-documents-review", pk=pk)
+            OneSchoolLineAllocation.objects.bulk_create(
+                [OneSchoolLineAllocation(batch=batch, **record) for record in rows],
+                batch_size=300,
+            )
+            batch.summary = {
+                **batch.summary,
+                "applied": {
+                    "timetable_version_id": preview["timetable_version_id"],
+                    "lines": preview["lines"],
+                    "allocations": preview["allocation_count"],
+                    "classes": preview["distinct_classes"],
+                    "staff_code_count": preview["staff_codes"],
+                    "unallocated_staff": preview["unallocated_staff"],
+                },
+                "verified_timetable_line_schema": True,
+            }
+            batch.status = OneSchoolArchiveBatch.Status.APPLIED
+            batch.applied_at = timezone.now()
+            batch.save(update_fields=["summary", "status", "applied_at"])
+            event(request, "oneschool_alignment_applied", batch)
+    except (ValueError, OSError) as exc:
+        messages.error(request, str(exc))
+        return redirect("oneschool-documents-review", pk=pk)
+    except IntegrityError:
+        messages.error(request, "Conflicting class/day/period records; no timetable lines were applied.")
+        return redirect("oneschool-documents-review", pk=pk)
+    messages.success(request,
+        f"Seven timetable lines verified and saved: {preview['allocation_count']} class slots. "
+        "Staff codes remain unverified evidence, not teacher account assignments."
+    )
+    return redirect("oneschool-documents-review", pk=pk)
+
+
+@administrator
+@require_POST
+def apply_staff_pdf(request, pk):
+    if request.POST.get("confirm_apply") != "yes":
+        return HttpResponseBadRequest("Confirm staff PDF evidence import.")
+    try:
+        with transaction.atomic():
+            batch = get_object_or_404(
+                OneSchoolArchiveBatch.objects.select_for_update(), pk=pk
+            )
+            if batch.kind != OneSchoolArchiveBatch.Kind.STAFF_PDF or batch.status != "staged" or batch.source_purged_at:
+                return HttpResponseBadRequest("This is not a pending staff PDF.")
+            rows, preview = staff_pdf_preview(batch)
+            if request.POST.get("source_signature") != preview["source_signature"]:
+                messages.error(request, "Staff PDF source changed. Review it again.")
+                return redirect("oneschool-documents-review", pk=pk)
+            if preview["pages_without_legend"] and request.POST.get("acknowledge_empty_pages") != "yes":
+                messages.error(request, "Acknowledge the pages without readable class legends.")
+                return redirect("oneschool-documents-review", pk=pk)
+            OneSchoolStaffClassReference.objects.bulk_create(
+                [OneSchoolStaffClassReference(batch=batch, **record) for record in rows],
+                batch_size=300,
+            )
+            batch.summary = {
+                **batch.summary,
+                "applied": {
+                    "pages": preview["pages"],
+                    "staff_codes": preview["staff_codes"],
+                    "class_references": preview["staff_class_references"],
+                    "classes": preview["distinct_classes"],
+                    "pages_without_legend": preview["pages_without_legend"],
+                    "timetable_version_id": preview["timetable_version_id"],
+                },
+                "verified_staff_pdf_layout": True,
+                "teacher_account_permission_grants": False,
+            }
+            batch.status = OneSchoolArchiveBatch.Status.APPLIED
+            batch.applied_at = timezone.now()
+            batch.save(update_fields=["summary", "status", "applied_at"])
+            event(request, "oneschool_staff_pdf_applied", batch)
+    except (ValueError, OSError) as exc:
+        messages.error(request, str(exc))
+        return redirect("oneschool-documents-review", pk=pk)
+    except IntegrityError:
+        messages.error(request, "Duplicate or conflicting staff class references; no PDF evidence was applied.")
+        return redirect("oneschool-documents-review", pk=pk)
+    messages.success(request,
+        f"Staff PDF evidence saved: {preview['staff_class_references']} class references. "
+        "No teacher account identity or permissions were changed."
     )
     return redirect("oneschool-documents-review", pk=pk)
 
