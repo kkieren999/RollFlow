@@ -1,3 +1,53 @@
+# V3.6.5 — Connected School Data (staging)
+
+## Upgrade your existing V3.6.4.1 / .2 / .3 test instance
+
+1. Stop RollFlow using Ctrl+C and wait for the database to stop.
+2. Extract V3.6.5 into a **new application folder**. Keep the old extracted
+   folder because instance.json points to its PostgreSQL runtime.
+3. Run **Upgrade Existing.cmd**. It refuses to proceed while PostgreSQL is
+   running, uses the existing %LOCALAPPDATA%\RollFlow-V3641-Staging state,
+   copies the encrypted originals and key into a new private
+   upgrade-backups directory, creates and checks a PostgreSQL dump, then
+   applies additive migration 0011 and runs Django checks.
+4. Only after successful upgrade, run **Start RollFlow.cmd** and visit
+   http://localhost:18085/manage/connected/. Do not click First Setup.
+   Do not delete original state or the old code. For custom state paths
+   use the explicit command below.
+
+```powershell
+.\python\python.exe -m deployment.native --state "$env:LOCALAPPDATA\RollFlow-V3641-Staging" upgrade
+```
+
+The backup is local and permission-restricted, not automatically encrypted
+as a whole. Keep a separate approved encrypted offline copy and rehearse
+restore; the dump check only validates its table of contents, not a full restore.
+Do not expose or sync backups. If upgrade fails, stop and retain the backup.
+An actual restore/rollback must be performed by a qualified administrator.
+
+## Publish connected data
+
+In OneSchool Import Centre select **Review and publish school data**.
+All four source types must be approved; latest line and staff PDF versions
+must match. Confirm the selected batch references. Verify teacher Staff IDs
+in Staff Management, then explicitly map printed staff codes to verified
+teacher accounts. Enter term start/end, all 20 weekday period times
+(Day,Period,HH:MM,HH:MM, no header) and closure dates. Review, then publish.
+The existing Classes and Master Timetable links now show the publication.
+Teacher login, My day and My week use only verified, published allocations.
+Class rosters are read-only and limited to the teacher's verified weekly
+slots within the current term; PDF-only classes are administrator-only.
+New import changes require a new review/publication. Earlier snapshots,
+manual records and original archive files are preserved. Latest original
+SM110 and student-class CSV must remain available for reconciliation.
+
+The weekly line exports omit relief, assemblies and non-line periods; this
+is a term planning timetable, not an authoritative live daily attendance
+feed. No attendance writes. School data requires an authorised host and
+ICT/security/privacy review. Use fictional records on home staging.
+
+---
+
 # V3.6.4.2 — Staff PDF empty-legend fix
 
 This is a code-only bugfix for V3.6.4.1. A staff page with no classes can

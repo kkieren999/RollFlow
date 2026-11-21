@@ -75,6 +75,11 @@ def master(request, admin_only=False):
         return redirect("teacher-login")
     if role not in ("teacher", "admin") or (admin_only and role != "admin"):
         return HttpResponseForbidden("Staff access required.")
+    from .connected_school import current
+    if current():
+        if role == "teacher":
+            return redirect("teacher-timetable")
+        return redirect("connected-master")
     from .oneschool_views import current_version, dated
     if settings.ROLLFLOW_LIVE_TIMETABLE and role == "teacher":
         # School-wide imported staff IDs and allocations are administrative data.

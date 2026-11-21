@@ -66,7 +66,8 @@ def teacher(request):
         return redirect("teacher-login")
     if role != "teacher":
         return HttpResponseForbidden("Use a teacher account to open the Teacher Portal.")
-    if settings.ROLLFLOW_LIVE_TIMETABLE:
+    from .connected_school import current
+    if current() or settings.ROLLFLOW_LIVE_TIMETABLE:
         return redirect("teacher-timetable")
     user = request.user
     profile = getattr(user, "staff_profile", None)
@@ -103,6 +104,10 @@ def teacher_timetable(request):
         return redirect("teacher-login")
     if role != "teacher":
         return HttpResponseForbidden("Teacher access required.")
+    from .connected_school import current
+    if current():
+        from .connected_views import teacher_schedule
+        return teacher_schedule(request)
     from .oneschool_views import current_version, dated
     if current_version():
         return dated(request, personal=True)

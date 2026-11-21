@@ -23,6 +23,9 @@ def active_slots():
 @administrator
 @require_http_methods(["GET"])
 def classes(request):
+    from .connected_school import current
+    if current() and request.GET.get("manual") != "1":
+        return redirect("connected-classes")
     q = request.GET.get("q","").strip()[:150]
     year = request.GET.get("year","")
     records = SchoolClass.objects.select_related("teacher").annotate(roster_count=Count("enrolments",filter=Q(enrolments__end_date__isnull=True))).order_by("code")
@@ -97,6 +100,9 @@ def end_enrolment(request,pk):
 @administrator
 @require_http_methods(["GET"])
 def timetable(request):
+    from .connected_school import current
+    if current() and request.GET.get("manual") != "1":
+        return redirect("connected-master")
     teacher=request.GET.get("teacher","")
     weekday=request.GET.get("day","")
     tab=request.GET.get("tab","lessons" if "day" in request.GET or "teacher" in request.GET else request.session.get("timetable_tab","overview"))

@@ -67,6 +67,8 @@ def set_role(user, role):
 def dashboard(request):
     users = User.objects.all()
     from .oneschool_views import current_version, coverage_message
+    from .connected_school import current as connected_current, visible_slots
+    connected=connected_current()
     version=current_version()
     imported_stats=[]
     if version:
@@ -74,15 +76,23 @@ def dashboard(request):
         current=version.days.filter(date=timezone.localdate()).first()
         rows=current.allocations if current else []
         imported_stats=[("Imported allocations",a.get("lessons",0)),("Imported classes",a.get("classes",0)),("Imported staff IDs",a.get("staff",0)),("Imported rooms",a.get("rooms",0)),("Imported school days",a.get("days",0)),("Today’s allocations",len(rows)),("Today’s classes",len({r["code"] for r in rows}))]
-    return page(request, "dashboard", published_import=version, coverage_warning=coverage_message(version,timezone.localdate()) if version else "", imported_stats=imported_stats, stats=[
+    if connected:
+        today_rows = visible_slots(connected, timezone.localdate())
+        counts = connected.snapshot["stats"]
+        imported_stats = [("Published classes", counts["classes"]), ("Weekly class slots", counts["slots"]),
+                          ("Published student-class links", counts["memberships"]),
+                          ("Verified mappings at publication", counts["verified_mappings"]),
+                          ("Today’s allocations", len(today_rows)),
+                          ("Today’s classes", len({row["code"] for row in today_rows}))]
+    return page(request, "dashboard", connected_publication=connected, published_import=version, coverage_warning=coverage_message(version,timezone.localdate()) if version else "", imported_stats=imported_stats, stats=[
         ("Staff accounts", users.count()),
         ("Active staff", users.filter(is_active=True).count()),
         ("Teachers", users.filter(groups__name="Teacher", is_staff=False, is_superuser=False).distinct().count()),
         ("Administrators", users.filter(is_staff=True, is_superuser=True).count()),
         ("Enrolled students", Student.objects.filter(status=Student.Status.ACTIVE).count()),
         ("Student records", Student.objects.count()),
-        ("Active classes", SchoolClass.objects.filter(active=True).count()),
-        ("Active timetable slots", TimetableSlot.objects.filter(active=True).count()),
+        ("Manual active classes", SchoolClass.objects.filter(active=True).count()),
+        ("Manual active timetable slots", TimetableSlot.objects.filter(active=True).count()),
     ], events=SecurityEvent.objects.select_related("actor").all()[:6])
 
 @administrator
@@ -164,6 +174,10 @@ def staff_edit(request, pk=None):
                     "staff_id": c["staff_id"], "faculty": c["faculty"], "campus": c["campus"],
                     "class_codes": c["class_codes"], "timetable_link_verified": link_verified,
                 })
+                if existing_profile and (previous_id != c["staff_id"] or not link_verified or c["role"] != "teacher" or not user.is_active):
+                    from .models import ConnectedStaffMapping
+                    if ConnectedStaffMapping.objects.filter(profile=existing_profile).delete()[0]:
+                        SecurityEvent.objects.create(actor=request.user, event="connected_mapping_revoked", subject=user.username)
                 if link_verified != bool(existing_profile and existing_profile.timetable_link_verified) or (
                     c["staff_id"] and previous_id != c["staff_id"] and link_verified
                 ):
@@ -214,6 +228,10 @@ def staff_status(request, pk):
             return redirect("management-section", section="staff")
         target.is_active = value == "1"
         target.save(update_fields=["is_active"])
+        if not target.is_active:
+            from .models import ConnectedStaffMapping
+            if ConnectedStaffMapping.objects.filter(profile__user=target).delete()[0]:
+                SecurityEvent.objects.create(actor=request.user, event="connected_mapping_revoked", subject=target.username)
         revoke_sessions(target)
         log(request, "account_activated" if target.is_active else "account_deactivated", target)
     messages.success(request, "Account status updated.")

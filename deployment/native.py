@@ -183,12 +183,81 @@ def backup(cfg, output):
     # Create with restrictive permissions, even when called outside the state directory.
     write_private(output, "")
     try:
+        if os.name == "nt":
+            harden_windows_acl(output)
         run([pg(cfg, "pg_dump"), "-h", "127.0.0.1", "-p", cfg["db_port"],
              "-U", "rollflow_app", "-Fc", "-f", output, "rollflow"], env=env)
     except BaseException:
         output.unlink(missing_ok=True)
         raise
     print("Database backup created. Keep it on approved encrypted storage:", output)
+
+def upgrade(cfg):
+    """Back up a stopped existing instance before additive schema migration.
+
+    Never initialise, replace instance.json, move PostgreSQL, rotate keys or
+    delete archive data. Old PostgreSQL binaries must remain installed.
+    """
+    import hashlib
+    import shutil
+    from datetime import datetime, timezone
+
+    state = Path(cfg["state"])
+    status = subprocess.run([str(pg(cfg, "pg_ctl")), "-D", str(state / "postgres"), "status"],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if status.returncode != 3:
+        raise RuntimeError("Stop the existing RollFlow instance and PostgreSQL before upgrading.")
+    lock = state / "upgrade-in-progress.lock"
+    write_private(lock, "Existing-instance upgrade in progress.\n")
+    try:
+        root = state / "upgrade-backups"
+        if root.is_symlink():
+            raise RuntimeError("Upgrade backup directory cannot be a symbolic link.")
+        root.mkdir(mode=0o700, exist_ok=True)
+        if os.name == "nt":
+            harden_windows_acl(root, directory=True)
+        dest = root / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+        dest.mkdir(mode=0o700)
+        if os.name == "nt":
+            harden_windows_acl(dest, directory=True)
+        archive, key = state / "oneschool-imports", state / "oneschool-import.key"
+        if archive.is_symlink() or key.is_symlink():
+            raise RuntimeError("Archive paths cannot be symbolic links.")
+        if archive.exists() and any(archive.iterdir()) and not key.is_file():
+            raise RuntimeError("Original archive key is missing; recover it before upgrading.")
+        def copy_verified(source, target):
+            if source.is_symlink() or not source.is_file():
+                raise RuntimeError("Unexpected archive entry; upgrade stopped.")
+            shutil.copyfile(source, target)
+            if os.name == "nt":
+                harden_windows_acl(target)
+            else:
+                target.chmod(0o600)
+            with source.open("rb") as a, target.open("rb") as b:
+                if hashlib.file_digest(a, "sha256").digest() != hashlib.file_digest(b, "sha256").digest():
+                    raise RuntimeError("Backup file verification failed.")
+        if archive.exists():
+            target = dest / "oneschool-imports"
+            target.mkdir(mode=0o700)
+            if os.name == "nt":
+                harden_windows_acl(target, directory=True)
+            for item in archive.iterdir():
+                copy_verified(item, target / item.name)
+        if key.exists():
+            copy_verified(key, dest / key.name)
+        with database(cfg):
+            backup(cfg, dest / "rollflow.dump")
+            run([pg(cfg, "pg_restore"), "--list", dest / "rollflow.dump"],
+                stdout=subprocess.DEVNULL)
+            print("Verified pre-upgrade backup:", dest)
+            manage(cfg, "migrate", "--noinput")
+            manage(cfg, "migrate", "--check")
+            manage(cfg, "check")
+            manage(cfg, "collectstatic", "--noinput")
+        print("Upgrade complete. Keep the original installation and backup; start the new code.")
+    finally:
+        lock.unlink(missing_ok=True)
+
 
 def main():
     if os.name != "nt":
@@ -204,6 +273,7 @@ def main():
     p.add_argument("--web-port", type=int, default=8080)
     p.add_argument("--no-admin", action="store_true", help="Create admin separately with manage.")
     sub.add_parser("start")
+    sub.add_parser("upgrade", help="Back up and migrate an existing stopped instance")
     m = sub.add_parser("manage")
     m.add_argument("args", nargs=argparse.REMAINDER)
     b = sub.add_parser("backup")
@@ -216,8 +286,14 @@ def main():
         init(args, state)
         return
     cfg = load(state)
+    if args.command == "upgrade":
+        upgrade(cfg)
+        return
+    if (state / "upgrade-in-progress.lock").exists():
+        raise RuntimeError("Upgrade in progress. Do not start or manage the instance.")
     with database(cfg):
         if args.command == "start":
+            manage(cfg, "migrate", "--check")
             # Child starts with a clean environment and can import from the application root.
             run([sys.executable, "-m", "deployment.serve_instance", str(state)],
                 cwd=ROOT, env=config_env(cfg))

@@ -221,3 +221,34 @@ class OneSchoolStaffClassReference(models.Model):
             models.UniqueConstraint(fields=["batch", "staff_code", "class_code"],
                                     name="unique_oneschool_staff_class_evidence"),
         ]
+
+
+class ConnectedStaffMapping(models.Model):
+    """Explicit administrator attestation connecting a printed code to a verified account."""
+    staff_code = models.CharField(max_length=40, unique=True)
+    profile = models.OneToOneField(StaffProfile, on_delete=models.PROTECT, related_name="connected_mapping")
+    verified_staff_id = models.CharField(max_length=40)
+    verified_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    verified_at = models.DateTimeField(auto_now=True)
+
+
+class ConnectedSchoolPublication(models.Model):
+    """Immutable reviewed projection of one term's approved sources."""
+    name = models.CharField(max_length=100)
+    starts = models.DateField()
+    ends = models.DateField()
+    active = models.BooleanField(default=True)
+    source_batches = models.JSONField(default=dict)
+    snapshot = models.JSONField(default=dict)
+    digest = models.CharField(max_length=64)
+    published_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    published_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-published_at", "-pk"]
+        constraints = [
+            models.UniqueConstraint(fields=["active"], condition=models.Q(active=True),
+                                    name="single_active_connected_school"),
+            models.CheckConstraint(condition=models.Q(ends__gte=models.F("starts")),
+                                   name="connected_school_date_order"),
+        ]
