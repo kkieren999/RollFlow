@@ -84,6 +84,7 @@ class OneSchoolClassImportTests(TestCase):
         self.assertEqual(batch.summary["unique_pairs"], 2)
         self.assertEqual(preview["matched_count"], 2)
         self.assertEqual(preview["skipped_count"], 0)
+        self.assertEqual(preview["matched_examples"][0], {"eqid": "000DEMO01", "class_code": "MATH08A"})
         self.assertContains(self.client.get(f"/manage/oneschool/documents/{batch.pk}/"), "Review student-to-class matches")
         self.assertEqual(batch.kind, "class_members")
         self.assertEqual(batch.files.count(), 1)
@@ -106,6 +107,7 @@ class OneSchoolClassImportTests(TestCase):
         batch.refresh_from_db()
         self.assertEqual(batch.status, "applied")
         self.assertEqual(batch.summary["applied"]["created"], 2)
+        self.assertTrue(batch.summary["subject_student_enrolment"])
         self.assertTrue(SecurityEvent.objects.filter(
             event="oneschool_classes_applied", subject=str(batch.pk)
         ).exists())
