@@ -54,6 +54,7 @@ def preview_links(pairs):
     inactive_students = set()
     unmatched_classes = set()
     matched = []
+    matched_examples = []
     witness = hashlib.sha256()
     for eqid, code in pairs:
         student = students.get(eqid)
@@ -73,8 +74,12 @@ def preview_links(pairs):
             unmatched_classes.add(code)
         if is_active and is_class:
             matched.append((student.pk, code))
+            # Ephemeral administrator-only preview, never saved in summary/logs.
+            if len(matched_examples) < 15:
+                matched_examples.append({"eqid": student.student_id, "class_code": code})
     return {
         "matched": matched,
+        "matched_examples": matched_examples,
         "matched_count": len(matched),
         "unmatched_student_count": len(unmatched_students),
         "inactive_student_count": len(inactive_students),
