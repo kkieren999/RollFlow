@@ -7,12 +7,12 @@ for the first V3.6.1 test. Extract the staging artifact into a **new folder**,
 such as `C:\RollFlow-V361-Test`. Stop the previous RollFlow process
 before testing or use the separate ports shown here. The **corrected
 V3.6.1 Windows package** now makes `First Setup.cmd` and `Start RollFlow.cmd`
-use a distinct `%LOCALAPPDATA%\\RollFlow-V361-Staging` instance and ports
+use a distinct `%LOCALAPPDATA%\RollFlow-V361-Staging` instance and ports
 55433 (PostgreSQL) / 18081 (web). You can use those shortcuts directly if the
 new state directory does not already exist.
 
 If you already downloaded an earlier V3.6.1 archive whose shortcuts still
-point at `%LOCALAPPDATA%\\RollFlow-Staging`, **do not delete the existing
+point at `%LOCALAPPDATA%\RollFlow-Staging`, **do not delete the existing
 directory**: it may hold the working V3.5 test data. Instead, open PowerShell
 in the new extracted folder and run the explicit isolated commands below,
 or download the updated package.
