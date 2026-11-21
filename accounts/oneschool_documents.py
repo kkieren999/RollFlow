@@ -68,6 +68,9 @@ def parse_students(raw):
         ws = wb["Data"]
         if ws.max_row > MAX_STUDENTS + 30 or ws.max_column > 30:
             raise ValueError("Unexpected student list size or columns.")
+        criteria = str(ws["A4"].value or "")
+        if not re.search(r"enrolment\s+status\s*:\s*active\b", criteria, re.I):
+            raise ValueError("SM110 must be exported with Enrolment Status: Active selected.")
         headers = [str(cell or "").strip() for cell in
                    next(ws.iter_rows(min_row=5, max_row=5, max_col=4, values_only=True))]
         if headers != STUDENT_HEADER:
