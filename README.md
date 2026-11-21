@@ -1,4 +1,4 @@
-# RollFlow V3.6.2 — OneSchool guided import centre (draft)
+# RollFlow V3.6.3 — OneSchool student-to-class import (draft)
 
 This integration branch contains **both** the Windows PostgreSQL password-file
 ACL fix from [draft PR #1](https://github.com/kkieren999/RollFlow/pull/1) and
@@ -20,6 +20,37 @@ release signing, clean-machine upgrade/restore and production readiness are
 outside the scope of this staging build.
 
 ## V3.5 — Self-contained school architecture foundation
+
+## V3.6.3 — OneSchool ExportStudentClass (CSV, draft)
+
+RollFlow now recognises the exact original OneSchool `ExportStudentClass` CSV:
+`EQID,Class_Name`. At **Admin → OneSchool Import Centre → Guided Uploads**
+(`/manage/oneschool/documents/`) select **ExportStudentClass** and upload
+one UTF-8 CSV. It is encrypted and stored in the same **local-only**
+OneSchool archive introduced in V3.6.2; no student records are placed in
+GitHub or logs.
+
+**Safe review workflow:** import SM110 students and publish the intended
+timetable first. RollFlow matches EQID (including leading zeros) to existing
+active student records and Class_Name to class codes in the currently
+published timetable or manually created active school classes. The review
+screen reports matching pairs, unknown/inactive students and unknown classes.
+Only after an explicit administrator confirmation may matched links be
+applied; unmatched rows require additional opt-in to skip. A stale preview
+is rejected if the matching catalogue has changed.
+
+Approved links live in `OneSchoolClassMembership`, independent of manual
+`SchoolClass` teacher allocations and historic `ClassEnrolment` rows.
+Admin-only `/manage/oneschool/class-memberships/` allows verification of
+class counts and matched students. A later upload is **additive and
+idempotent**: it does not remove students missing from the new file, change
+attendance, fabricate staff profiles or assign teachers. Reconciliation,
+historical start/end dates and teacher-accessible rosters need separate
+privacy/education review before school operation.
+
+The V3.6.3 Windows staging package uses its own local state and ports,
+rather than overwriting earlier home test installations. It is still an
+unsigned engineering build, not approved for identifiable school data.
 
 ## V3.6.2 — OneSchool guided import centre (draft)
 
