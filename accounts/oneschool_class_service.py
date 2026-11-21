@@ -9,7 +9,8 @@ import hashlib
 
 from .models import (
     ImportedTimetableDay, OneSchoolClassMembership,
-    SchoolClass, Student,
+    SchoolClass, Student, OneSchoolArchiveBatch,
+    OneSchoolLineAllocation, OneSchoolStaffClassReference,
 )
 
 
@@ -23,6 +24,31 @@ def known_class_codes():
                 code = item.get("code", "")
                 if isinstance(code, str) and code.strip():
                     classes.add(code)
+    # Each applied seven-line set is an immutable weekly version. Only the
+    # latest approved set contributes class codes, never older mixed semesters.
+    latest_lines = OneSchoolArchiveBatch.objects.filter(
+        kind=OneSchoolArchiveBatch.Kind.TT_ALIGNMENT, status="applied"
+    ).order_by("-applied_at", "-pk").first()
+    version = None
+    if latest_lines:
+        version = (latest_lines.summary.get("applied") or {}).get("timetable_version_id")
+        classes.update(OneSchoolLineAllocation.objects.filter(
+            batch=latest_lines
+        ).values_list("class_code", flat=True))
+    # A verified staff PDF contains additional home groups not present in
+    # the academic timetable lines. Never combine different source versions.
+    pdf_batches = OneSchoolArchiveBatch.objects.filter(
+        kind=OneSchoolArchiveBatch.Kind.STAFF_PDF, status="applied"
+    ).order_by("-applied_at", "-pk")
+    matching_pdf = next(
+        (item for item in pdf_batches if version is None
+         or str((item.summary.get("applied") or {}).get("timetable_version_id")) == str(version)),
+        None,
+    )
+    if matching_pdf:
+        classes.update(OneSchoolStaffClassReference.objects.filter(
+            batch=matching_pdf
+        ).values_list("class_code", flat=True))
     return {code.strip().upper() for code in classes}
 
 
