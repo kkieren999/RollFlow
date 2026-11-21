@@ -4,7 +4,7 @@ on:
   push:
     branches: [v3.0-foundation]
   pull_request:
-    branches: [main, v3.0-foundation, integration/v3.6.1-windows-teacher-portal]
+    branches: [main, v3.0-foundation, integration/v3.6.1-windows-teacher-portal, feature/v3.6.2-oneschool-import-centre]
 permissions:
   contents: read
 jobs:
@@ -84,10 +84,10 @@ jobs:
           $setupLauncher = Get-Content (Join-Path $bundle 'First Setup.cmd') -Raw
           $startLauncher = Get-Content (Join-Path $bundle 'Start RollFlow.cmd') -Raw
           foreach ($launcher in @($setupLauncher, $startLauncher)) {
-            if ($launcher -notmatch 'RollFlow-V362-Staging') { throw 'V3.6.1 shortcuts must have a dedicated instance state' }
+            if ($launcher -notmatch 'RollFlow-V363-Staging') { throw 'V3.6.1 shortcuts must have a dedicated instance state' }
             if ($launcher -notmatch '--state') { throw 'Shortcut state override missing' }
           }
-          if ($setupLauncher -notmatch '--db-port 55434 --web-port 18082') { throw 'V3.6.1 setup must use independent database and web ports' }
+          if ($setupLauncher -notmatch '--db-port 55435 --web-port 18083') { throw 'V3.6.1 setup must use independent database and web ports' }
           if ($startLauncher -notmatch 'start') { throw 'Start shortcut must use configured V3.6.1 state' }
           & "$bundle/python/python.exe" -m deployment.native --state $state init --no-admin
           if ($LASTEXITCODE -ne 0) { throw 'Native setup failed' }
@@ -101,11 +101,13 @@ jobs:
           & "$bundle/python/python.exe" -m deployment.native --state $state manage shell -c "from django.urls import reverse; import openpyxl, pypdf, cryptography; from accounts.models import OneSchoolArchiveBatch; assert reverse('oneschool-documents') == '/manage/oneschool/documents/'; assert OneSchoolArchiveBatch._meta.db_table in __import__('django.db',fromlist=['connection']).connection.introspection.table_names()"
           & "$bundle/python/python.exe" -m deployment.native --state $state manage shell -c "from accounts.oneschool_storage import save_encrypted, read_encrypted; token=save_encrypted(b'fictional-offline-import'); assert read_encrypted(token) == b'fictional-offline-import'"
           if ($LASTEXITCODE -ne 0) { throw 'Windows local encrypted OneSchool archive smoke test failed' }
+          & "$bundle/python/python.exe" -m deployment.native --state $state manage shell -c "from django.urls import reverse; from django.db import connection; from accounts.models import OneSchoolClassMembership; assert reverse('oneschool-documents-apply-classes', kwargs={'pk':1}) == '/manage/oneschool/documents/1/apply-classes/'; assert OneSchoolClassMembership._meta.db_table in connection.introspection.table_names()"
+          if ($LASTEXITCODE -ne 0) { throw 'Class membership migration or import route unavailable' }
           & "$bundle/python/python.exe" -m deployment.native --state $state backup "$env:RUNNER_TEMP/rf-test-backup.dump"
           if ($LASTEXITCODE -ne 0) { throw 'Database backup failed' }
       - uses: actions/upload-artifact@v4
         with:
-          name: RollFlow-V3.6.2-Windows-x64-STAGING
+          name: RollFlow-V3.6.3-Windows-x64-STAGING
           path: ${{ runner.temp }}/RollFlow/
           if-no-files-found: error
           retention-days: 14
