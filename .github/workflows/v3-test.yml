@@ -23,6 +23,7 @@ jobs:
       - run: python manage.py check
       - run: python manage.py makemigrations --check --dry-run
       - run: python manage.py test accounts
+      - run: python -m unittest deployment.test_native_permissions -v
   postgres-and-native:
     runs-on: ubuntu-24.04
     steps:
@@ -38,7 +39,7 @@ jobs:
       - run: python deployment/ci_smoke.py
 
   windows-offline-bundle:
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/v3.0-foundation'
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/v3.0-foundation'
     runs-on: windows-2025
     timeout-minutes: 25
     steps:
@@ -70,21 +71,38 @@ jobs:
           if (!$pgRoot) { throw 'PostgreSQL bin/lib/share layout not found' }
           python deployment/build_windows.py --python-runtime "$root/python" --postgres-runtime $pgRoot.FullName --output "$env:RUNNER_TEMP/RollFlow"
           if ($LASTEXITCODE -ne 0) { throw 'Bundle build failed' }
+      - name: Unit-test Windows password-file ACL handling
+        run: python -m unittest deployment.test_native_permissions -v
       - name: Smoke-test bundled runtime, database and backup
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $bundle = "$env:RUNNER_TEMP/RollFlow"
           $state = "$env:RUNNER_TEMP/rf-test-state"
+          # Regression: the actual Windows shortcuts must not silently reuse
+          # a previous version's default RollFlow-Staging instance.
+          $setupLauncher = Get-Content (Join-Path $bundle 'First Setup.cmd') -Raw
+          $startLauncher = Get-Content (Join-Path $bundle 'Start RollFlow.cmd') -Raw
+          foreach ($launcher in @($setupLauncher, $startLauncher)) {
+            if ($launcher -notmatch 'RollFlow-V361-Staging') { throw 'V3.6.1 shortcuts must have a dedicated instance state' }
+            if ($launcher -notmatch '--state') { throw 'Shortcut state override missing' }
+          }
+          if ($setupLauncher -notmatch '--db-port 55433 --web-port 18081') { throw 'V3.6.1 setup must use independent database and web ports' }
+          if ($startLauncher -notmatch 'start') { throw 'Start shortcut must use configured V3.6.1 state' }
           & "$bundle/python/python.exe" -m deployment.native --state $state init --no-admin
           if ($LASTEXITCODE -ne 0) { throw 'Native setup failed' }
+          if (Test-Path (Join-Path $state 'initial-password.txt')) { throw 'Temporary initdb password was not deleted' }
           & "$bundle/python/python.exe" -m deployment.native --state $state manage check
           if ($LASTEXITCODE -ne 0) { throw 'Django system check failed' }
+          & "$bundle/python/python.exe" -m deployment.native --state $state manage makemigrations --check --dry-run
+          if ($LASTEXITCODE -ne 0) { throw 'Migration integrity check failed' }
+          & "$bundle/python/python.exe" -m deployment.native --state $state manage shell -c "from django.urls import reverse; from django.db import connection; from accounts.models import StaffProfile; assert reverse('teacher-week') == '/teacher/week/'; cursor = connection.cursor(); assert 'timetable_link_verified' in [col.name for col in connection.introspection.get_table_description(cursor, StaffProfile._meta.db_table)]"
+          if ($LASTEXITCODE -ne 0) { throw 'V3.6.1 teacher route or migrated identity verification missing' }
           & "$bundle/python/python.exe" -m deployment.native --state $state backup "$env:RUNNER_TEMP/rf-test-backup.dump"
           if ($LASTEXITCODE -ne 0) { throw 'Database backup failed' }
       - uses: actions/upload-artifact@v4
         with:
-          name: RollFlow-V3.5-Windows-x64-STAGING
+          name: RollFlow-V3.6.1-Windows-x64-STAGING
           path: ${{ runner.temp }}/RollFlow/
           if-no-files-found: error
           retention-days: 14

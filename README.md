@@ -1,4 +1,35 @@
-# RollFlow V3.5 — Self-contained school architecture foundation
+# RollFlow V3.6.1 — Integrated Windows staging candidate
+
+This integration branch contains **both** the Windows PostgreSQL password-file
+ACL fix from [draft PR #1](https://github.com/kkieren999/RollFlow/pull/1) and
+the protected Connected Teacher Portal from
+[draft PR #2](https://github.com/kkieren999/RollFlow/pull/2).
+Neither PR has been merged and `main` is unchanged. Windows CI builds an
+offline `RollFlow-V3.6.1-Windows-x64-STAGING` artifact, checks that
+`initdb` can access its private temporary password, migrates the schema,
+verifies the authenticated teacher-week route and staff-link column, and
+backs up PostgreSQL. Only fictional data are authorised for testing.
+
+**For home testing:** use the independent directory/state instructions in
+[deployment/README.md](deployment/README.md) to avoid modifying an existing
+working V3.5 installation. Verified OneSchool links and the published timetable
+are stored in the school instance database. In live school mode, old links
+start unverified; a school administrator must affirm a staff-ID link before
+the teacher can see assigned lessons. Actual attendance, data-sharing approval,
+release signing, clean-machine upgrade/restore and production readiness are
+outside the scope of this staging build.
+
+## V3.5 — Self-contained school architecture foundation
+
+## V3.6 — Connected Teacher Portal (draft)
+
+The protected Django Teacher Portal now offers a **My week** view at `/teacher/week/` alongside the existing day-by-day timetable. Both are read-only and display only allocations from the currently *published* OneSchool timetable whose exact `Staff_Id` matches the signed-in teacher's administrator-maintained Staff Profile. Staff codes, query parameters, class codes and browser storage never authorise a teacher's timetable. Personal week data is projected to class, subject, period, time, year and room only; no other staff IDs or raw imported records are sent to the view.
+
+**Administrator verification is mandatory in live timetable mode.** Existing OneSchool staff links are intentionally unverified after migration `0007_verified_timetable_link`. Under Staff Management, edit the staff member, check the OneSchool staff ID against the authoritative staff record, then tick **I verified this OneSchool staff ID against the authorised staff record** and save. Changing an ID without another explicit confirmation automatically revokes verification. Imported or newly created accounts do not receive verification by default. Only authorised administrators can modify this mapping; the operation is logged as a staff-link verification/revocation event. Ambiguous case-insensitive mappings fail closed. The public static demo and non-live development timetable are unchanged.
+
+In live mode teachers cannot open the school-wide Master Timetable route; it redirects to their scoped timetable instead. Administrators retain the full master timetable for publication review. The two views never allow teachers to select another staff ID, user or archived snapshot, and they show clear missing/unverified mapping, no-publication, absent date and expired coverage states. The original fictional attendance interface is still disabled in school mode; **real attendance, student rosters and OneSchool write-back are not implemented**. Do not use live student or staff exports without departmental approval and security review.
+
+Run `python manage.py migrate`, `python manage.py check`, `python manage.py makemigrations --check --dry-run` and `python manage.py test accounts` on this branch. The new teacher security tests cover access rules, missing or unverified links, URL spoofing, exact-ID isolation despite shared staff-code aliases, timetable replacement and administrator verification. Keep this PR in draft pending review and clean Windows installation testing. This branch is based on `v3.0-foundation` and does not include the independent V3.5.1 draft PR unless that work is later integrated.
 
 ## V3.5 — Portable school installation foundation
 
