@@ -149,9 +149,29 @@ def staff_edit(request, pk=None):
                     user = User(username=c["username"], first_name=c["first_name"], last_name=c["last_name"], is_active=c["active"])
                     user.set_password(c["password"])
                 set_role(user, c["role"])
+                existing_profile = StaffProfile.objects.select_for_update().filter(user=user).first()
+                previous_id = (existing_profile.staff_id or "").upper() if existing_profile else ""
+                # A changed ID loses its old verification unless the administrator
+                # explicitly attests to the *new* ID on this submission.
+                link_verified = bool(c["staff_id"]) and (
+                    c["verify_timetable_link"] or (
+                        existing_profile is not None
+                        and existing_profile.timetable_link_verified
+                        and previous_id == c["staff_id"]
+                    )
+                )
                 StaffProfile.objects.update_or_create(user=user, defaults={
-                    "staff_id": c["staff_id"], "faculty": c["faculty"], "campus": c["campus"], "class_codes": c["class_codes"],
+                    "staff_id": c["staff_id"], "faculty": c["faculty"], "campus": c["campus"],
+                    "class_codes": c["class_codes"], "timetable_link_verified": link_verified,
                 })
+                if link_verified != bool(existing_profile and existing_profile.timetable_link_verified) or (
+                    c["staff_id"] and previous_id != c["staff_id"] and link_verified
+                ):
+                    SecurityEvent.objects.create(
+                        actor=request.user,
+                        event="staff_link_verified" if link_verified else "staff_link_revoked",
+                        subject=user.username,
+                    )
                 if target and user.pk != request.user.pk and (old_active != user.is_active or old_role != (user.is_staff, user.is_superuser)):
                     revoke_sessions(user)
                 log(request, "staff_updated" if target else "staff_created", user)
