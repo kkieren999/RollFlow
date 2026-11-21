@@ -41,7 +41,7 @@ class OneSchoolDocumentTests(TestCase):
         ws.append(["Fictional State High"])
         ws.append(["Dynamic Student List Report"])
         ws.append([])
-        ws.append(["Selected Criteria: Enrolment Status Active"])
+        ws.append(["Selected Criteria: Enrolment Status: Active"])
         ws.append(["Student Name", "EQ ID", "Roll Class", "Year"] if not bad_header
                   else ["Wrong header", "EQ ID", "Roll Class", "Year"])
         for row in rows if rows is not None else [
@@ -154,6 +154,16 @@ class OneSchoolDocumentTests(TestCase):
                 self.assertEqual(OneSchoolArchiveBatch.objects.count(), 0)
                 self.assertEqual(OneSchoolArchivedFile.objects.count(), 0)
 
+    def test_inactive_report_criteria_rejected(self):
+        from openpyxl import load_workbook
+        wb = load_workbook(io.BytesIO(self.xlsx()))
+        wb["Data"]["A4"] = "Selected Criteria: Enrolment Status: Inactive"
+        stream = io.BytesIO()
+        wb.save(stream)
+        wb.close()
+        self.assertEqual(self.upload(sources=[("SM110.xlsx", stream.getvalue())]).status_code, 200)
+        self.assertEqual(OneSchoolArchiveBatch.objects.count(), 0)
+
     def test_tt_line_accepts_several_parts_without_assigned_classes(self):
         wb = self.xlsx()
         csv = b"Line,Class,Period\nL1,DEMO071A,P1\n"
@@ -214,10 +224,12 @@ class OneSchoolDocumentTests(TestCase):
             f"/manage/oneschool/documents/{batch.pk}/purge/",
             {"confirm_purge": "wrong"},
         ).status_code, 400)
-        self.assertEqual(self.client.post(
-            f"/manage/oneschool/documents/{batch.pk}/purge/",
-            {"confirm_purge": "DELETE SOURCES"},
-        ).status_code, 302)
+        with self.captureOnCommitCallbacks(execute=True):
+            self.assertEqual(self.client.post(
+                f"/manage/oneschool/documents/{batch.pk}/purge/",
+                {"confirm_purge": "DELETE SOURCES"},
+            ).status_code, 302)
+        self.assertFalse(path.exists())
         batch.refresh_from_db()
         self.assertIsNotNone(batch.source_purged_at)
         # In Django TestCase, on_commit executes only through captureOnCommitCallbacks.
