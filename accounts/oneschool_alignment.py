@@ -83,18 +83,22 @@ def parse_alignment_file(raw):
         if len(set((day, period) for _, day, period in groups)) != len(groups):
             raise ValueError("Duplicate day/period heading.")
         year = None
+        section_line = None
         records = []
         offline_rows = 0
         for row_no, row in enumerate(data, 3):
             first = str(row[0]).strip() if row[0] is not None else ""
             section = SECTION.fullmatch(first)
-            if section:
-                if int(section.group(2)) != line_no:
-                    raise ValueError(f"Row {row_no}: section belongs to a different timetable line.")
-                year = int(section.group(1))
-                continue
-            if OFFLINE.fullmatch(first):
-                offline_rows += 1
+            offline = OFFLINE.fullmatch(first)
+            if section or offline:
+                if any(v is not None and str(v).strip() for v in row[1:]):
+                    raise ValueError(f"Row {row_no}: unexpected data in section heading.")
+                # LineNr identifies the exported period blocks, not necessarily
+                # every class's academic line. Preserve the actual section line.
+                # Zero denotes an explicitly labelled Offline section, not P0.
+                year = int((section or offline).group(1))
+                section_line = int(section.group(2)) if section else 0
+                offline_rows += int(bool(offline))
                 continue
             if all(x is None or str(x).strip() == "" for x in row):
                 continue
@@ -113,7 +117,7 @@ def parse_alignment_file(raw):
                 if not STAFF.fullmatch(teacher) or not STAFF.fullmatch(room):
                     raise ValueError(f"Row {row_no}: invalid staff/room code.")
                 records.append({
-                    "line_number": line_no, "year_level": year,
+                    "line_number": section_line, "year_level": year,
                     "weekday": day, "period": period, "class_code": klass,
                     "staff_code": teacher, "room_code": room,
                 })
@@ -124,6 +128,8 @@ def parse_alignment_file(raw):
             "timetable_version_id": version_id,
             "allocations": len(records),
             "offline_rows": offline_rows,
+            "offline_allocations": sum(r["line_number"] == 0 for r in records),
+            "cross_line_allocations": sum(r["line_number"] not in (0, line_no) for r in records),
             "unallocated_staff": sum(not r["staff_code"] for r in records),
             "unallocated_room": sum(not r["room_code"] for r in records),
             "day_period_blocks": len(groups),
@@ -136,6 +142,7 @@ def parse_alignment_file(raw):
 def parse_alignment_batch(files):
     """files: [(filename, original_bytes)] ; validates all seven parts together."""
     lines, rows, digest = set(), [], hashlib.sha256()
+    cross_line_allocations = 0
     version = None
     for name, raw in files:
         if not name.lower().endswith(".xlsx"):
@@ -149,6 +156,7 @@ def parse_alignment_batch(files):
         lines.add(line)
         version = meta["timetable_version_id"]
         rows.extend(extracted)
+        cross_line_allocations += meta["cross_line_allocations"]
         digest.update(hashlib.sha256(raw).digest())
     keys = [(v["weekday"], v["period"], v["class_code"]) for v in rows]
     if len(keys) != len(set(keys)):
@@ -160,6 +168,8 @@ def parse_alignment_batch(files):
         "complete": not missing,
         "timetable_version_id": version,
         "allocation_count": len(rows),
+        "offline_allocations": sum(r["line_number"] == 0 for r in rows),
+        "cross_line_allocations": cross_line_allocations,
         "distinct_classes": len({v["class_code"] for v in rows}),
         "staff_codes": len({v["staff_code"] for v in rows if v["staff_code"]}),
         "rooms": len({v["room_code"] for v in rows if v["room_code"]}),
