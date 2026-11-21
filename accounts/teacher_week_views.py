@@ -21,6 +21,10 @@ def week(request):
     if role != "teacher":
         return HttpResponseForbidden("Teacher access required.")
 
+    from .connected_school import current
+    if current():
+        from .connected_views import teacher_schedule
+        return teacher_schedule(request, week=True)
     version = current_version()
     if version is None:
         return render(request, "live_timetable_pending.html")
