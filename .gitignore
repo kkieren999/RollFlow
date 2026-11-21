@@ -13,11 +13,16 @@ __pycache__/
 backups/
 private-data/
 
-# Do not commit school exports
+# Do not commit OneSchool exports or raw/encrypted private archives
 ExportTimetable*.csv
-TTLineAlignmentExport*.xlsx
+TTLineAlignmentExport*.*
+SM110_DynamicStudentList*.xlsx
+*StaffTimetable*.pdf
 ClassList*.pdf
 oneschool-exports/
+oneschool-imports/
+oneschool-import.key
+*.rfenc
 
 # Generated offline distribution and private installation state
 /dist/

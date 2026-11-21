@@ -1,5 +1,5 @@
 from django.urls import path
-from accounts import staff_views, student_views, timetable_views, master_views, oneschool_views
+from accounts import staff_views, student_views, timetable_views, master_views, oneschool_views, oneschool_document_views
 
 urlpatterns = [
     path("", staff_views.dashboard, name="management-dashboard"),
@@ -38,6 +38,11 @@ urlpatterns = [
     path("master/", master_views.master, {"admin_only": True}, name="management-master"),
     path("oneschool/", oneschool_views.centre, name="oneschool-centre"),
     path("oneschool/sample/", oneschool_views.sample, name="oneschool-sample"),
+    path("oneschool/documents/", oneschool_document_views.centre, name="oneschool-documents"),
+    path("oneschool/documents/<int:pk>/", oneschool_document_views.review, name="oneschool-documents-review"),
+    path("oneschool/documents/<int:pk>/apply/", oneschool_document_views.apply_students, name="oneschool-documents-apply"),
+    path("oneschool/documents/<int:pk>/purge/", oneschool_document_views.purge, name="oneschool-documents-purge"),
+    path("oneschool/documents/file/<int:pk>/download/", oneschool_document_views.download, name="oneschool-documents-download"),
     path("oneschool/<int:pk>/", oneschool_views.review, name="oneschool-review"),
     path("oneschool/<int:pk>/publish/", oneschool_views.publish, name="oneschool-publish"),
     path("<str:section>/", staff_views.section, name="management-section"),

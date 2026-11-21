@@ -1,4 +1,4 @@
-# RollFlow V3.6.1 — Integrated Windows staging candidate
+# RollFlow V3.6.2 — OneSchool guided import centre (draft)
 
 This integration branch contains **both** the Windows PostgreSQL password-file
 ACL fix from [draft PR #1](https://github.com/kkieren999/RollFlow/pull/1) and
@@ -20,6 +20,36 @@ release signing, clean-machine upgrade/restore and production readiness are
 outside the scope of this staging build.
 
 ## V3.5 — Self-contained school architecture foundation
+
+## V3.6.2 — OneSchool guided import centre (draft)
+
+Administrators can open **Management → OneSchool Import Centre → Guided document uploads**
+at \`/manage/oneschool/documents/\`. The page explains what to find in OneSchool,
+how to export each source, and exactly what can and cannot be applied.
+
+| Source | Choose in the portal | Current behaviour |
+| --- | --- | --- |
+| **SM110 Dynamic Student List** | One \`.xlsx\` file with \`Data\` sheet, columns \`Student Name, EQ ID, Roll Class, Year\` on row 5 | Validate and archive, then explicitly approve an ID-matched student directory/home-group upsert |
+| **Whole-staff timetable PDF** | One or more PDFs | Validate PDF structure/text layer and securely archive originals; **no automatic teacher/class allocations yet** |
+| **TTLineAlignmentExport** | Multiple \`.csv\`, \`.xlsx\`, or \`.pdf\` files in one batch | Validate and keep all parts grouped for review; **no automatic class alignment until the exact schema is verified** |
+
+The **existing OneSchool date-specific Timetable Export CSV importer** is unchanged and remains the supported route for published allocations.
+
+SM110 upserts use exact EQ IDs and are all-or-nothing in a database transaction. The import never deactivates absent students, resets status, changes dates or portraits, removes attendance, or assigns subject-class enrolments. Existing staff-ID verification remains required for live teacher views.
+
+### Protected offline archive and recovery
+
+Originals are encrypted with Fernet using a **per-instance key stored separately from encrypted source blobs**, under \`ROLLFLOW_DATA_DIR\`:
+
+- \`oneschool-imports/<random-token>.rfenc\`: private encrypted source files.
+- \`oneschool-import.key\`: local encryption key; **store in protected offline backups separate from the PostgreSQL dump**.
+- \`uploads/\`: temporary upload area; never served publicly or placed in static files.
+
+Instance NTFS/Unix permissions are restricted and a user-specific ACL is applied to the archive directory and key on Windows. Uploads and original downloads require authenticated active administrators, and downloads are hash-verified and \`no-store\`. The database stores source metadata/hashes and review summaries, **not raw exports**. Every upload, apply, retrieval and purge is included in existing SecurityEvents. The admin can retrieve an original later or explicitly purge its encrypted copy while retaining audit metadata. A database backup alone does **not** restore archived originals or their key. Establish a local retention schedule and test recovery procedures before school deployment.
+
+Only fictional/synthetic development files and approved de-identified examples belong in personal development installations. Actual school files require school ICT approval, an authorised protected host, and a privacy/security review. Do **not** commit user uploads to GitHub, post them to a ticket, sync the archive to consumer cloud drives or expose local application/database ports.
+
+Development: install \`requirements.txt\`, run \`python manage.py migrate\`, and \`python manage.py test accounts\`. This work targets the separate V3.6.1 integration branch in a **draft PR**; do not merge it into \`main\`. Teacher/class PDF extraction and subject-enrolment allocation are intentionally not enabled until authentic formats can be reviewed safely with fictional equivalents.
 
 ## V3.6 — Connected Teacher Portal (draft)
 

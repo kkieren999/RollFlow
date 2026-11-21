@@ -128,3 +128,42 @@ class ImportedTimetableDay(models.Model):
     class Meta:
         ordering = ["date"]
         constraints = [models.UniqueConstraint(fields=["version","date"],name="unique_imported_day")]
+
+
+class OneSchoolArchiveBatch(models.Model):
+    """A versioned, administrator-only record of an offline OneSchool upload."""
+    class Kind(models.TextChoices):
+        STUDENTS = "students", "SM110 Student List (Excel)"
+        STAFF_PDF = "staff_pdf", "Whole-staff Timetable (PDF)"
+        TT_ALIGNMENT = "tt_alignment", "TTLineAlignmentExport (multiple files)"
+
+    class Status(models.TextChoices):
+        STAGED = "staged", "Awaiting review"
+        APPLIED = "applied", "Applied to student directory"
+
+    kind = models.CharField(max_length=20, choices=Kind.choices)
+    label = models.CharField(max_length=120)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    created_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.STAGED)
+    applied_at = models.DateTimeField(null=True, blank=True)
+    source_purged_at = models.DateTimeField(null=True, blank=True)
+    summary = models.JSONField(default=dict)
+    class Meta:
+        ordering = ["-created_at"]
+
+
+class OneSchoolArchivedFile(models.Model):
+    """Metadata only; actual export bytes are encrypted on the instance disk."""
+    batch = models.ForeignKey(OneSchoolArchiveBatch, on_delete=models.PROTECT, related_name="files")
+    original_name = models.CharField(max_length=180)
+    storage_token = models.CharField(max_length=32, unique=True)
+    sha256 = models.CharField(max_length=64)
+    size = models.PositiveIntegerField()
+    format = models.CharField(max_length=12)
+    created_at = models.DateTimeField(auto_now_add=True)
+    class Meta:
+        ordering = ["id"]
+        constraints = [
+            models.UniqueConstraint(fields=["batch", "sha256"], name="unique_file_digest_in_import_batch"),
+        ]

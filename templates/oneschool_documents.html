@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en-AU"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>RollFlow · OneSchool Import Centre</title>
+<style>
+*{box-sizing:border-box}
+:root{color-scheme:light}
+body{margin:0;background:#f0f4f6;color:#233c49;font:15px/1.5 Arial,Helvetica,sans-serif}
+header{background:#112c3b;color:#fff;padding:16px max(16px,calc((100% - 1180px)/2));display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+header strong{font-size:20px}
+header nav{display:flex;gap:15px;flex-wrap:wrap}
+header a{color:white;text-underline-offset:3px}
+main{max-width:1220px;margin:auto;padding:26px 18px 50px}
+h1{margin:0;font-size:30px;line-height:1.25}
+h2{font-size:19px;margin:0 0 8px}
+h3{font-size:16px;margin:0 0 6px}
+p{margin:7px 0 13px}
+small,.muted{color:#5b7480}
+.lead{max-width:850px;color:#5b7480}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin:20px 0}
+.card,.panel{background:white;border:1px solid #d9e4e8;border-radius:10px;padding:18px}
+.card{display:flex;flex-direction:column;gap:7px}
+.card p{margin:0}
+.tag{display:inline-flex;align-self:flex-start;border:1px solid #cddde4;background:#f1f7f9;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:bold}
+.card .filename{font-family:ui-monospace,Consolas,monospace;font-size:13px;overflow-wrap:anywhere}
+.panel{margin-top:18px;padding:23px}
+label{font-weight:650;display:block;margin-bottom:6px}
+input[type=text],select,input[type=file]{width:100%;max-width:650px;border:1px solid #9bb3be;border-radius:6px;padding:10px;font:inherit;background:white}
+input[type=checkbox]{margin-right:8px}
+.field{margin:14px 0}
+.form-hint{color:#536e7a;font-size:13px;margin:4px 0 10px}
+button,.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;color:#213e4b;background:white;border:1px solid #a8bfca;border-radius:7px;padding:9px 14px;font:inherit;font-weight:bold;cursor:pointer}
+button.primary,.btn.primary{background:#087c38;border-color:#087c38;color:white}
+button.danger{color:#9c3030;border-color:#deaaaa}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #dfa836;outline-offset:3px}
+.note{border-left:4px solid #9fb2bc;padding:12px 16px;background:#f5f8fa;border-radius:4px}
+.note.warn{border-left-color:#af7936;background:#fffaf0}
+.notice{padding:12px;background:#edf7ef;border:1px solid #afd4b8;border-radius:6px}
+.notice.error{background:#fff0f0;border-color:#e7b6b6;color:#912727}
+.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:14px 0}
+table{width:100%;border-collapse:collapse;text-align:left}
+th,td{border-bottom:1px solid #e3eaed;padding:11px 10px;vertical-align:top}
+th{background:#f5f8fa;color:#4b6571;font-size:12px}
+.table-wrap{overflow-x:auto}
+strong.number{font-size:26px;display:block}
+.meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:18px 0}
+.metric{background:#f4f7f9;padding:12px;border-radius:7px}
+.help{color:#506773}
+code{overflow-wrap:anywhere}
+@media(max-width:650px){main{padding:16px 10px 32px}.panel{padding:14px}h1{font-size:25px}}
+</style>
+</head>
+<body>
+<header><strong>RollFlow · OneSchool Import Centre</strong>
+<nav aria-label="Administrator navigation">
+<a href="{% url 'management-dashboard' %}">Dashboard</a>
+<a href="{% url 'oneschool-centre' %}">Timetable CSV</a>
+<a href="{% url 'management-student-directory' %}">Students</a>
+<a href="{% url 'management-section' section='staff' %}">Staff</a>
+</nav></header>
+<main>
+{% for message in messages %}<div class="notice {{ message.tags }}" role="status">{{ message }}</div>{% endfor %}
+{% if batch %}
+  <p><a href="{% url 'oneschool-documents' %}">← All OneSchool uploads</a></p>
+  <h1>Review imported files</h1>
+  <p class="lead">{{ batch.label }} · {{ batch.get_kind_display }} · Uploaded {{ batch.created_at|date:"j M Y H:i" }} by {{ batch.created_by.username }}.</p>
+  <div class="meta">
+    <div class="metric"><small>Documents received</small><strong class="number">{{ batch.summary.file_count }}</strong></div>
+    <div class="metric"><small>Total file size</small><strong class="number">{{ batch.summary.bytes|filesizeformat }}</strong></div>
+    <div class="metric"><small>Status</small><strong>{{ batch.get_status_display }}</strong></div>
+    {% if batch.kind == 'students' %}
+    <div class="metric"><small>SM110 students</small><strong class="number">{{ batch.summary.student_count }}</strong></div>
+    <div class="metric"><small>Home groups</small><strong class="number">{{ batch.summary.home_group_count }}</strong></div>
+    {% endif %}
+  </div>
+  {% if batch.kind != 'students' %}
+    <p class="note warn"><strong>Stored for review, not applied.</strong> These files have been securely archived but have not been used to create teachers, class allocations or a timetable. The original export layout and staff-ID mappings need validation before any automatic assignment can be enabled.</p>
+  {% elif batch.status == 'staged' %}
+    <section class="panel">
+    <h2>Step 2 — Approve the student directory changes</h2>
+    <p>RollFlow will create missing student records and update the name, year and home group of matching EQ IDs. It will <strong>not</strong> delete absent students, reset attendance, change student status, assign subject classes or change enrolment dates.</p>
+    <p class="help">The import uses the exact SM110 header: Student Name, EQ ID, Roll Class, Year. Confirm the file came from the intended reporting period and uses the correct home groups.</p>
+    {% if batch.source_purged_at %}<p class="notice error">The original source has been purged and can no longer be applied.</p>{% else %}
+    <form method="post" action="{% url 'oneschool-documents-apply' pk=batch.pk %}">
+      {% csrf_token %}
+      <label><input type="checkbox" name="confirm_apply" value="yes" required> I have reviewed this fictional or authorised student import and approve its directory changes.</label>
+      <div class="actions"><button class="primary" type="submit">Apply student directory update</button></div>
+    </form>{% endif %}
+    </section>
+  {% else %}
+    <p class="notice"><strong>Applied to student directory.</strong> New: {{ batch.summary.applied.created }} · Updated: {{ batch.summary.applied.updated }} · Unchanged: {{ batch.summary.applied.unchanged }}. Subject-class enrolments were not changed.</p>
+  {% endif %}
+  <section class="panel"><h2>Archived source files</h2>
+    {% if batch.source_purged_at %}<p class="note warn">Original encrypted copies were purged {{ batch.source_purged_at|date:"j M Y H:i" }}. Only audit metadata remains.</p>{% else %}<p class="help">Only administrators can retrieve originals. Each file is checked against its stored SHA-256 digest before being downloaded.</p>{% endif %}
+    <div class="table-wrap"><table><thead><tr><th>File</th><th>Format</th><th>Size</th><th>Action</th></tr></thead><tbody>
+      {% for item in batch.files.all %}
+      <tr><td>{{ item.original_name }}</td><td>{{ item.format }}</td><td>{{ item.size|filesizeformat }}</td><td>{% if not batch.source_purged_at %}<a class="btn" href="{% url 'oneschool-documents-download' pk=item.pk %}">Download original</a>{% else %}Removed{% endif %}</td></tr>
+      {% endfor %}
+    </tbody></table></div>
+  </section>
+  {% if batch.summary.years %}
+  <section class="panel"><h2>Year levels in student export</h2><div class="meta">
+  {% for year, count in batch.summary.years.items %}<div class="metric"><small>Year {{ year }}</small><strong class="number">{{ count }}</strong></div>{% endfor %}
+  </div></section>
+  {% endif %}
+  {% if batch.summary.files %}
+  <section class="panel"><h2>Format checks</h2>
+  <div class="table-wrap"><table><thead><tr><th>File</th><th>Checks</th></tr></thead><tbody>
+  {% for detail in batch.summary.files %}
+  <tr><td>{{ forloop.counter }} · {{ detail.format }}</td><td>
+  {% if detail.pages %}{{ detail.pages }} pages · {{ detail.text_pages }} pages with readable text{% endif %}
+  {% if detail.csv_rows_including_header %}{{ detail.csv_rows_including_header }} CSV rows including header{% endif %}
+  {% if detail.worksheets %}{{ detail.worksheets }} Excel sheets{% endif %}
+  {% if batch.kind == 'students' %}SM110 columns and student IDs validated{% endif %}
+  </td></tr>
+  {% endfor %}</tbody></table></div></section>
+  {% endif %}
+  {% if not batch.source_purged_at %}
+    <section class="panel"><h2>Remove stored originals</h2>
+    <p class="help">Use this when retention rules require removal of the source exports. This cannot be undone. Student directory changes (if already applied) are not undone; audit summary and file hashes remain.</p>
+    <form method="post" action="{% url 'oneschool-documents-purge' pk=batch.pk %}">
+      {% csrf_token %}
+      <label><input type="checkbox" name="confirm_purge" value="DELETE SOURCES" required> Permanently delete this batch's encrypted original files.</label>
+      <button class="danger" type="submit">Delete archived originals</button>
+    </form></section>
+  {% endif %}
+{% else %}
+  <p class="tag">ADMINISTRATOR-ONLY · OFFLINE FILES</p>
+  <h1>Bring OneSchool information into RollFlow</h1>
+  <p class="lead">Choose the report you downloaded from OneSchool. RollFlow keeps the original files in a protected local archive so you can review them again. Nothing goes to GitHub or an external storage service.</p>
+  <div class="cards" aria-label="OneSchool report finding guide">
+    <article class="card"><span class="tag">1 · Student directory</span>
+      <h2>SM110 — Dynamic Student List</h2>
+      <p><strong>Find:</strong> Look in OneSchool's reports for <b>SM110 Dynamic Student List</b>. Filter to the intended active enrolments and export as Excel.</p>
+      <p><strong>Upload:</strong> one <span class="filename">SM110_DynamicStudentList*.xlsx</span> file.</p>
+      <p><strong>RollFlow does:</strong> validate student IDs, year levels and roll classes; let you approve creating/updating the student directory.</p>
+      <p class="help">Does not assign students to their subject classes.</p>
+    </article>
+    <article class="card"><span class="tag">2 · Staff teaching schedule</span>
+      <h2>Whole-staff timetable</h2>
+      <p><strong>Find:</strong> The timetable export/report in OneSchool showing staff schedules, teaching periods, class codes and rooms.</p>
+      <p><strong>Upload:</strong> a <span class="filename">.pdf</span> whole-staff timetable, or several PDF parts.</p>
+      <p><strong>RollFlow does:</strong> preserve originals and report page/text checks for later parsing.</p>
+      <p class="help">Teacher identity and class mapping require a verified PDF format before automatic allocation.</p>
+    </article>
+    <article class="card"><span class="tag">3 · Timetable line alignment</span>
+      <h2>TTLineAlignmentExport</h2>
+      <p><strong>Find:</strong> OneSchool's timetable/line-alignment exports. Save every relevant file for the same reporting period.</p>
+      <p><strong>Upload:</strong> <b>multiple files at once</b> using Ctrl or Shift. Accepts <span class="filename">.csv</span>, <span class="filename">.xlsx</span> and <span class="filename">.pdf</span>.</p>
+      <p><strong>RollFlow does:</strong> checks each file, encrypts and groups all parts into one import batch for review.</p>
+      <p class="help">No class allocation is applied until its actual field structure is verified.</p>
+    </article>
+  </div>
+  <section class="panel" id="upload">
+    <h2>Step 1 — Select and stage files</h2>
+    <p class="help">Start with fictional exports or authorised de-identified files. Genuine school records must stay inside an approved school-hosted installation, not a home test.</p>
+    {% if form.non_field_errors %}<div class="notice error">{{ form.non_field_errors }}</div>{% endif %}
+    <form method="post" enctype="multipart/form-data" autocomplete="off">
+      {% csrf_token %}
+      <div class="field"><label for="{{ form.kind.id_for_label }}">{{ form.kind.label }}</label>{{ form.kind }}{{ form.kind.errors }}</div>
+      <div class="field"><label for="{{ form.label.id_for_label }}">{{ form.label.label }}</label>{{ form.label }}<p class="form-hint">{{ form.label.help_text }}</p>{{ form.label.errors }}</div>
+      <div class="field"><label for="oneschool-files">Select exported files</label>
+        <input id="oneschool-files" name="files" type="file" multiple accept=".xlsx" required>
+        <p class="form-hint" id="file-tip" role="status">Select one SM110 Excel workbook (.xlsx).</p>
+      </div>
+      <div class="field"><label><input type="checkbox" name="acknowledge" value="on" required>{{ form.acknowledge.label }}</label>{{ form.acknowledge.errors }}</div>
+      <div class="actions"><button type="submit" class="primary">Save encrypted files for review</button><small>Max 12 files · 12 MB each · 48 MB per batch</small></div>
+    </form>
+  </section>
+  <section class="panel"><h2>Need the existing CSV timetable importer?</h2>
+    <p>For the supported date-specific <b>OneSchool Timetable Export CSV</b>, continue using the existing <a href="{% url 'oneschool-centre' %}">Timetable CSV Import Centre</a>. Its draft/review/publish process remains available.</p>
+  </section>
+  <section class="panel">
+    <h2>Offline archive history</h2>
+    <p class="help">The archive resides under the installation's protected data directory, separate from application files and static pages. It uses encrypted source blobs, a separate local key and administrator-only access. Secure backups must include both the encrypted files and their key; the database dump alone cannot recover them.</p>
+    <div class="table-wrap"><table><thead><tr><th>Uploaded</th><th>Reference</th><th>Export</th><th>Files</th><th>Status</th><th></th></tr></thead><tbody>
+      {% for item in batches %}
+      <tr><td>{{ item.created_at|date:"j M Y H:i" }}</td><td>{{ item.label }}</td><td>{{ item.get_kind_display }}</td><td>{{ item.summary.file_count }}</td><td>{{ item.get_status_display }}{% if item.source_purged_at %} · Sources removed{% endif %}</td><td><a class="btn" href="{% url 'oneschool-documents-review' pk=item.pk %}">Review</a></td></tr>
+      {% empty %}<tr><td colspan="6">No saved OneSchool source files.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+  <p class="note warn">RollFlow does not yet automatically assign students to subject classes. That will be designed separately after suitable enrolment data is identified.</p>
+  <script>
+  (function(){
+    const type=document.getElementById('id_kind');
+    const input=document.getElementById('oneschool-files');
+    const tip=document.getElementById('file-tip');
+    if(!type||!input||!tip)return;
+    const hints={
+      students:['.xlsx','Select exactly one SM110 Dynamic Student List (.xlsx).'],
+      staff_pdf:['.pdf','Select one or more staff timetable PDFs.'],
+      tt_alignment:['.csv,.xlsx,.pdf','Select all TTLineAlignmentExport parts together (Ctrl or Shift to select multiple).']
+    };
+    function update(){const [accept,hint]=hints[type.value]||hints.students;input.accept=accept;tip.textContent=hint;}
+    type.addEventListener('change',update);update();
+  })();
+  </script>
+{% endif %}
+</main></body></html>
