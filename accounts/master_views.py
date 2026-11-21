@@ -76,6 +76,12 @@ def master(request, admin_only=False):
     if role not in ("teacher", "admin") or (admin_only and role != "admin"):
         return HttpResponseForbidden("Staff access required.")
     from .oneschool_views import current_version, dated
+    if settings.ROLLFLOW_LIVE_TIMETABLE and role == "teacher":
+        # School-wide imported staff IDs and allocations are administrative data.
+        # Teachers are confined to their individually verified published schedule.
+        if current_version():
+            return redirect("teacher-timetable")
+        return render(request, "live_timetable_pending.html")
     if current_version():
         return dated(request, admin_only=admin_only)
     if settings.ROLLFLOW_LIVE_TIMETABLE:

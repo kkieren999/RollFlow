@@ -8,6 +8,11 @@ ROLE_CHOICES = [("teacher", "Teacher"), ("admin", "Administrator")]
 
 class StaffForm(forms.Form):
     staff_id = forms.CharField(label="Staff ID", max_length=40, required=False)
+    verify_timetable_link = forms.BooleanField(
+        required=False,
+        label="I verified this OneSchool staff ID against the authorised staff record",
+        help_text="Only tick after checking the person's identity. Unverified links cannot view published personal timetables in live mode.",
+    )
     username = forms.CharField(max_length=150, validators=[User.username_validator])
     first_name = forms.CharField(max_length=100)
     last_name = forms.CharField(max_length=100)
@@ -65,6 +70,8 @@ class StaffForm(forms.Form):
 
     def clean(self):
         cleaned = super().clean()
+        if cleaned.get("verify_timetable_link") and not cleaned.get("staff_id"):
+            self.add_error("verify_timetable_link", "Enter a staff ID before verifying its identity.")
         if self.target and self.actor and self.target.pk == self.actor.pk:
             cleaned["role"], cleaned["active"] = "admin", True
         if self.target and cleaned.get("active") and not self.target.has_usable_password():

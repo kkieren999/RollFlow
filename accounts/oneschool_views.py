@@ -26,6 +26,7 @@ from .models import ImportedTimetable, ImportedTimetableDay, SecurityEvent
 from .staff_views import administrator, page
 from .views import role_for
 from .oneschool_csv import parse, HEADER, MAX_BYTES
+from .teacher_schedule import staff_identity, assigned_rows
 
 class ImportForm(forms.Form):
     name=forms.CharField(label="Timetable version name",max_length=100)
@@ -144,9 +145,8 @@ def dated(request, personal=False,admin_only=False):
         day=timezone.localdate()
     record=version.days.filter(date=day).first()
     all_rows=record.allocations if record else []
-    profile=getattr(request.user,"staff_profile",None)
-    staff_id=profile.staff_id if personal and profile else None
-    rows=[r for r in all_rows if not personal or bool(staff_id) and r["staff_id"].casefold()==staff_id.casefold()]
+    staff_id, link_message = staff_identity(request.user) if personal else (None, "")
+    rows=assigned_rows(all_rows, staff_id) if personal else all_rows
     query=request.GET.get("q","").strip()[:150]
     year=request.GET.get("year","")
     if year not in [str(y) for y in range(7,13)]:
@@ -187,7 +187,7 @@ def dated(request, personal=False,admin_only=False):
     tabs=[{"date":shift_date(monday,i).isoformat(),"label":["Monday","Tuesday","Wednesday","Thursday","Friday"][i],"url":params(date=shift_date(monday,i).isoformat())} for i in range(5)]
     current_periods=[p for p in period_headers if p["current"]]
     next_period=next((p for p in period_headers if is_today and p["start"]>current_time),None)
-    context=dict(live_timetable=settings.ROLLFLOW_LIVE_TIMETABLE,version=version,selected_date=day.isoformat(),day=day,tabs=tabs,periods=period_headers,groups=groups,rows=shown if personal else filtered,query=query,year=year,years=range(7,13),hide=hide,personal=personal,unlinked=personal and not staff_id,record_exists=record is not None,admin=role=="admin",staff=staff,room=room,highlight=highlight,has_filter=bool(query or year or staff or staff_key or room),staff_key=staff_key,visible_count=sum(1 for r in rows if (r["start"],r["end"],r["period"]) in visible),coverage_warning=coverage_message(version,today),staff_choices=sorted({r["staff_code"] for r in rows if r["staff_code"]}|({staff} if staff else set())),room_choices=sorted({r["room"] for r in rows if r["room"]}|({room} if room else set())),today_url=params(date=today.isoformat()),prev_url=params(date=shift_date(day,-7).isoformat()),next_url=params(date=shift_date(day,7).isoformat()),first_url=params(date=version.summary["first_date"]),clear_url=params(q="",year="",staff="",staff_id="",room=""),break_url=params(breaks="" if hide else "hide"),highlight_url=params(highlight="" if highlight else "1"),is_today=is_today,current_periods=current_periods,next_period=next_period)
+    context=dict(live_timetable=settings.ROLLFLOW_LIVE_TIMETABLE,version=version,selected_date=day.isoformat(),day=day,tabs=tabs,periods=period_headers,groups=groups,rows=shown if personal else filtered,query=query,year=year,years=range(7,13),hide=hide,personal=personal,unlinked=personal and not staff_id,link_message=link_message,record_exists=record is not None,admin=role=="admin",staff=staff,room=room,highlight=highlight,has_filter=bool(query or year or staff or staff_key or room),staff_key=staff_key,visible_count=sum(1 for r in rows if (r["start"],r["end"],r["period"]) in visible),coverage_warning=coverage_message(version,today),staff_choices=sorted({r["staff_code"] for r in rows if r["staff_code"]}|({staff} if staff else set())),room_choices=sorted({r["room"] for r in rows if r["room"]}|({room} if room else set())),today_url=params(date=today.isoformat()),prev_url=params(date=shift_date(day,-7).isoformat()),next_url=params(date=shift_date(day,7).isoformat()),first_url=params(date=version.summary["first_date"]),clear_url=params(q="",year="",staff="",staff_id="",room=""),break_url=params(breaks="" if hide else "hide"),highlight_url=params(highlight="" if highlight else "1"),is_today=is_today,current_periods=current_periods,next_period=next_period)
     if role=="admin":
         return page(request,"master",dated_import=True,**context)
     return render(request,"imported_teacher.html",context)
