@@ -1,4 +1,4 @@
-# RollFlow V3.6.3 — OneSchool student-to-class import (draft)
+# RollFlow V3.6.4 — Real OneSchool export layouts (draft)
 
 This integration branch contains **both** the Windows PostgreSQL password-file
 ACL fix from [draft PR #1](https://github.com/kkieren999/RollFlow/pull/1) and
@@ -20,6 +20,33 @@ release signing, clean-machine upgrade/restore and production readiness are
 outside the scope of this staging build.
 
 ## V3.5 — Self-contained school architecture foundation
+
+## V3.6.4 — Actual OneSchool export layout support (draft)
+
+The protected Import Centre can now parse a complete **seven-file
+TTLineAlignmentExport XLSX** collection and the **TTStaffTimetable PDF**,
+both observed from actual OneSchool export structures, without storing
+authentic sample data in source control. Original files are archived
+encrypted locally, and administrators must review and explicitly approve
+their extracted class information.
+
+- TTLine workbooks: day/period Class–Teacher–Room blocks, Year/Line groups,
+  missing-staff/room cells, LineNr and TimetableVersionId consistency.
+- Staff PDF: per-staff printed codes, class names and class legends,
+  timetable version footer; names are **not** copied into evidence tables,
+  and no staff code grants a teacher login.
+- ExportStudentClass: existing student EQIDs can be matched to class
+  codes from the latest approved seven-line snapshot and an approved PDF
+  of the matching timetable version. Unknown/inactive IDs remain
+  unassigned for review.
+- The existing SM110 student directory and date-specific CSV importer remain
+  available, and student/class assignments never silently delete existing
+  memberships or create unknown teacher profiles.
+
+This is **engineering staging only**. Use generated fictional data for
+development and clean-machine Windows tests. Authentic school exports
+must remain on an approved restricted host after ICT privacy/security
+approval, with archive/key/DB backup and retention processes.
 
 ## V3.6.3 — OneSchool ExportStudentClass (CSV, draft)
 
