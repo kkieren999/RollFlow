@@ -72,9 +72,51 @@ code{overflow-wrap:anywhere}
     {% if batch.kind == 'students' %}
     <div class="metric"><small>SM110 students</small><strong class="number">{{ batch.summary.student_count }}</strong></div>
     <div class="metric"><small>Home groups</small><strong class="number">{{ batch.summary.home_group_count }}</strong></div>
+    {% elif batch.kind == 'class_members' %}
+    <div class="metric"><small>Student/class pairs</small><strong class="number">{{ batch.summary.unique_pairs }}</strong></div>
+    <div class="metric"><small>Distinct class codes</small><strong class="number">{{ batch.summary.class_count }}</strong></div>
     {% endif %}
   </div>
-  {% if batch.kind != 'students' %}
+  {% if batch.kind == 'class_members' %}
+    <section class="panel">
+      <h2>Step 2 — Review student-to-class matches</h2>
+      <p>EQID is matched to an existing active student and Class_Name to a class in the currently published timetable or an active, administrator-created SchoolClass. No students, teachers or classes are fabricated. Existing memberships are never removed.</p>
+      {% if batch.status == 'applied' %}
+        <p class="notice"><strong>Class links applied.</strong> {{ batch.summary.applied.created }} added, {{ batch.summary.applied.already_present }} already present and {{ batch.summary.applied.skipped }} unmatched source rows skipped.</p>
+        <p><a class="btn" href="{% url 'oneschool-class-rosters' %}">View imported class memberships</a></p>
+      {% elif preview_error %}
+        <p class="notice error" role="alert">{{ preview_error }}</p>
+      {% elif class_preview %}
+        <div class="meta">
+          <div class="metric"><small>Eligible student/class pairs</small><strong class="number">{{ class_preview.matched_count }}</strong></div>
+          <div class="metric"><small>Skipped source rows</small><strong class="number">{{ class_preview.skipped_count }}</strong></div>
+          <div class="metric"><small>Unknown EQIDs</small><strong class="number">{{ class_preview.unmatched_student_count }}</strong></div>
+          <div class="metric"><small>Inactive students</small><strong class="number">{{ class_preview.inactive_student_count }}</strong></div>
+          <div class="metric"><small>Unknown class codes</small><strong class="number">{{ class_preview.unmatched_class_count }}</strong></div>
+          <div class="metric"><small>Duplicate CSV rows ignored</small><strong class="number">{{ batch.summary.duplicate_rows }}</strong></div>
+        </div>
+        {% if class_preview.unmatched_class_examples %}
+          <p class="note warn"><strong>Unmatched classes to check:</strong> {{ class_preview.unmatched_class_examples|join:", " }}. Import/publish the matching timetable first or create an authorised school class.</p>
+        {% endif %}
+        {% if class_preview.skipped_count %}
+          <p class="note warn">Some EQIDs have not been imported from SM110 or have inactive status, and/or class codes are missing. You may fix and re-review them, or explicitly approve applying the matched subset only. No missing accounts or classes will be created automatically.</p>
+        {% endif %}
+        {% if class_preview.matched_count and not batch.source_purged_at %}
+        <form method="post" action="{% url 'oneschool-documents-apply-classes' pk=batch.pk %}">
+          {% csrf_token %}
+          <input type="hidden" name="preview_signature" value="{{ class_preview.preview_signature }}">
+          {% if class_preview.skipped_count %}
+          <label><input type="checkbox" name="skip_unmatched" value="yes" required> I accept that {{ class_preview.skipped_count }} unmatched row{{ class_preview.skipped_count|pluralize }} will be skipped.</label>
+          {% endif %}
+          <label><input type="checkbox" name="confirm_apply" value="yes" required> I have reviewed the student and class match counts and approve adding only these links. Existing links will not be removed.</label>
+          <div class="actions"><button class="primary" type="submit">Apply {{ class_preview.matched_count }} matched links</button></div>
+        </form>
+        {% else %}
+          <p class="note warn">No eligible pairs are available yet. Import SM110 students and publish the timetable first.</p>
+        {% endif %}
+      {% endif %}
+    </section>
+  {% elif batch.kind != 'students' %}
     <p class="note warn"><strong>Stored for review, not applied.</strong> These files have been securely archived but have not been used to create teachers, class allocations or a timetable. The original export layout and staff-ID mappings need validation before any automatic assignment can be enabled.</p>
   {% elif batch.status == 'staged' %}
     <section class="panel">
@@ -104,6 +146,7 @@ code{overflow-wrap:anywhere}
   {% for year, count in batch.summary.years.items %}<div class="metric"><small>Year {{ year }}</small><strong class="number">{{ count }}</strong></div>{% endfor %}
   </div></section>
   {% endif %}
+  {% if batch.kind == 'class_members' %}<p class="help">Encrypted originals are retained for future review. The timetable/teacher assignments are not modified by this import.</p>{% endif %}
   {% if batch.summary.files %}
   <section class="panel"><h2>Format checks</h2>
   <div class="table-wrap"><table><thead><tr><th>File</th><th>Checks</th></tr></thead><tbody>
@@ -151,6 +194,13 @@ code{overflow-wrap:anywhere}
       <p><strong>RollFlow does:</strong> checks each file, encrypts and groups all parts into one import batch for review.</p>
       <p class="help">No class allocation is applied until its actual field structure is verified.</p>
     </article>
+    <article class="card"><span class="tag">4 · Student subject classes</span>
+      <h2>ExportStudentClass</h2>
+      <p><strong>Find:</strong> Export Student Class in OneSchool's student/class reports. Save the original CSV.</p>
+      <p><strong>Upload:</strong> one <span class="filename">ExportStudentClass*.csv</span> with <code>EQID,Class_Name</code> columns.</p>
+      <p><strong>RollFlow does:</strong> match existing student EQIDs to known class codes, show unknown students/classes and let the administrator approve only valid links.</p>
+      <p class="help">Import the SM110 student list and publish a timetable first. Teacher assignment remains separate and is never guessed.</p>
+    </article>
   </div>
   <section class="panel" id="upload">
     <h2>Step 1 — Select and stage files</h2>
@@ -180,7 +230,7 @@ code{overflow-wrap:anywhere}
       {% empty %}<tr><td colspan="6">No saved OneSchool source files.</td></tr>{% endfor %}
     </tbody></table></div>
   </section>
-  <p class="note warn">RollFlow does not yet automatically assign students to subject classes. That will be designed separately after suitable enrolment data is identified.</p>
+  <p class="note warn">ExportStudentClass can now add reviewed student/class-code memberships. It does not assign teachers or automatically remove students absent from newer files.</p>
   <script>
   (function(){
     const type=document.getElementById('id_kind');
@@ -190,7 +240,8 @@ code{overflow-wrap:anywhere}
     const hints={
       students:['.xlsx','Select exactly one SM110 Dynamic Student List (.xlsx).'],
       staff_pdf:['.pdf','Select one or more staff timetable PDFs.'],
-      tt_alignment:['.csv,.xlsx,.pdf','Select all TTLineAlignmentExport parts together (Ctrl or Shift to select multiple).']
+      tt_alignment:['.csv,.xlsx,.pdf','Select all TTLineAlignmentExport parts together (Ctrl or Shift to select multiple).'],
+      class_members:['.csv','Select one ExportStudentClass CSV with EQID,Class_Name columns.']
     };
     function update(){const [accept,hint]=hints[type.value]||hints.students;input.accept=accept;tip.textContent=hint;}
     type.addEventListener('change',update);update();
