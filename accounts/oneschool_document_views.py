@@ -254,7 +254,9 @@ def apply_class_memberships(request, pk):
                 messages.error(request, "There are no matching student-class pairs to apply.")
                 return redirect("oneschool-documents-review", pk=pk)
             applied = apply_links(preview["matched"], batch)
-            batch.summary = {**batch.summary, **parsed, "applied": {
+            batch.summary = {**batch.summary, **parsed,
+                "subject_student_enrolment": True,
+                "applied": {
                 **applied,
                 "skipped": preview["skipped_count"],
                 "matched": preview["matched_count"],
