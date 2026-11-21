@@ -110,6 +110,7 @@ code{overflow-wrap:anywhere}
     {% if batch.status == 'applied' %}
       <p class="notice">Approved: {{ batch.summary.applied.pages }} pages, {{ batch.summary.applied.staff_codes }} staff codes, {{ batch.summary.applied.class_references }} class references, version {{ batch.summary.applied.timetable_version_id }}.</p>
     {% elif preview_error %}<p class="notice error">{{ preview_error }}</p>
+      <p class="note warn">Stored for review, not applied. This staff PDF layout could not be verified, so it cannot be activated. The original remains encrypted.</p>
     {% elif staff_review %}
       <div class="meta">
         <div class="metric"><small>PDF pages</small><strong class="number">{{ staff_review.pages }}</strong></div>
