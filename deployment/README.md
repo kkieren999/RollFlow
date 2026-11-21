@@ -1,3 +1,45 @@
+# V3.6.4 — Verified OneSchool source layouts (draft)
+
+Use the new independent Windows staging folder, not any prior RollFlow
+installation. Launchers use `%LOCALAPPDATA%\RollFlow-V364-Staging`,
+PostgreSQL port **55436** and local web port **18084**. Run `First Setup.cmd`
+only once, then `Start RollFlow.cmd` and browse http://localhost:18084/.
+
+### Actual OneSchool file import order
+
+1. **SM110 Dynamic Student List**: upload the original active-student
+   XLSX with Data worksheet columns Student Name / EQ ID / Roll Class / Year.
+   Review and approve student directory changes.
+2. **TTLineAlignmentExport**: select all **seven** XLSX files at once using
+   Ctrl/Shift. These contain different line numbers 1–7 from the same
+   TimetableVersionId; review the parsed day/period slots, blank staff and
+   room cells, then approve the class-timetable evidence.
+3. **TTStaffTimetable**: upload the full staff-timetable PDF as **one file**.
+   Review the extracted staff/class legend evidence and pages without a
+   class legend, then approve. This does **not** link staff to logins.
+4. **ExportStudentClass**: upload the two-column `EQID,Class_Name` CSV.
+   RollFlow compares identifiers against the **active SM110 directory**
+   and classes against the reviewed line and PDF catalogues. Explicitly
+   review unmatched/inactive EQIDs and unrecognised class codes before
+   approving additions.
+5. Optionally use the existing **date-specific OneSchool Timetable Export CSV**
+   to publish the dated teacher schedule. TTLine weekly slots are not a
+   substitute for date-specific published lessons.
+
+Approved line slots and PDF class evidence are stored in PostgreSQL, original
+files are encrypted locally under `oneschool-imports/` with a separate key,
+and every approval is audited. Unmatched student IDs are never fabricated.
+No teacher account is verified or granted student information access based
+on raw PDF or line staff codes. Later imports do not silently delete existing
+class memberships.
+
+**Use fictional exports in home testing.** Real OneSchool data requires
+the approved school host, ICT review and authorised retention/backup controls.
+Keep the encrypted archive AND its key alongside database backups. Never
+commit the actual school exports to GitHub.
+
+---
+
 # V3.6.3 — Student-to-class enrolment CSV import (draft staging)
 
 The guided Admin Import Centre now accepts the official OneSchool
