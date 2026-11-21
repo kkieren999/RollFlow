@@ -223,6 +223,49 @@ class ActualOneSchoolLayoutTests(TestCase):
         with self.assertRaisesRegex(ValueError, "too many worksheet rows"):
             parse_alignment_file(unlimited)
 
+    def test_cross_line_and_offline_sections_preserve_actual_allocations(self):
+        from openpyxl import load_workbook
+        wb = load_workbook(io.BytesIO(fictional_line(4)))
+        ws = wb["Sheet1"]
+        ws.cell(3, 1, "Year 7 - Line 1")
+        ws.cell(5, 1, "Year 8 - Line 5")
+        ws.cell(6, 1, "DEMO85A")
+        ws.cell(6, 2, "FAKESTAFF")
+        ws.cell(6, 3, "R01")
+        ws.cell(7, 1, "Year 9 - Offline")
+        ws.cell(8, 4, "DEMO90A")
+        ws.cell(8, 5, "FAKESTAFF")
+        ws.cell(8, 6, "R02")
+        for row in wb["ReportCriteria"].iter_rows():
+            if row[0].value == "Record Count":
+                row[1].value = 5
+        output = io.BytesIO()
+        wb.save(output)
+        wb.close()
+        raw = without_excel_dimensions(output.getvalue())
+        rows, info = parse_alignment_file(raw)
+        self.assertEqual(info["line_number"], 4)
+        self.assertEqual(info["cross_line_allocations"], 4)
+        self.assertEqual(info["offline_allocations"], 1)
+        self.assertEqual([(r["year_level"], r["line_number"]) for r in rows],
+                         [(7, 1), (7, 1), (7, 1), (8, 5), (9, 0)])
+        self.assertEqual((rows[-1]["weekday"], rows[-1]["period"]), (4, 3))
+        files = self.seven_lines()
+        files[3] = ("fictional-line4.xlsx", raw)
+        self.assertEqual(self.stage("tt_alignment", files).status_code, 302)
+        batch = OneSchoolArchiveBatch.objects.get()
+        preview = self.client.get(f"/manage/oneschool/documents/{batch.pk}/").context["alignment_review"]
+        self.assertTrue(preview["complete"])
+        self.assertEqual(preview["allocation_count"], 21)
+        self.assertEqual(preview["cross_line_allocations"], 4)
+        self.assertEqual(preview["offline_allocations"], 1)
+        self.client.post(f"/manage/oneschool/documents/{batch.pk}/apply-alignment/",
+                         {"confirm_apply": "yes", "source_signature": preview["source_signature"]})
+        self.assertEqual(OneSchoolLineAllocation.objects.count(), 21)
+        self.assertTrue(OneSchoolLineAllocation.objects.filter(
+            class_code="DEMO90A", year_level=9, line_number=0, weekday=4, period=3
+        ).exists())
+
     def test_parsers_accept_full_seven_line_layout(self):
         rows = []
         for line in range(1,8):

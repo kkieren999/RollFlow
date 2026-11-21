@@ -328,6 +328,8 @@ def apply_alignment(request, pk):
                     "timetable_version_id": preview["timetable_version_id"],
                     "lines": preview["lines"],
                     "allocations": preview["allocation_count"],
+                    "cross_line_allocations": preview["cross_line_allocations"],
+                    "offline_allocations": preview["offline_allocations"],
                     "classes": preview["distinct_classes"],
                     "staff_code_count": preview["staff_codes"],
                     "unallocated_staff": preview["unallocated_staff"],
