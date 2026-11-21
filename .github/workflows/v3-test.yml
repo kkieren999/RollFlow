@@ -2,9 +2,9 @@ name: V3 foundation tests
 on:
   workflow_dispatch:
   push:
-    branches: [v3.0-foundation]
+    branches: [v3.0-foundation, feature/v3.6.5-connected-school-data]
   pull_request:
-    branches: [main, v3.0-foundation, integration/v3.6.1-windows-teacher-portal, feature/v3.6.2-oneschool-import-centre, feature/v3.6.4-real-oneschool-format-support, fix/v3.6.4-oneschool-unknown-worksheet-size, fix/v3.6.4.2-empty-staff-pdf-legends]
+    branches: [main, v3.0-foundation, integration/v3.6.1-windows-teacher-portal, feature/v3.6.2-oneschool-import-centre, feature/v3.6.4-real-oneschool-format-support, fix/v3.6.4-oneschool-unknown-worksheet-size, fix/v3.6.4.2-empty-staff-pdf-legends, fix/v3.6.4.3-cross-line-alignment]
 permissions:
   contents: read
 jobs:
@@ -39,7 +39,7 @@ jobs:
       - run: python deployment/ci_smoke.py
 
   windows-offline-bundle:
-    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/v3.0-foundation'
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/v3.0-foundation' || github.ref == 'refs/heads/feature/v3.6.5-connected-school-data'
     runs-on: windows-2025
     timeout-minutes: 25
     steps:
@@ -111,9 +111,19 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Windows mixed staff PDF legend smoke test failed' }
           & "$bundle/python/python.exe" -m deployment.native --state $state backup "$env:RUNNER_TEMP/rf-test-backup.dump"
           if ($LASTEXITCODE -ne 0) { throw 'Database backup failed' }
+          # Isolated CI only: recreate pre-upgrade schema, seed an archive and student,
+          # then exercise the actual supported upgrade command. Never downgrade a real instance.
+          & "$bundle/python/python.exe" -m deployment.native --state $state manage migrate accounts 0010 --noinput
+          if ($LASTEXITCODE -ne 0) { throw 'Could not prepare old schema for upgrade smoke' }
+          & "$bundle/python/python.exe" -m deployment.native --state $state manage shell -c "from accounts.models import Student, OneSchoolArchiveBatch, OneSchoolArchivedFile; from accounts.oneschool_storage import save_encrypted; from django.contrib.auth.models import User; import hashlib; u=User.objects.create_superuser('upgrade-fixture', password='Fictional-ci-password-321!'); Student.objects.create(student_id='UPGRADEFAKE',first_name='Fictional',last_name='Learner',year_level=7); b=OneSchoolArchiveBatch.objects.create(kind='students',label='fictional prior import',created_by=u,status='applied'); raw=b'fictional-existing-archive'; OneSchoolArchivedFile.objects.create(batch=b,original_name='fictional.xlsx',storage_token=save_encrypted(raw),sha256=hashlib.sha256(raw).hexdigest(),size=len(raw),format='.xlsx')"
+          if ($LASTEXITCODE -ne 0) { throw 'Could not seed prior schema with fictional data' }
+          & "$bundle/python/python.exe" -m deployment.native --state $state upgrade
+          if ($LASTEXITCODE -ne 0) { throw 'V3.6.5 existing-instance upgrade failed' }
+          & "$bundle/python/python.exe" -m deployment.native --state $state manage shell -c "from accounts.models import Student, OneSchoolArchivedFile, ConnectedSchoolPublication; from accounts.oneschool_storage import read_encrypted; from django.urls import reverse; from django.db import connection; from django.conf import settings; import pathlib; assert Student.objects.filter(student_id='UPGRADEFAKE').exists(); f=OneSchoolArchivedFile.objects.get(original_name='fictional.xlsx'); assert read_encrypted(f.storage_token)==b'fictional-existing-archive'; assert ConnectedSchoolPublication._meta.db_table in connection.introspection.table_names(); assert reverse('connected-school')=='/manage/connected/'; backups=list((pathlib.Path(settings.ROLLFLOW_ARCHIVE_STATE_DIR)/'upgrade-backups').iterdir()); assert len(backups)==1 and (backups[0]/'rollflow.dump').is_file() and (backups[0]/'oneschool-import.key').is_file() and (backups[0]/'oneschool-imports'/(f.storage_token+'.rfenc')).is_file()"
+          if ($LASTEXITCODE -ne 0) { throw 'Existing database or archive preservation smoke failed' }
       - uses: actions/upload-artifact@v4
         with:
-          name: RollFlow-V3.6.4.3-Windows-x64-STAGING
+          name: RollFlow-V3.6.5-Windows-x64-STAGING
           path: ${{ runner.temp }}/RollFlow/
           if-no-files-found: error
           retention-days: 14
