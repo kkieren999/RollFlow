@@ -118,12 +118,12 @@ code{overflow-wrap:anywhere}
         <div class="metric"><small>PDF pages</small><strong class="number">{{ staff_review.pages }}</strong></div>
         <div class="metric"><small>Staff codes</small><strong class="number">{{ staff_review.staff_codes }}</strong></div>
         <div class="metric"><small>Class references</small><strong class="number">{{ staff_review.staff_class_references }}</strong></div>
-        <div class="metric"><small>Pages without legend</small><strong class="number">{{ staff_review.pages_without_legend }}</strong></div>
+        <div class="metric"><small>Pages with empty or absent legends</small><strong class="number">{{ staff_review.pages_without_legend }}</strong></div>
       </div>
       <p class="help">Timetable version {{ staff_review.timetable_version_id }}. These are class catalogue references, not verified OneSchool staff IDs.</p>
       <form method="post" action="{% url 'oneschool-documents-apply-staff-evidence' pk=batch.pk %}">{% csrf_token %}
         <input type="hidden" name="source_signature" value="{{ staff_review.source_signature }}">
-        {% if staff_review.pages_without_legend %}<label><input type="checkbox" name="acknowledge_empty_pages" value="yes" required> I reviewed the {{ staff_review.pages_without_legend }} page{{ staff_review.pages_without_legend|pluralize }} without class legends.</label>{% endif %}
+        {% if staff_review.pages_without_legend %}<label><input type="checkbox" name="acknowledge_empty_pages" value="yes" required> I reviewed the {{ staff_review.pages_without_legend }} page{{ staff_review.pages_without_legend|pluralize }} with empty or absent class legends. No class links will be created for these pages.</label>{% endif %}
         <label><input type="checkbox" name="confirm_apply" value="yes" required> I approve saving class evidence only. No staff account or identity is authorised by this action.</label>
         <button type="submit" class="primary">Apply staff PDF evidence</button>
       </form>
