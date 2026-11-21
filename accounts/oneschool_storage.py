@@ -36,24 +36,27 @@ def locations():
     return state, dest
 
 
-def archive_cipher(state):
+def archive_cipher(state, *, create=False):
     key_path = state / "oneschool-import.key"
     if key_path.is_symlink():
         raise ValueError("Archive key cannot be a symbolic link.")
-    try:
-        fd = os.open(key_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    except FileExistsError:
-        pass
-    else:
+    # Never generate a new key when retrieving old sources: restore the
+    # original key from a protected backup or the archive is unreadable.
+    if create:
         try:
-            with os.fdopen(fd, "wb") as stream:
-                stream.write(Fernet.generate_key())
-                stream.flush()
-                os.fsync(stream.fileno())
-            private_path(key_path, directory=False)
-        except BaseException:
-            key_path.unlink(missing_ok=True)
-            raise
+            fd = os.open(key_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        except FileExistsError:
+            pass
+        else:
+            try:
+                with os.fdopen(fd, "wb") as stream:
+                    stream.write(Fernet.generate_key())
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                private_path(key_path, directory=False)
+            except BaseException:
+                key_path.unlink(missing_ok=True)
+                raise
     if not key_path.is_file():
         raise ValueError("Archive encryption key is missing.")
     if os.name == "nt":
@@ -67,7 +70,7 @@ def archive_cipher(state):
 
 def save_encrypted(raw):
     state, directory = locations()
-    cipher = archive_cipher(state)
+    cipher = archive_cipher(state, create=True)
     token = uuid4().hex
     file = directory / (token + ".rfenc")
     encrypted = cipher.encrypt(raw)
