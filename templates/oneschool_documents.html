@@ -129,7 +129,7 @@ code{overflow-wrap:anywhere}
   {% elif batch.kind == 'class_members' %}
     <section class="panel">
       <h2>Step 2 — Review student-to-class matches</h2>
-      <p>EQID is matched to an existing active student and Class_Name to a class in the currently published timetable or an active, administrator-created SchoolClass. No students, teachers or classes are fabricated. Existing memberships are never removed.</p>
+      <p>EQID is matched to an active student; Class_Name matches approved seven-line TTLine and same-version staff PDF class codes, the published dated timetable, or an active administrator-created class. Import the seven line files and staff PDF first so home groups are recognised too. Unmatched records are not fabricated.</p>
       {% if batch.status == 'applied' %}
         <p class="notice"><strong>Class links applied.</strong> {{ batch.summary.applied.created }} added, {{ batch.summary.applied.already_present }} already present and {{ batch.summary.applied.skipped }} unmatched source rows skipped.</p>
         <p><a class="btn" href="{% url 'oneschool-class-rosters' %}">View imported class memberships</a></p>
@@ -240,23 +240,23 @@ code{overflow-wrap:anywhere}
     <article class="card"><span class="tag">2 · Staff teaching schedule</span>
       <h2>Whole-staff timetable</h2>
       <p><strong>Find:</strong> The timetable export/report in OneSchool showing staff schedules, teaching periods, class codes and rooms.</p>
-      <p><strong>Upload:</strong> a <span class="filename">.pdf</span> whole-staff timetable, or several PDF parts.</p>
-      <p><strong>RollFlow does:</strong> preserve originals and report page/text checks for later parsing.</p>
+      <p><strong>Upload:</strong> one complete <span class="filename">TTStaffTimetable*.pdf</span>.</p>
+      <p><strong>RollFlow does:</strong> encrypt the original, extract class legend evidence and require explicit administrator approval before saving evidence.</p>
       <p class="help">Teacher identity and class mapping require a verified PDF format before automatic allocation.</p>
     </article>
     <article class="card"><span class="tag">3 · Timetable line alignment</span>
       <h2>TTLineAlignmentExport</h2>
       <p><strong>Find:</strong> OneSchool's timetable/line-alignment exports. Save every relevant file for the same reporting period.</p>
-      <p><strong>Upload:</strong> <b>multiple files at once</b> using Ctrl or Shift. Accepts <span class="filename">.csv</span>, <span class="filename">.xlsx</span> and <span class="filename">.pdf</span>.</p>
-      <p><strong>RollFlow does:</strong> checks each file, encrypts and groups all parts into one import batch for review.</p>
-      <p class="help">No class allocation is applied until its actual field structure is verified.</p>
+      <p><strong>Upload:</strong> <b>all seven .xlsx files together</b> (LineNr 1–7, same TimetableVersionId) with Ctrl or Shift.</p>
+      <p><strong>RollFlow does:</strong> checks Class/Teacher/Room blocks, day/periods and source versions; approved weekly slots are saved to the local database.</p>
+      <p class="help">Missing staff or rooms remain blank. Staff codes never grant teacher access.</p>
     </article>
     <article class="card"><span class="tag">4 · Student subject classes</span>
       <h2>ExportStudentClass</h2>
       <p><strong>Find:</strong> Export Student Class in OneSchool's student/class reports. Save the original CSV.</p>
       <p><strong>Upload:</strong> one <span class="filename">ExportStudentClass*.csv</span> with <code>EQID,Class_Name</code> columns.</p>
       <p><strong>RollFlow does:</strong> match existing student EQIDs to known class codes, show unknown students/classes and let the administrator approve only valid links.</p>
-      <p class="help">Import the SM110 student list and publish a timetable first. Teacher assignment remains separate and is never guessed.</p>
+      <p class="help">Import SM110 first, then approve the seven TTLine XLSX files and staff PDF to recognise class codes, including home groups. Teacher identities remain separately verified.</p>
     </article>
   </div>
   <section class="panel" id="upload">
@@ -297,7 +297,7 @@ code{overflow-wrap:anywhere}
     const hints={
       students:['.xlsx','Select exactly one SM110 Dynamic Student List (.xlsx).'],
       staff_pdf:['.pdf','Select one or more staff timetable PDFs.'],
-      tt_alignment:['.csv,.xlsx,.pdf','Select all TTLineAlignmentExport parts together (Ctrl or Shift to select multiple).'],
+      tt_alignment:['.xlsx','Select seven TTLineAlignmentExport XLSX files (LineNr 1–7) together.'],
       class_members:['.csv','Select one ExportStudentClass CSV with EQID,Class_Name columns.']
     };
     function update(){const [accept,hint]=hints[type.value]||hints.students;input.accept=accept;tip.textContent=hint;}
