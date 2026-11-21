@@ -108,6 +108,19 @@ class OneSchoolDocumentTests(TestCase):
         self.client.force_login(self.teacher)
         self.assertEqual(self.client.get(f"/manage/oneschool/documents/file/{file.pk}/download/").status_code, 403)
 
+    def test_missing_archive_key_does_not_get_replaced_automatically(self):
+        self.upload()
+        item = OneSchoolArchivedFile.objects.get()
+        key = self.state / "oneschool-import.key"
+        old = self.state / "oneschool-import.key.backup"
+        key.rename(old)
+        from .oneschool_storage import read_encrypted
+        with self.assertRaises(ValueError):
+            read_encrypted(item.storage_token)
+        self.assertFalse(key.exists())
+        old.rename(key)
+        self.assertTrue(read_encrypted(item.storage_token).startswith(b"PK"))
+
     def test_approved_sm110_upsert_preserves_status_and_subject_membership(self):
         old = Student.objects.create(
             student_id="E00001", first_name="Former", last_name="Name",
