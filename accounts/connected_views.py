@@ -195,6 +195,8 @@ def roster(request, code, admin_only=False):
     students = Student.objects.filter(pk__in=record["students"], status=Student.Status.ACTIVE).filter(
         Q(enrolled_on__isnull=True) | Q(enrolled_on__lte=today)
     ).filter(Q(left_on__isnull=True) | Q(left_on__gte=today)).order_by("last_name", "first_name", "pk")
+    identity = publication.snapshot.get("student_identity", {})
+    students = [s for s in students if canonical(s.student_id) == identity.get(str(s.pk))]
     return render(request, "connected_school.html", {
         "mode": "roster", "publication": publication, "record": record,
         "students": Paginator(students, 50).get_page(request.GET.get("page")),
