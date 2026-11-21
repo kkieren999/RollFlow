@@ -77,8 +77,8 @@ def centre(request):
         kind = form.cleaned_data["kind"]
         if not uploaded or len(uploaded) > MAX_FILES:
             form.add_error(None, f"Select 1 to {MAX_FILES} export files.")
-        elif kind in ("students", "class_members") and len(uploaded) != 1:
-            form.add_error(None, "Select exactly one file for the student list or student-class membership export.")
+        elif kind in ("students", "class_members", "staff_pdf") and len(uploaded) != 1:
+            form.add_error(None, "Select exactly one SM110, ExportStudentClass or whole-staff PDF file. Upload TTLine XLSX parts together.")
         elif sum(x.size for x in uploaded) > MAX_BATCH_SIZE:
             form.add_error(None, "Total upload size must be below 48 MB.")
         else:
