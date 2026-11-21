@@ -14,6 +14,7 @@ from zipfile import BadZipFile, ZipFile
 
 from openpyxl import load_workbook
 from pypdf import PdfReader
+from .oneschool_class_csv import parse_student_classes
 
 
 MAX_FILE_SIZE = 12 * 1024 * 1024
@@ -26,6 +27,7 @@ ALLOWED = {
     "students": {".xlsx"},
     "staff_pdf": {".pdf"},
     "tt_alignment": {".csv", ".xlsx", ".pdf"},
+    "class_members": {".csv"},
 }
 
 
@@ -147,6 +149,9 @@ def inspect_file(kind, name, raw):
               "sha256": hashlib.sha256(raw).hexdigest()}
     if kind == "students":
         students, summary = parse_students(raw)
+        return common, summary
+    if kind == "class_members":
+        pairs, summary = parse_student_classes(raw)
         return common, summary
     if suffix == ".pdf":
         return common, inspect_pdf(raw)

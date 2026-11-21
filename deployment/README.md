@@ -1,3 +1,28 @@
+# V3.6.3 — Student-to-class enrolment CSV import (draft staging)
+
+The guided Admin Import Centre now accepts the official OneSchool
+`ExportStudentClass*.csv` format with two columns: `EQID,Class_Name`.
+Import the fictional SM110 student list first and publish the corresponding
+fictional timetable CSV (or create authorised school classes). Then
+**OneSchool Import Centre → ExportStudentClass** uploads the original CSV
+into the locally encrypted offline archive. Review matched, missing and
+inactive EQIDs and unmatched class codes before applying. If unmatched rows
+exist, they are skipped **only** with an explicit administrator acknowledgement.
+The importer adds idempotent membership records without deleting existing
+links or inventing students, classes or teacher account assignments.
+This is not a live attendance-writing system.
+
+V3.6.3 Windows staging shortcuts use separate state
+`%LOCALAPPDATA%\RollFlow-V363-Staging` with PostgreSQL port **55435** and
+web port **18083**. Use `First Setup.cmd` once in a fresh extracted folder,
+then `Start RollFlow.cmd` and open `http://localhost:18083/`.
+Do not overwrite V3.5, V3.6.1, or V3.6.2 test instances.
+
+Only use fictional records on a home computer. Real school information
+requires a formally approved private school host and access controls.
+
+---
+
 # V3.6.2 — Guided OneSchool Import Centre (development staging)
 
 This build extends the V3.6.1 connected teacher portal with a guided importer at
