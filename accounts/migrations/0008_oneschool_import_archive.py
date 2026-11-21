@@ -25,6 +25,7 @@ class Migration(migrations.Migration):
                     ("staged", "Awaiting review"), ("applied", "Applied to student directory"),
                 ])),
                 ("applied_at", models.DateTimeField(blank=True, null=True)),
+                ("source_purged_at", models.DateTimeField(blank=True, null=True)),
                 ("summary", models.JSONField(default=dict)),
                 ("created_by", models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
             ],
