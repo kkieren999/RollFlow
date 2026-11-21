@@ -4,18 +4,20 @@
 
 Do not overwrite the older, working V3.5 installation or reuse its data directory
 for the first V3.6.1 test. Extract the staging artifact into a **new folder**,
-such as `C:\\RollFlow-V361-Test`. Open PowerShell there and run:
+such as `C:\RollFlow-V361-Test`. Stop the previous RollFlow process
+before testing or use the separate ports shown here. Open PowerShell in the
+new extracted folder and run:
 
 ```powershell
 $state = Join-Path $env:LOCALAPPDATA 'RollFlow-V361-Staging'
-.\\python\\python.exe -m deployment.native --state $state init
-.\\python\\python.exe -m deployment.native --state $state start
+.\python\python.exe -m deployment.native --state $state init --db-port 55433 --web-port 18081
+.\python\python.exe -m deployment.native --state $state start
 ```
 
-Create a fictional administrator at the prompt. Open http://localhost:8080/.
-Stop the server with Ctrl+C before running the management command below.
-For subsequent sessions, run the second command only. This separate state
-means the older V3.5 testing database and passwords are not altered.
+Create a fictional administrator at the prompt. Open http://localhost:18081/.
+Stop the new server with Ctrl+C. For subsequent sessions, run the second
+command only. This separate state and set of ports mean that the older V3.5
+testing database and passwords are not altered.
 
 The personal teacher portal requires a published **fictional** OneSchool
 timetable and an administrator-verified matching staff-ID link. Use the
