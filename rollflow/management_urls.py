@@ -40,6 +40,7 @@ urlpatterns = [
     path("oneschool/sample/", oneschool_views.sample, name="oneschool-sample"),
     path("oneschool/documents/", oneschool_document_views.centre, name="oneschool-documents"),
     path("oneschool/class-memberships/", oneschool_document_views.class_rosters, name="oneschool-class-rosters"),
+    path("oneschool/timetable-evidence/", oneschool_document_views.timetable_evidence, name="oneschool-timetable-evidence"),
     path("oneschool/documents/<int:pk>/", oneschool_document_views.review, name="oneschool-documents-review"),
     path("oneschool/documents/<int:pk>/apply/", oneschool_document_views.apply_students, name="oneschool-documents-apply"),
     path("oneschool/documents/<int:pk>/apply-classes/", oneschool_document_views.apply_class_memberships, name="oneschool-documents-apply-classes"),
