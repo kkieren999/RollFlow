@@ -77,7 +77,56 @@ code{overflow-wrap:anywhere}
     <div class="metric"><small>Distinct class codes</small><strong class="number">{{ batch.summary.class_count }}</strong></div>
     {% endif %}
   </div>
-  {% if batch.kind == 'class_members' %}
+  {% if batch.kind == 'tt_alignment' %}
+  <section class="panel">
+    <h2>Step 2 — Verify seven TTLine alignment files</h2>
+    <p>RollFlow checks each LineNr, TimetableVersionId, all Class/Teacher/Room columns and period/day blocks. Staff codes are planning evidence only and do not grant teacher account permissions.</p>
+    {% if batch.status == 'applied' %}
+      <p class="notice">Approved: version {{ batch.summary.applied.timetable_version_id }}, {{ batch.summary.applied.allocations }} weekly class slots and {{ batch.summary.applied.classes }} classes.</p>
+    {% elif preview_error %}<p class="notice error">{{ preview_error }}</p>
+    {% elif alignment_review %}
+      <div class="meta">
+        <div class="metric"><small>Files / lines</small><strong class="number">{{ alignment_review.lines|length }}/7</strong></div>
+        <div class="metric"><small>Timetable slots</small><strong class="number">{{ alignment_review.allocation_count }}</strong></div>
+        <div class="metric"><small>Classes</small><strong class="number">{{ alignment_review.distinct_classes }}</strong></div>
+        <div class="metric"><small>Unallocated teacher cells</small><strong class="number">{{ alignment_review.unallocated_staff }}</strong></div>
+      </div>
+      <p class="help">Timetable version {{ alignment_review.timetable_version_id }}. Missing staff and room cells stay unallocated; no teacher accounts are created.</p>
+      {% if alignment_review.missing_lines %}
+        <p class="note warn">Missing TTLine numbers: {{ alignment_review.missing_lines|join:", " }}. Re-upload all seven in one batch to activate.</p>
+      {% else %}
+        <form method="post" action="{% url 'oneschool-documents-apply-alignment' pk=batch.pk %}">{% csrf_token %}
+          <input type="hidden" name="source_signature" value="{{ alignment_review.source_signature }}">
+          <label><input type="checkbox" name="confirm_apply" value="yes" required> I reviewed all seven source files and approve saving these weekly class slots. I understand teacher accounts are unchanged.</label>
+          <button class="primary" type="submit">Apply seven timetable lines</button>
+        </form>
+      {% endif %}
+    {% endif %}
+  </section>
+  {% elif batch.kind == 'staff_pdf' %}
+  <section class="panel">
+    <h2>Step 2 — Verify staff PDF class legends</h2>
+    <p>Only class-code, class-name, printed staff-code and line-number evidence is extracted. Names are not copied into the database. This cannot authorise teacher login or reveal student lists.</p>
+    {% if batch.status == 'applied' %}
+      <p class="notice">Approved: {{ batch.summary.applied.pages }} pages, {{ batch.summary.applied.staff_codes }} staff codes, {{ batch.summary.applied.class_references }} class references, version {{ batch.summary.applied.timetable_version_id }}.</p>
+    {% elif preview_error %}<p class="notice error">{{ preview_error }}</p>
+    {% elif staff_review %}
+      <div class="meta">
+        <div class="metric"><small>PDF pages</small><strong class="number">{{ staff_review.pages }}</strong></div>
+        <div class="metric"><small>Staff codes</small><strong class="number">{{ staff_review.staff_codes }}</strong></div>
+        <div class="metric"><small>Class references</small><strong class="number">{{ staff_review.staff_class_references }}</strong></div>
+        <div class="metric"><small>Pages without legend</small><strong class="number">{{ staff_review.pages_without_legend }}</strong></div>
+      </div>
+      <p class="help">Timetable version {{ staff_review.timetable_version_id }}. These are class catalogue references, not verified OneSchool staff IDs.</p>
+      <form method="post" action="{% url 'oneschool-documents-apply-staff-evidence' pk=batch.pk %}">{% csrf_token %}
+        <input type="hidden" name="source_signature" value="{{ staff_review.source_signature }}">
+        {% if staff_review.pages_without_legend %}<label><input type="checkbox" name="acknowledge_empty_pages" value="yes" required> I reviewed the {{ staff_review.pages_without_legend }} page{{ staff_review.pages_without_legend|pluralize }} without class legends.</label>{% endif %}
+        <label><input type="checkbox" name="confirm_apply" value="yes" required> I approve saving class evidence only. No staff account or identity is authorised by this action.</label>
+        <button type="submit" class="primary">Apply staff PDF evidence</button>
+      </form>
+    {% endif %}
+  </section>
+  {% elif batch.kind == 'class_members' %}
     <section class="panel">
       <h2>Step 2 — Review student-to-class matches</h2>
       <p>EQID is matched to an existing active student and Class_Name to a class in the currently published timetable or an active, administrator-created SchoolClass. No students, teachers or classes are fabricated. Existing memberships are never removed.</p>
