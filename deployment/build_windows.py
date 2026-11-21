@@ -57,19 +57,19 @@ def main():
         "Manage RollFlow.cmd": "manage",
         "Backup RollFlow.cmd": "backup",
     }.items():
-        # The V3.6.4 shortcuts must never pick up an older V3.5 instance
+        # The V3.6.4.1 shortcuts must never pick up an older V3.5 instance
         # from the native runner's shared default state folder.
         launcher = ('@echo off\n"%~dp0python\\python.exe" -m deployment.native '
-                    '--state "%LOCALAPPDATA%\\RollFlow-V364-Staging" ' + command)
+                    '--state "%LOCALAPPDATA%\\RollFlow-V3641-Staging" ' + command)
         if command == "init":
-            launcher += " --db-port 55436 --web-port 18084"
+            launcher += " --db-port 55437 --web-port 18085"
         (out / name).write_text(launcher + ' %*\nif errorlevel 1 pause\n',
                                 encoding="ascii")
     (out / "READ FIRST.txt").write_text(
-        "V3.6.4 integrated engineering staging bundle. Fictional data only.\n"
+        "V3.6.4.1 integrated engineering staging bundle. Fictional data only.\n"
         "Copy to a local controlled directory. Run First Setup.cmd once, then Start RollFlow.cmd.\n"
-        "Open http://localhost:18084/. No internet is required at runtime.\n"
-        "V3.6.4 shortcuts use %LOCALAPPDATA%\\RollFlow-V364-Staging, not the earlier V3.5 database.\n"
+        "Open http://localhost:18085/. No internet is required at runtime.\n"
+        "V3.6.4.1 shortcuts use %LOCALAPPDATA%\\RollFlow-V3641-Staging, not the earlier V3.5 database.\n"
         "See app/deployment/README.md for side-by-side test setup, ICT restrictions and backup steps.\n",
         encoding="utf-8")
     manifest = []

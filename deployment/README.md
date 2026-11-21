@@ -1,3 +1,22 @@
+# V3.6.4.1 — Fix for OneSchool Excel worksheets without dimension metadata
+
+Some genuine OneSchool TTLineAlignmentExport XLSX files omit the optional
+worksheet dimension reference. Older V3.6.4 builds raised a TypeError on
+upload when the streaming Excel reader returned a missing row count. V3.6.4.1
+accepts that format, checks rows with explicit bounded iteration, and applies
+the same fix to SM110 student-list Excel files. Original imports still need
+administrator review before records are applied.
+
+For an isolated clean test, extract the V3.6.4.1 staging ZIP to a new
+folder. Run **First Setup.cmd** once and then **Start RollFlow.cmd**.
+New staging state: `%LOCALAPPDATA%\RollFlow-V3641-Staging`.
+Local URL: **http://localhost:18085/**. PostgreSQL: **55437**.
+Do not delete or overwrite your V3.6.4 database or archives.
+Use only fictional files in a home test. Live OneSchool records require an
+approved private school host and a privacy/security assessment.
+
+---
+
 # V3.6.4 — Verified OneSchool source layouts (draft)
 
 Use the new independent Windows staging folder, not any prior RollFlow

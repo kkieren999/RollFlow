@@ -68,7 +68,10 @@ def parse_students(raw):
         if "Data" not in wb.sheetnames:
             raise ValueError("Expected the SM110 'Data' worksheet.")
         ws = wb["Data"]
-        if ws.max_row > MAX_STUDENTS + 30 or ws.max_column > 30:
+        # An OneSchool XLSX can omit its worksheet <dimension> metadata.
+        # Streaming openpyxl readers then expose None for row/column count.
+        if ((ws.max_row is not None and ws.max_row > MAX_STUDENTS + 30)
+                or (ws.max_column is not None and ws.max_column > 30)):
             raise ValueError("Unexpected student list size or columns.")
         criteria = str(ws["A4"].value or "")
         if not re.search(r"enrolment\s+status\s*:\s*active\b", criteria, re.I):
@@ -79,6 +82,8 @@ def parse_students(raw):
             raise ValueError("Expected the exact SM110 columns: Student Name, EQ ID, Roll Class, Year.")
         students, ids, years, groups = [], set(), Counter(), set()
         for line, values in enumerate(ws.iter_rows(min_row=6, min_col=1, max_col=4, values_only=True), 6):
+            if line > MAX_STUDENTS + 30:
+                raise ValueError("Unexpected student list size or columns.")
             if all(v is None or str(v).strip() == "" for v in values):
                 continue
             name, sid, group, year = [str(v).strip() if v is not None else "" for v in values]

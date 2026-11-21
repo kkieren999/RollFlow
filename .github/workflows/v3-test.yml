@@ -4,7 +4,7 @@ on:
   push:
     branches: [v3.0-foundation]
   pull_request:
-    branches: [main, v3.0-foundation, integration/v3.6.1-windows-teacher-portal, feature/v3.6.2-oneschool-import-centre]
+    branches: [main, v3.0-foundation, integration/v3.6.1-windows-teacher-portal, feature/v3.6.2-oneschool-import-centre, feature/v3.6.4-real-oneschool-format-support]
 permissions:
   contents: read
 jobs:
@@ -84,10 +84,10 @@ jobs:
           $setupLauncher = Get-Content (Join-Path $bundle 'First Setup.cmd') -Raw
           $startLauncher = Get-Content (Join-Path $bundle 'Start RollFlow.cmd') -Raw
           foreach ($launcher in @($setupLauncher, $startLauncher)) {
-            if ($launcher -notmatch 'RollFlow-V364-Staging') { throw 'V3.6.1 shortcuts must have a dedicated instance state' }
+            if ($launcher -notmatch 'RollFlow-V3641-Staging') { throw 'V3.6.1 shortcuts must have a dedicated instance state' }
             if ($launcher -notmatch '--state') { throw 'Shortcut state override missing' }
           }
-          if ($setupLauncher -notmatch '--db-port 55436 --web-port 18084') { throw 'V3.6.1 setup must use independent database and web ports' }
+          if ($setupLauncher -notmatch '--db-port 55437 --web-port 18085') { throw 'V3.6.1 setup must use independent database and web ports' }
           if ($startLauncher -notmatch 'start') { throw 'Start shortcut must use configured V3.6.1 state' }
           & "$bundle/python/python.exe" -m deployment.native --state $state init --no-admin
           if ($LASTEXITCODE -ne 0) { throw 'Native setup failed' }
@@ -105,11 +105,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Class membership migration or import route unavailable' }
           & "$bundle/python/python.exe" -m deployment.native --state $state manage shell -c "from django.db import connection; from django.urls import reverse; from accounts.models import OneSchoolLineAllocation, OneSchoolStaffClassReference; assert all(x._meta.db_table in connection.introspection.table_names() for x in (OneSchoolLineAllocation, OneSchoolStaffClassReference)); assert reverse('oneschool-documents-apply-alignment', kwargs={'pk':1}) == '/manage/oneschool/documents/1/apply-alignment/'; assert reverse('oneschool-documents-apply-staff-evidence', kwargs={'pk':1}) == '/manage/oneschool/documents/1/apply-staff-evidence/'"
           if ($LASTEXITCODE -ne 0) { throw 'V3.6.4 OneSchool staff and line evidence schema/route smoke failed' }
+          & "$bundle/python/python.exe" -m deployment.native --state $state manage shell -c "from accounts.test_oneschool_real_formats import fictional_line, without_excel_dimensions; from accounts.oneschool_alignment import parse_alignment_file; rows, detail = parse_alignment_file(without_excel_dimensions(fictional_line(1))); assert detail['line_number'] == 1 and len(rows) > 0"
+          if ($LASTEXITCODE -ne 0) { throw 'Windows missing-dimension OneSchool XLSX parser smoke failed' }
           & "$bundle/python/python.exe" -m deployment.native --state $state backup "$env:RUNNER_TEMP/rf-test-backup.dump"
           if ($LASTEXITCODE -ne 0) { throw 'Database backup failed' }
       - uses: actions/upload-artifact@v4
         with:
-          name: RollFlow-V3.6.4-Windows-x64-STAGING
+          name: RollFlow-V3.6.4.1-Windows-x64-STAGING
           path: ${{ runner.temp }}/RollFlow/
           if-no-files-found: error
           retention-days: 14

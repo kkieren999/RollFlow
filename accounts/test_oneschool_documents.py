@@ -154,6 +154,16 @@ class OneSchoolDocumentTests(TestCase):
             SecurityEvent.objects.filter(event="oneschool_students_applied", subject=str(batch.pk)).exists()
         )
 
+    def test_sm110_missing_dimension_metadata_is_validated_safely(self):
+        from .test_oneschool_real_formats import without_excel_dimensions
+        source = without_excel_dimensions(self.xlsx())
+        response = self.upload(sources=[("SM110_DynamicStudentList.xlsx", source)])
+        self.assertEqual(response.status_code, 302)
+        batch = OneSchoolArchiveBatch.objects.get()
+        self.assertEqual(batch.status, "staged")
+        self.assertEqual(batch.summary["student_count"], 2)
+        self.assertEqual(Student.objects.count(), 0)
+
     def test_invalid_header_and_duplicate_id_are_atomic(self):
         for raw in [
             self.xlsx(bad_header=True),

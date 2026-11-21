@@ -3,7 +3,9 @@
 Do not commit authentic school exports, names or EQIDs to this repository.
 """
 import io
+import re
 import tempfile
+from zipfile import ZipFile
 from pathlib import Path
 
 from django.contrib.auth.models import User
@@ -96,6 +98,26 @@ def fictional_staff_pdf(version=186054, empty_legend=False):
     return file.getvalue()
 
 
+
+
+def without_excel_dimensions(original):
+    """Simulate OneSchool files whose XML omits sheet <dimension ref=.../>."""
+    result = io.BytesIO()
+    changed = 0
+    with ZipFile(io.BytesIO(original), "r") as source:
+        with ZipFile(result, "w") as target:
+            for item in source.infolist():
+                content = source.read(item.filename)
+                if item.filename.startswith("xl/worksheets/sheet") and item.filename.endswith(".xml"):
+                    content, count = re.subn(
+                        rb"<dimension\s+ref=\"[^\"]*\"\s*/>", b"", content, count=1
+                    )
+                    changed += count
+                target.writestr(item, content)
+    if not changed:
+        raise AssertionError("Synthetic XLSX did not contain dimensions to remove.")
+    return result.getvalue()
+
 @override_settings(SECURE_SSL_REDIRECT=False, SESSION_COOKIE_SECURE=False, CSRF_COOKIE_SECURE=False)
 class ActualOneSchoolLayoutTests(TestCase):
     def setUp(self):
@@ -118,6 +140,53 @@ class ActualOneSchoolLayoutTests(TestCase):
 
     def seven_lines(self, version=186054):
         return [(f"TTLineAlignmentExport-{n}.xlsx", fictional_line(n,version)) for n in range(1,8)]
+
+    def test_oneschool_xlsx_without_dimensions_stages_and_parses(self):
+        from .oneschool_documents import workbook_from_bytes
+        raw = without_excel_dimensions(fictional_line(1))
+        wb = workbook_from_bytes(raw)
+        try:
+            self.assertIsNone(wb["Sheet1"].max_row)
+            self.assertIsNone(wb["Sheet1"].max_column)
+            self.assertIsNone(wb["ReportCriteria"].max_row)
+        finally:
+            wb.close()
+        rows, summary = parse_alignment_file(raw)
+        self.assertEqual(summary["line_number"], 1)
+        self.assertEqual(len(rows), len(HEADINGS[0]))
+        self.assertEqual(self.stage(
+            "tt_alignment", [("TTLineAlignmentExport-line1.xlsx", raw)]
+        ).status_code, 302)
+        batch = OneSchoolArchiveBatch.objects.get()
+        review = self.client.get(f"/manage/oneschool/documents/{batch.pk}/")
+        self.assertEqual(review.status_code, 200)
+        self.assertEqual(review.context["alignment_review"]["lines"], [1])
+        self.assertEqual(review.context["alignment_review"]["missing_lines"], [2,3,4,5,6,7])
+
+    def test_all_seven_oneschool_xlsx_without_dimensions(self):
+        files = [
+            (name, without_excel_dimensions(raw))
+            for name, raw in self.seven_lines()
+        ]
+        self.assertEqual(self.stage("tt_alignment", files).status_code, 302)
+        batch = OneSchoolArchiveBatch.objects.get()
+        review = self.client.get(f"/manage/oneschool/documents/{batch.pk}/")
+        self.assertEqual(review.status_code, 200)
+        self.assertTrue(review.context["alignment_review"]["complete"])
+        self.assertEqual(review.context["alignment_review"]["allocation_count"], 19)
+
+    def test_unspecified_dimensions_still_enforce_workbook_row_limits(self):
+        from openpyxl import load_workbook
+        raw = fictional_line(1)
+        wb = load_workbook(io.BytesIO(raw))
+        ws = wb["Sheet1"]
+        ws.cell(601, 1, "Unexpected extra content")
+        out = io.BytesIO()
+        wb.save(out)
+        wb.close()
+        unlimited = without_excel_dimensions(out.getvalue())
+        with self.assertRaisesRegex(ValueError, "too many worksheet rows"):
+            parse_alignment_file(unlimited)
 
     def test_parsers_accept_full_seven_line_layout(self):
         rows = []
