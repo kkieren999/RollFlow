@@ -1,4 +1,25 @@
-# RollFlow V3.5 — Self-contained school architecture foundation
+# RollFlow V3.6.1 — Integrated Windows staging candidate
+
+This integration branch contains **both** the Windows PostgreSQL password-file
+ACL fix from [draft PR #1](https://github.com/kkieren999/RollFlow/pull/1) and
+the protected Connected Teacher Portal from
+[draft PR #2](https://github.com/kkieren999/RollFlow/pull/2).
+Neither PR has been merged and `main` is unchanged. Windows CI builds an
+offline `RollFlow-V3.6.1-Windows-x64-STAGING` artifact, checks that
+`initdb` can access its private temporary password, migrates the schema,
+verifies the authenticated teacher-week route and staff-link column, and
+backs up PostgreSQL. Only fictional data are authorised for testing.
+
+**For home testing:** use the independent directory/state instructions in
+[deployment/README.md](deployment/README.md) to avoid modifying an existing
+working V3.5 installation. Verified OneSchool links and the published timetable
+are stored in the school instance database. In live school mode, old links
+start unverified; a school administrator must affirm a staff-ID link before
+the teacher can see assigned lessons. Actual attendance, data-sharing approval,
+release signing, clean-machine upgrade/restore and production readiness are
+outside the scope of this staging build.
+
+## V3.5 — Self-contained school architecture foundation
 
 ## V3.6 — Connected Teacher Portal (draft)
 

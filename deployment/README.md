@@ -1,4 +1,32 @@
-# V3.5 — Self-contained School Edition foundation
+# V3.6.1 — Integrated Windows staging (V3.5.1 installation + V3.6 portal)
+
+## Safe side-by-side test on a home computer
+
+Do not overwrite the older, working V3.5 installation or reuse its data directory
+for the first V3.6.1 test. Extract the staging artifact into a **new folder**,
+such as `C:\\RollFlow-V361-Test`. Open PowerShell there and run:
+
+```powershell
+$state = Join-Path $env:LOCALAPPDATA 'RollFlow-V361-Staging'
+.\\python\\python.exe -m deployment.native --state $state init
+.\\python\\python.exe -m deployment.native --state $state start
+```
+
+Create a fictional administrator at the prompt. Open http://localhost:8080/.
+Stop the server with Ctrl+C before running the management command below.
+For subsequent sessions, run the second command only. This separate state
+means the older V3.5 testing database and passwords are not altered.
+
+The personal teacher portal requires a published **fictional** OneSchool
+timetable and an administrator-verified matching staff-ID link. Use the
+administrative Staff Management edit screen to verify the identity explicitly.
+After setup, the teacher can use My day and My week; unverified links fail closed.
+The live school profile requires an approved HTTPS gateway and must **not**
+be enabled for an unapproved home test. Do not import genuine school information.
+
+The native runner has no automated in-place upgrade or restore procedure.
+A clean-machine and isolated backup/restore test are required before
+considering a release. This build is unsigned staging software only.
 
 ## What is supported in this engineering release
 
@@ -17,6 +45,19 @@ The builder copies the runtimes, fetches binary wheels on the build machine only
 ## Offline synthetic staging
 
 Copy the built directory to local storage, not a network share or USB for running the database. Run under a standard dedicated account, not Administrator/root. Configure restrictive access (Windows NTFS ACLs) to the application and private data directories. Double-click First Setup.cmd once; create the initial admin at the prompt using a unique password. Start RollFlow.cmd and browse http://localhost:8080/. The default data directory is %LOCALAPPDATA%/RollFlow-Staging on Windows. Ctrl+C stops the application and the database it started. Application files and persistent state are separate. Do not use real records in staging. For a different state directory, call the bundled Python directly with --state before the command. Do not run two launchers against the same instance.
+
+### Windows PostgreSQL initialization permissions (V3.5.1)
+
+First setup now removes inherited NTFS permissions on the new instance directory and
+grants access explicitly to the Windows account performing setup. The short-lived
+`initial-password.txt` file receives a separate current-user SID grant so
+PostgreSQL `initdb` can read it even when its Windows token does not retain
+access through the Administrators group. The file is deleted after setup or a
+failed `initdb` attempt. ACL changes fail closed; do not work around failures
+with `Everyone`, `Users`, or broad administrator-group access. Use a local
+NTFS volume and the same dedicated standard account to set up and run RollFlow.
+Windows CI covers the bundled `initdb`, migration and backup path; a clean-machine
+test is still required before any release.
 
 ## Private school profile (future approved pilot only)
 

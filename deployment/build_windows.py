@@ -60,10 +60,10 @@ def main():
         (out / name).write_text('@echo off\n"%~dp0python\\python.exe" -m deployment.native ' +
                                 command + ' %*\nif errorlevel 1 pause\n', encoding="ascii")
     (out / "READ FIRST.txt").write_text(
-        "V3.5 engineering staging bundle. Fictional data only.\n"
+        "V3.6.1 integrated engineering staging bundle. Fictional data only.\n"
         "Copy to a local controlled directory. Run First Setup.cmd once, then Start RollFlow.cmd.\n"
         "Open http://localhost:8080/. No internet is required at runtime.\n"
-        "See app/deployment/README.md for ICT restrictions, supported prerequisites and backup steps.\n",
+        "See app/deployment/README.md for side-by-side test setup, ICT restrictions and backup steps.\n",
         encoding="utf-8")
     manifest = []
     for path in sorted(out.rglob("*")):

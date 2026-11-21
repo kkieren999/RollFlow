@@ -22,6 +22,34 @@ def write_private(path, content):
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         f.write(content)
 
+def harden_windows_acl(path, *, directory=False):
+    """Restrict an NTFS path to the invoking user, not the Administrators group.
+
+    PostgreSQL's Windows initdb can run with a restricted token which cannot
+    depend on group-only access inherited from a temporary parent directory.
+    Resolve the user's SID rather than a possibly localised account name.
+    """
+    import csv
+    import io
+
+    identity = subprocess.check_output(
+        ["whoami.exe", "/user", "/fo", "csv", "/nh"],
+        text=True, errors="replace",
+    )
+    rows = [row for row in csv.reader(io.StringIO(identity)) if row]
+    if len(rows) != 1 or len(rows[0]) != 2:
+        raise RuntimeError("Could not determine the Windows user SID.")
+    sid = rows[0][1].strip()
+    if not re.fullmatch(r"S-\d+(?:-\d+)+", sid):
+        raise RuntimeError("Invalid Windows user SID; refusing to loosen access.")
+
+    # Remove inherited access (which can be group-only on CI runners), and
+    # grant this user's SID explicitly. Never grant Everyone/Users access.
+    access = "(OI)(CI)F" if directory else "F"
+    run(["icacls.exe", path, "/inheritance:r", "/grant:r",
+         f"*{sid}:{access}"], stdout=subprocess.DEVNULL)
+
+
 def pg(cfg, name):
     return Path(cfg["pg_bin"]) / (name + EXE)
 
@@ -94,18 +122,22 @@ def init(args, state):
         if not (pg_bin / (name + EXE)).is_file():
             raise RuntimeError("Missing PostgreSQL runtime: " + name)
     state.mkdir(mode=0o700, parents=True)
+    if os.name == "nt":
+        harden_windows_acl(state, directory=True)
     cfg = dict(state=str(state), pg_bin=str(pg_bin), mode=args.mode, host=host,
                db_port=args.db_port, web_port=args.web_port,
                secret=secrets.token_urlsafe(64), db_password=secrets.token_urlsafe(40))
     admin_password = secrets.token_urlsafe(40)
     pwfile = state / "initial-password.txt"
-    write_private(pwfile, admin_password + "\n")
     try:
+        write_private(pwfile, admin_password + "\n")
+        if os.name == "nt":
+            harden_windows_acl(pwfile)
         run([pg(cfg, "initdb"), "-D", state / "postgres", "--encoding=UTF8",
              "--locale=C", "--username=rollflow_owner", "--auth=scram-sha-256",
              "--pwfile=" + str(pwfile)])
     finally:
-        pwfile.unlink()
+        pwfile.unlink(missing_ok=True)
     # Keep database administration separate from the application's restricted role.
     write_private(state / "database-owner.txt", admin_password + "\n")
     with (state / "postgres" / "postgresql.conf").open("a", encoding="utf-8") as f:
