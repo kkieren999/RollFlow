@@ -1,8 +1,14 @@
 from django.urls import path
+from accounts import connected_views
 from accounts import staff_views, student_views, timetable_views, master_views, oneschool_views, oneschool_document_views
 
 urlpatterns = [
     path("", staff_views.dashboard, name="management-dashboard"),
+    path("connected/", connected_views.centre, name="connected-school"),
+    path("connected/mapping/", connected_views.mapping, name="connected-mapping"),
+    path("connected/classes/", connected_views.classes, name="connected-classes"),
+    path("connected/master/", connected_views.master, name="connected-master"),
+    path("connected/roster/<str:code>/", connected_views.roster, {"admin_only": True}, name="connected-admin-roster"),
     path("staff/add/", staff_views.staff_edit, name="management-staff-add"),
     path("staff/import/", staff_views.staff_import, name="management-staff-import"),
     path("staff/<int:pk>/edit/", staff_views.staff_edit, name="management-staff-edit"),
