@@ -164,6 +164,10 @@ def staff_edit(request, pk=None):
                     "staff_id": c["staff_id"], "faculty": c["faculty"], "campus": c["campus"],
                     "class_codes": c["class_codes"], "timetable_link_verified": link_verified,
                 })
+                if existing_profile and (previous_id != c["staff_id"] or not link_verified or c["role"] != "teacher" or not user.is_active):
+                    from .models import ConnectedStaffMapping
+                    if ConnectedStaffMapping.objects.filter(profile=existing_profile).delete()[0]:
+                        SecurityEvent.objects.create(actor=request.user, event="connected_mapping_revoked", subject=user.username)
                 if link_verified != bool(existing_profile and existing_profile.timetable_link_verified) or (
                     c["staff_id"] and previous_id != c["staff_id"] and link_verified
                 ):
@@ -214,6 +218,10 @@ def staff_status(request, pk):
             return redirect("management-section", section="staff")
         target.is_active = value == "1"
         target.save(update_fields=["is_active"])
+        if not target.is_active:
+            from .models import ConnectedStaffMapping
+            if ConnectedStaffMapping.objects.filter(profile__user=target).delete()[0]:
+                SecurityEvent.objects.create(actor=request.user, event="connected_mapping_revoked", subject=target.username)
         revoke_sessions(target)
         log(request, "account_activated" if target.is_active else "account_deactivated", target)
     messages.success(request, "Account status updated.")
