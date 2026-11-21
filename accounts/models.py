@@ -136,10 +136,11 @@ class OneSchoolArchiveBatch(models.Model):
         STUDENTS = "students", "SM110 Student List (Excel)"
         STAFF_PDF = "staff_pdf", "Whole-staff Timetable (PDF)"
         TT_ALIGNMENT = "tt_alignment", "TTLineAlignmentExport (multiple files)"
+        CLASS_MEMBERS = "class_members", "ExportStudentClass (CSV)"
 
     class Status(models.TextChoices):
         STAGED = "staged", "Awaiting review"
-        APPLIED = "applied", "Applied to student directory"
+        APPLIED = "applied", "Applied after administrator review"
 
     kind = models.CharField(max_length=20, choices=Kind.choices)
     label = models.CharField(max_length=120)
@@ -167,3 +168,24 @@ class OneSchoolArchivedFile(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["batch", "sha256"], name="unique_file_digest_in_import_batch"),
         ]
+
+
+class OneSchoolClassMembership(models.Model):
+    """Reviewed OneSchool EQID-to-class-code link (not a teacher assignment).
+
+    SchoolClass requires a manually verified teacher; published timetable
+    classes can be present without a SchoolClass row. Using class_code
+    independently avoids inventing a staff account or teacher identity.
+    """
+    student = models.ForeignKey(Student, on_delete=models.PROTECT, related_name="oneschool_memberships")
+    class_code = models.CharField(max_length=30)
+    source_batch = models.ForeignKey(OneSchoolArchiveBatch, on_delete=models.PROTECT,
+                                     related_name="class_memberships")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["class_code", "student__last_name", "student__first_name"]
+        constraints = [
+            models.UniqueConstraint(fields=["student", "class_code"], name="unique_oneschool_student_class"),
+        ]
+
