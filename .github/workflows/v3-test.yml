@@ -99,6 +99,8 @@ jobs:
           & "$bundle/python/python.exe" -m deployment.native --state $state manage shell -c "from django.urls import reverse; from django.db import connection; from accounts.models import StaffProfile; assert reverse('teacher-week') == '/teacher/week/'; cursor = connection.cursor(); assert 'timetable_link_verified' in [col.name for col in connection.introspection.get_table_description(cursor, StaffProfile._meta.db_table)]"
           if ($LASTEXITCODE -ne 0) { throw 'V3.6.1 teacher route or migrated identity verification missing' }
           & "$bundle/python/python.exe" -m deployment.native --state $state manage shell -c "from django.urls import reverse; import openpyxl, pypdf, cryptography; from accounts.models import OneSchoolArchiveBatch; assert reverse('oneschool-documents') == '/manage/oneschool/documents/'; assert OneSchoolArchiveBatch._meta.db_table in __import__('django.db',fromlist=['connection']).connection.introspection.table_names()"
+          & "$bundle/python/python.exe" -m deployment.native --state $state manage shell -c "from accounts.oneschool_storage import save_encrypted, read_encrypted; token=save_encrypted(b'fictional-offline-import'); assert read_encrypted(token) == b'fictional-offline-import'"
+          if ($LASTEXITCODE -ne 0) { throw 'Windows local encrypted OneSchool archive smoke test failed' }
           & "$bundle/python/python.exe" -m deployment.native --state $state backup "$env:RUNNER_TEMP/rf-test-backup.dump"
           if ($LASTEXITCODE -ne 0) { throw 'Database backup failed' }
       - uses: actions/upload-artifact@v4
