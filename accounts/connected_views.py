@@ -36,7 +36,19 @@ def event(request, name, subject):
 @administrator
 @require_http_methods(["GET", "POST"])
 def centre(request):
-    form = PublishForm(request.POST if request.method == "POST" else None)
+    existing = current()
+    initial = {}
+    if existing:
+        from .connected_school import DAYS
+        calendar = existing.snapshot["calendar"]
+        initial = {"name": existing.name, "starts": existing.starts, "ends": existing.ends,
+                   "times": "\n".join(f"{day},{period}," + ",".join(calendar["times"][f"{index}:{period}"])
+                             for index, day in enumerate(DAYS, 1) for period in range(1, 5)),
+                   "closures": "\n".join(calendar["closed"])}
+    else:
+        from .connected_school import DAYS
+        initial["times"] = "\n".join(f"{day},{period},," for day in DAYS for period in range(1,5))
+    form = PublishForm(request.POST if request.method == "POST" else None, initial=initial)
     preview = None
     if request.method == "POST" and form.is_valid():
         action = request.POST.get("action")
@@ -45,7 +57,9 @@ def centre(request):
         try:
             with transaction.atomic():
                 sources, snapshot, digest = build_candidate(**form.cleaned_data)
-                preview = {"stats": snapshot["stats"], "digest": digest, "sources": sources}
+                preview = {"stats": snapshot["stats"], "digest": digest, "sources": sources,
+                           "examples": [{"code": c["code"], "name": c["name"], "count": len(c["students"])}
+                                        for c in snapshot["classes"][:12]]}
                 if action == "publish":
                     if request.POST.get("digest") != digest or request.POST.get("confirm") != "yes":
                         form.add_error(None, "Data or settings changed, or approval was missing. Review again before publication.")
