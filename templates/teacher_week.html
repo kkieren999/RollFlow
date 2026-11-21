@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RollFlow · My week</title>
+<style>
+:root{color-scheme:light}
+*{box-sizing:border-box}
+body{margin:0;background:#eff3f5;color:#253746;font:15px/1.5 Arial,Helvetica,sans-serif}
+header{background:#112332;color:white;padding:15px max(16px,calc((100vw - 1200px)/2));display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+header strong{font-size:20px}
+header nav{display:flex;gap:16px;flex-wrap:wrap}
+header a{color:white}
+header form{margin:0}
+button,.btn{display:inline-block;background:white;color:#253746;text-decoration:none;border:1px solid #bfcdd4;border-radius:6px;padding:9px 12px;font:inherit;cursor:pointer}
+button:focus-visible,.btn:focus-visible,header a:focus-visible{outline:3px solid #ffbf47;outline-offset:3px}
+main{max-width:1240px;margin:0 auto;padding:24px 18px 45px}
+h1{font-size:25px;margin:0 0 4px}
+h2{font-size:18px;margin:0}
+p{margin:6px 0}
+.muted{color:#5a7180}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0}
+.primary{background:#16852b;border-color:#16852b;color:white}
+.notice{padding:12px 16px;border-left:4px solid #16852b;background:white;border-radius:4px;margin:16px 0}
+.warning{border-left-color:#ba7922}
+.days{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.day{min-width:0;background:white;border:1px solid #dce5e8;border-radius:8px;overflow:hidden}
+.day-head{padding:12px 14px;background:#e8eff2;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.day-head small{display:block;color:#506978}
+.day-body{padding:12px 14px}
+.lesson{padding:10px 0;border-bottom:1px solid #e5eaec}
+.lesson:last-child{border:0}
+.lesson .time{color:#375a6a;font-size:13px;font-weight:bold}
+.lesson strong{display:block;margin:4px 0}
+.lesson small{display:block;color:#526b7a}
+.summary{color:#526b7a;font-size:13px}
+@media(max-width:600px){main{padding:15px 12px 36px}header{padding:12px}.days{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <strong>RollFlow · Teacher Portal</strong>
+  <nav aria-label="Teacher timetable">
+    <a href="{% url 'teacher-timetable' %}">My day</a>
+    <a href="{% url 'teacher-week' %}" aria-current="page">My week</a>
+    {% if not live_timetable %}<a href="{% url 'teacher-master' %}">Fictional master timetable</a>{% endif %}
+  </nav>
+  <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit">Sign out</button></form>
+</header>
+<main>
+  <h1>My teaching week</h1>
+  <p class="muted">{{ request.user.get_full_name|default:request.user.username }} · {{ week_start|date:"j F Y" }} · Published version: {{ version.name }}</p>
+  <p class="summary">Your personal timetable is read-only. It comes from the currently published OneSchool snapshot; it is not an attendance register.</p>
+  <nav aria-label="Timetable week navigation" class="actions">
+    <a class="btn" href="?date={{ prev_week }}">← Previous week</a>
+    <a class="btn primary" href="?date={{ today_url }}">This week</a>
+    <a class="btn" href="?date={{ next_week }}">Next week →</a>
+    <a class="btn" href="?date={{ first_url }}">First imported week</a>
+  </nav>
+  {% if coverage_warning %}<p role="status" class="notice warning">{{ coverage_warning }}</p>{% endif %}
+  {% if link_message %}
+    <p role="status" class="notice warning">{{ link_message }} Until your account is verified, no imported lessons will be shown.</p>
+  {% else %}
+    <p class="summary">{{ lesson_count }} assigned lesson{{ lesson_count|pluralize }} this week. Only your own OneSchool staff-ID allocations are shown.</p>
+    <div class="days">
+    {% for day in week_days %}
+      <section class="day" aria-label="{{ day.date|date:'l j F Y' }}">
+        <div class="day-head"><div><h2>{{ day.date|date:"l" }}</h2><small>{{ day.date|date:"j F Y" }}</small></div><a class="btn" href="{% url 'teacher-timetable' %}?date={{ day.iso }}">Day view</a></div>
+        <div class="day-body">
+        {% for lesson in day.lessons %}
+          <div class="lesson">
+            <span class="time">{{ lesson.period }} · {{ lesson.start }}–{{ lesson.end }}</span>
+            <strong>{{ lesson.code }}</strong>
+            <small>{{ lesson.subject }} · Year {{ lesson.year }}</small>
+            <small>Room: {{ lesson.room|default:"Unallocated" }}</small>
+          </div>
+        {% empty %}
+          <p class="muted">{% if day.published %}No assigned lessons on this day.{% else %}No published timetable for this date.{% endif %}</p>
+        {% endfor %}
+        </div>
+      </section>
+    {% endfor %}
+    </div>
+  {% endif %}
+</main>
+</body>
+</html>
