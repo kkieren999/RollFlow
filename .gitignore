@@ -17,6 +17,7 @@ private-data/
 ExportTimetable*.csv
 TTLineAlignmentExport*.*
 SM110_DynamicStudentList*.xlsx
+ExportStudentClass*.csv
 *StaffTimetable*.pdf
 ClassList*.pdf
 oneschool-exports/
