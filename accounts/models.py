@@ -147,6 +147,7 @@ class OneSchoolArchiveBatch(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=12, choices=Status.choices, default=Status.STAGED)
     applied_at = models.DateTimeField(null=True, blank=True)
+    source_purged_at = models.DateTimeField(null=True, blank=True)
     summary = models.JSONField(default=dict)
     class Meta:
         ordering = ["-created_at"]
