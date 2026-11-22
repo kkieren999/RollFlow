@@ -2,9 +2,9 @@ name: V3 foundation tests
 on:
   workflow_dispatch:
   push:
-    branches: [v3.0-foundation, feature/v3.6.5-connected-school-data]
+    branches: [v3.0-foundation, feature/v3.6.5-connected-school-data, feature/v3.6.6-automated-school-setup]
   pull_request:
-    branches: [main, v3.0-foundation, integration/v3.6.1-windows-teacher-portal, feature/v3.6.2-oneschool-import-centre, feature/v3.6.4-real-oneschool-format-support, fix/v3.6.4-oneschool-unknown-worksheet-size, fix/v3.6.4.2-empty-staff-pdf-legends, fix/v3.6.4.3-cross-line-alignment]
+    branches: [main, v3.0-foundation, integration/v3.6.1-windows-teacher-portal, feature/v3.6.2-oneschool-import-centre, feature/v3.6.4-real-oneschool-format-support, fix/v3.6.4-oneschool-unknown-worksheet-size, fix/v3.6.4.2-empty-staff-pdf-legends, fix/v3.6.4.3-cross-line-alignment, feature/v3.6.5-connected-school-data]
 permissions:
   contents: read
 jobs:
@@ -39,7 +39,7 @@ jobs:
       - run: python deployment/ci_smoke.py
 
   windows-offline-bundle:
-    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/v3.0-foundation' || github.ref == 'refs/heads/feature/v3.6.5-connected-school-data'
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/v3.0-foundation' || github.ref == 'refs/heads/feature/v3.6.5-connected-school-data' || github.ref == 'refs/heads/feature/v3.6.6-automated-school-setup'
     runs-on: windows-2025
     timeout-minutes: 25
     steps:
@@ -121,9 +121,11 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'V3.6.5 existing-instance upgrade failed' }
           & "$bundle/python/python.exe" -m deployment.native --state $state manage shell -c "from accounts.models import Student, OneSchoolArchivedFile, ConnectedSchoolPublication; from accounts.oneschool_storage import read_encrypted; from django.urls import reverse; from django.db import connection; from django.conf import settings; import pathlib; assert Student.objects.filter(student_id='UPGRADEFAKE').exists(); f=OneSchoolArchivedFile.objects.get(original_name='fictional.xlsx'); assert read_encrypted(f.storage_token)==b'fictional-existing-archive'; assert ConnectedSchoolPublication._meta.db_table in connection.introspection.table_names(); assert reverse('connected-school')=='/manage/connected/'; backups=list((pathlib.Path(settings.ROLLFLOW_ARCHIVE_STATE_DIR)/'upgrade-backups').iterdir()); assert len(backups)==1 and (backups[0]/'rollflow.dump').is_file() and (backups[0]/'oneschool-import.key').is_file() and (backups[0]/'oneschool-imports'/(f.storage_token+'.rfenc')).is_file()"
           if ($LASTEXITCODE -ne 0) { throw 'Existing database or archive preservation smoke failed' }
+          & "$bundle/python/python.exe" -m deployment.native --state $state manage shell -c "from accounts.models import PendingTeacherSetup; from django.db import connection; from django.urls import reverse; assert PendingTeacherSetup._meta.db_table in connection.introspection.table_names(); assert reverse('automated-school-setup') == '/manage/connected/setup/'"
+          if ($LASTEXITCODE -ne 0) { throw 'V3.6.6 setup schema or route unavailable' }
       - uses: actions/upload-artifact@v4
         with:
-          name: RollFlow-V3.6.5-Windows-x64-STAGING
+          name: RollFlow-V3.6.6-Windows-x64-STAGING
           path: ${{ runner.temp }}/RollFlow/
           if-no-files-found: error
           retention-days: 14
