@@ -144,6 +144,10 @@ def section(request, section):
 @require_http_methods(["GET", "POST"])
 def staff_edit(request, pk=None):
     target = get_object_or_404(User, pk=pk) if pk is not None else None
+    from .models import PendingTeacherSetup
+    if target and PendingTeacherSetup.objects.filter(user=target, activated_at__isnull=True).exists():
+        messages.error(request, "Complete pending teacher verification in Automated School Setup. Use password reset separately.")
+        return redirect("automated-school-setup")
     form = StaffForm(request.POST if request.method == "POST" else None, target=target, actor=request.user)
     if request.method == "POST" and form.is_valid():
         c = form.cleaned_data
@@ -223,6 +227,10 @@ def staff_status(request, pk):
         value = request.POST.get("active")
         if value not in ("0", "1"):
             return HttpResponseBadRequest("Invalid status.")
+        from .models import PendingTeacherSetup
+        if value == "1" and PendingTeacherSetup.objects.filter(user=target, activated_at__isnull=True).exists():
+            messages.error(request, "Activate pending teacher accounts through Automated School Setup.")
+            return redirect("automated-school-setup")
         if value == "1" and not target.has_usable_password():
             messages.error(request, "Reset this imported account's password before activating it.")
             return redirect("management-section", section="staff")

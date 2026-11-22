@@ -252,3 +252,14 @@ class ConnectedSchoolPublication(models.Model):
             models.CheckConstraint(condition=models.Q(ends__gte=models.F("starts")),
                                    name="connected_school_date_order"),
         ]
+
+
+class PendingTeacherSetup(models.Model):
+    """Imported staff candidate, not a verified identity."""
+    staff_code = models.CharField(max_length=40, unique=True)
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="pending_teacher_setup")
+    source_batch = models.ForeignKey(OneSchoolArchiveBatch, on_delete=models.PROTECT)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+    activated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+", null=True, blank=True)
+    activated_at = models.DateTimeField(null=True, blank=True)
