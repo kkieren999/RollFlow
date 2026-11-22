@@ -1,5 +1,11 @@
 # RollFlow — Teacher Edition
 
+## Public Pages teacher demonstration login: swilliams
+
+The **public browser-only demonstration** now accepts `swilliams / swilliams` in addition to `teacher / teacher` and `admin / admin`. The fictional Sarah Williams account has the existing timetable fixture classes `ENG071A` (Year 7 English), `ENG091B` (Year 9 English), `ENG101B` (Year 10 English) and `10BH` (Year 10B Home Group).
+
+The two teacher demos have separate **browser-local** attendance and workspace storage keys. Signing out of Sarah Williams returns to the public login, and changing teacher reloads the demo identity to avoid sharing in-memory teacher state. This is **not real authentication**; credentials are public and any browser user can enter either identity. School planning preview and other shared fictional fixture data remain browser-local. No real school or Windows user credentials and no private PostgreSQL records are involved. GitHub Pages cannot log into or synchronise with a Windows school database.
+
 ## V3.4.4 — Import reliability and timetable bug fixes
 
 Browser import fingerprints are based on the original decoded CSV content, not masked timetable structure. Only the fingerprint and masked schedule are stored. Exact repeated source text reuses a version; changed source text (including row order or duplicate rows) creates a new version. Existing V3.4.2/3 versions remain intact; the first reimport under V3.4.4 may create a new version. The original file is not stored or uploaded. Use approved data only; masking is not a guarantee of anonymity.
