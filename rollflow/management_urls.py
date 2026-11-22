@@ -1,10 +1,11 @@
 from django.urls import path
-from accounts import connected_views
+from accounts import connected_views, automated_views
 from accounts import staff_views, student_views, timetable_views, master_views, oneschool_views, oneschool_document_views
 
 urlpatterns = [
     path("", staff_views.dashboard, name="management-dashboard"),
     path("connected/", connected_views.centre, name="connected-school"),
+    path("connected/setup/", automated_views.setup, name="automated-school-setup"),
     path("connected/mapping/", connected_views.mapping, name="connected-mapping"),
     path("connected/classes/", connected_views.classes, name="connected-classes"),
     path("connected/master/", connected_views.master, name="connected-master"),
