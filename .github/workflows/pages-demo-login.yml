@@ -1,0 +1,33 @@
+name: Public Pages demo login smoke
+
+on:
+  push:
+    branches: [feature/pages-demo-swilliams-login, main]
+    paths:
+      - 'index.html'
+      - 'tests/pages-demo-login-smoke.cjs'
+      - '.github/workflows/pages-demo-login.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'tests/pages-demo-login-smoke.cjs'
+      - '.github/workflows/pages-demo-login.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  public-demo-login:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install browser test driver
+        run: npm install --no-save --no-audit --no-fund playwright-core@1.56.1
+      - name: Check public demo in headless Google Chrome
+        run: node tests/pages-demo-login-smoke.cjs
