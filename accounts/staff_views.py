@@ -20,7 +20,7 @@ from .views import role_for
 NAVIGATION = (
     ("SCHOOL MANAGEMENT", (("dashboard", "Dashboard"), ("staff", "Staff Management"), ("students", "Student Management"), ("classes", "Class Management"), ("timetable", "Timetable Management"), ("master", "Master Timetable"), ("relief", "Relief & Supervision"))),
     ("OPERATIONS", (("attendance", "Attendance Monitoring"), ("movements", "Student Movements"), ("notices", "School Notices"), ("reports", "Reports"))),
-    ("SYSTEM", (("roles", "Roles & Permissions"), ("data", "Data Management"), ("oneschool", "OneSchool Import Centre"), ("audit", "Audit Logs"), ("settings", "School Settings"))),
+    ("SYSTEM", (("roles", "Roles & Permissions"), ("data", "Data Management"), ("oneschool", "OneSchool Timetable CSV"), ("audit", "Audit Logs"), ("settings", "School Settings"))),
 )
 TITLES = dict(item for _, items in NAVIGATION for item in items)
 
