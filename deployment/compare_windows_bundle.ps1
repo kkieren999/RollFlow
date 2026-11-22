@@ -80,7 +80,7 @@ try {
     if ($remoteCommit -notmatch '^[0-9a-fA-F]{40}$') {
         throw 'GitHub returned no valid commit identifier.'
     }
-    $remoteTree = Invoke-RestMethod -Uri "$base/git/trees/$remoteCommit?recursive=1" -Headers $headers -TimeoutSec 30
+    $remoteTree = Invoke-RestMethod -Uri "$base/git/trees/$($remoteCommit)?recursive=1" -Headers $headers -TimeoutSec 30
 }
 catch {
     throw "Could not read GitHub branch '$Branch'. Check internet access and GitHub API availability. $($_.Exception.Message)"
