@@ -48,6 +48,15 @@ def centre(request):
     else:
         from .connected_school import DAYS
         initial["times"] = "\n".join(f"{day},{period},," for day in DAYS for period in range(1,5))
+    if request.method == "GET" and (not existing or request.GET.get("autofill") == "1"):
+        from .automated_setup import setup_candidate, suggested_csv
+        try:
+            suggestion = setup_candidate()
+            initial["times"] = suggested_csv(suggestion)
+            if not existing and suggestion["term_hint"]:
+                initial["name"] = suggestion["term_hint"]
+        except Exception:
+            pass  # Manual calendar remains available if the source has an unsupported layout.
     form = PublishForm(request.POST if request.method == "POST" else None, initial=initial)
     preview = None
     if request.method == "POST" and form.is_valid():
