@@ -24,12 +24,12 @@ function startServer() {
   });
 }
 
-async function logIn(page, username, password) {
+async function logIn(page, username, password, destination = '.top-user > span') {
   await page.locator('#demo-login-form').waitFor();
   await page.locator('#demo-username').fill(username);
   await page.locator('#demo-password').fill(password);
   await page.locator('#demo-login-form button[type="submit"]').click();
-  await page.locator('.top-user > span').waitFor();
+  await page.locator(destination).waitFor();
 }
 
 async function test() {
@@ -77,7 +77,7 @@ async function test() {
 
     await page.locator('[data-demo-signout]').first().click();
     await page.locator('#demo-login-form').waitFor();
-    await logIn(page, 'admin', 'admin');
+    await logIn(page, 'admin', 'admin', '.v31-admin');
     assert(await page.locator('.v31-admin').count(), 'Admin demo login broke');
     console.log('PASS: swilliams login, separate class ownership, teacher switch and admin login.');
   }
