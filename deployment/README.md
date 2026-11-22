@@ -1,3 +1,24 @@
+# V3.6.6 — Automated School Setup (draft staging)
+
+Stop the existing instance, extract the new package separately, keep the
+previous PostgreSQL runtime folder, run Upgrade Existing.cmd, then Start
+RollFlow.cmd only after successful upgrade. This reuses V3641 staging state,
+port 18085 and the protected archive. The backup-first upgrade applies
+migration 0012. Do not run First Setup on existing data.
+
+Open /manage/connected/setup/ as an administrator. Verify PDF period
+suggestions, missing/conflicting grids and staff candidates. Select eligible
+staff to create inactive users with unusable passwords. Set each individual's
+password using the existing reset screen. Then explicitly supply each
+authorised OneSchool Staff ID and confirm identity and teacher eligibility
+before bulk activation. No inferred ID, shared password, automatic activation
+or automatic overwrite. Existing accounts require manual review and mapping.
+Review and republish connected school data to activate new mappings.
+
+Lesson times are editable; term and closure dates remain administrator-entered.
+Other period types remain evidence only. Use fictional records for home tests.
+School data requires authorised ICT/privacy/security review.
+
 # V3.6.5 — Connected School Data (staging)
 
 ## Upgrade your existing V3.6.4.1 / .2 / .3 test instance
