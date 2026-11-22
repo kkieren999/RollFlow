@@ -97,6 +97,8 @@ $different = New-Object 'System.Collections.Generic.List[string]'
 foreach ($entry in $remoteTree.tree) {
     if ($entry.type -ne 'blob') { continue }
     $relative = [string]$entry.path
+    # The diagnostic itself is not part of the application version being checked.
+    if ($relative -eq 'deployment/compare_windows_bundle.ps1') { continue }
     $isAppSource = ($relative -match '^(accounts|rollflow|templates|deployment)/') -or
         ($relative -in @('index.html', 'manage.py', 'requirements.txt', 'README.md'))
     if (-not $isAppSource) { continue }
