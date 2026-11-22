@@ -171,7 +171,11 @@ def schedule_context(publication, request, codes=None, week=False):
             if codes is not None:
                 row.pop("staff", None)
         days.append({"date": d, "rows": rows})
+    step = timedelta(days=7 if week else 1)
+    previous_date = max(publication.starts, day - step)
+    next_date = min(publication.ends, day + step)
     return {"publication": publication, "day": day, "days": days,
+            "previous_date": previous_date, "next_date": next_date,
             "week_view": week, "no_mapping": codes == set()}
 
 
