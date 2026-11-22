@@ -1,5 +1,4 @@
-{# Use: {% include "ui_header.html" with portal="teacher" active="week" %}
-     or portal="admin" active="school". Nothing in this partial grants access. #}
+{# Unified staff-facing navigation, visible links only; server permissions remain authoritative. #}
 <header class="rf-appbar">
   <a class="rf-brand" href="{% if portal == 'teacher' %}{% url 'teacher-timetable' %}{% else %}{% url 'management-dashboard' %}{% endif %}">
     <span class="rf-mark" aria-hidden="true">RF</span>
