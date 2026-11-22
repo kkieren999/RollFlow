@@ -154,4 +154,4 @@ class SharedInterfaceTests(TestCase):
                 get_template(template)
         html = (settings.BASE_DIR / "index.html").read_text(encoding="utf-8")
         self.assertEqual(html.count("<!-- ROLLFLOW_SERVER_BOOTSTRAP -->"), 1)
-        self.assertIn("--green:#168a38", html)
+        self.assertIn("--green:#147f38", html)
