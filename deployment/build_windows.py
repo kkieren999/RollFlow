@@ -67,11 +67,11 @@ def main():
         (out / name).write_text(launcher + ' %*\nif errorlevel 1 pause\n',
                                 encoding="ascii")
     (out / "READ FIRST.txt").write_text(
-        "V3.6.5 connected school data staging bundle. Fictional data only.\n"
-        "EXISTING V3.6.4.1/2/3: stop RollFlow, extract separately, run Upgrade Existing.cmd then Start RollFlow.cmd. Do NOT run First Setup. Keep the old extracted folder (PostgreSQL path).\n"
+        "V3.6.6 connected school data staging bundle. Fictional data only.\n"
+        "EXISTING V3.6.4.1/2/3 or V3.6.5: stop RollFlow, extract separately, run Upgrade Existing.cmd then Start RollFlow.cmd. Do NOT run First Setup. Keep the old extracted folder (PostgreSQL path).\n"
         "Only a new empty test instance should run First Setup.cmd.\n"
         "Open http://localhost:18085/. No internet is required at runtime.\n"
-        "V3.6.5 shortcuts intentionally reuse %LOCALAPPDATA%\\RollFlow-V3641-Staging, not the earlier V3.5 database.\n"
+        "V3.6.6 shortcuts intentionally reuse %LOCALAPPDATA%\\RollFlow-V3641-Staging, not the earlier V3.5 database.\n"
         "See app/deployment/README.md for side-by-side test setup, ICT restrictions and backup steps.\n",
         encoding="utf-8")
     manifest = []
