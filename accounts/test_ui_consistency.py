@@ -125,7 +125,10 @@ class SharedInterfaceTests(TestCase):
 
     def test_unpublished_legacy_teacher_demo_keeps_server_bootstrap(self):
         self.client.force_login(self.teacher)
-        html = self.assert_interface("/teacher/")
+        res = self.client.get("/teacher/")
+        self.assertEqual(res.status_code, 200)
+        html = res.content.decode()
+        self.assertIn("Skip to teacher portal", html)
         self.assertIn("TEACHER PORTAL", html)
         self.assertIn('id="rollflow-server-identity"', html)
         self.assertNotIn("href=\"/manage/", html)
