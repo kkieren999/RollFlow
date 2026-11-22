@@ -3,7 +3,7 @@
 ## Shared design contract
 
 All server-rendered staff-facing pages use `templates/ui_system.html` for the
-same navy (#112332), green (#168a38), neutral surfaces, typography, form
+same navy (#112332), green (#147f38), neutral surfaces, typography, form
 controls, table headings, status messages, focus indicators and responsive
 spacing. Standalone pages use `ui_header.html` with role-limited navigation
 and POST-only CSRF-protected sign-out. Admin console tabs retain their
