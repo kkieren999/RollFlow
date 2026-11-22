@@ -1,3 +1,21 @@
+# V3.6.7 — Unified Teacher & Administration Interface (draft staging)
+
+This is a UI-only update on top of V3.6.6: shared offline design tokens,
+administrator and teacher navigation, page layouts, tables, forms, focus
+styles, responsive handling and version labels. No school records, account
+roles, imported files, published timetable allocations, or database schema
+are modified by these UI changes.
+
+For an existing instance: stop RollFlow, extract the new Windows bundle into
+a NEW directory, retain the previous extracted directory because instance.json
+holds the PostgreSQL runtime path, run Upgrade Existing.cmd for a new private
+backup and migration checks, then start with Start RollFlow.cmd. Never run
+First Setup on an existing installation. The native staging state and port
+remain %LOCALAPPDATA%\RollFlow-V3641-Staging and 18085.
+
+See deployment/UI_AUDIT_V367.md for route-by-route functional and responsive
+review. Existing OneSchool archive and current teacher timetable are preserved.
+
 # V3.6.6 — Automated School Setup (draft staging)
 
 Stop the existing instance, extract the new package separately, keep the
