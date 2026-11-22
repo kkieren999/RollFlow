@@ -14,20 +14,14 @@ button.secondary{background:white;color:#244754;border-color:#a7bac4}
 button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #d9a442;outline-offset:3px}
 input[type=checkbox]{margin-right:6px}table{width:100%;text-align:left;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid #dce6eb}th{font-size:12px;background:#f2f6f8;color:#4e6975}.scroll{overflow-x:auto}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px}.metric{background:#f3f7f8;padding:14px;border-radius:6px}.metric strong{display:block;font-size:24px}.actions{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:14px 0}.inline{display:inline-block}header button{background:transparent;border-color:#b1c4cd}small{color:#536e79}
-</style></head><body>
-<header><strong>ROLLFLOW · V3.6.6</strong><nav>
-{% if mode == 'teacher' or mode == 'roster' and not admin_roster %}
-<a href="{% url 'teacher-timetable' %}">My day</a><a href="{% url 'teacher-week' %}">My week</a>
-{% else %}
-<a href="{% url 'management-dashboard' %}">Dashboard</a><a href="{% url 'oneschool-documents' %}">Imports</a><a href="{% url 'connected-school' %}">Publish school data</a>
-{% if publication %}<a href="{% url 'connected-classes' %}">Classes</a><a href="{% url 'connected-master' %}">Master timetable</a>{% endif %}
-{% endif %}
-<form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit">Sign out</button></form></nav></header>
-<main>
+</style>{% include "ui_system.html" %}</head><body>
+<a class="rf-skip" href="#main-content">Skip to main content</a>
+{% if mode == 'teacher' %}{% if week_view %}{% include "ui_header.html" with portal="teacher" active="week" %}{% else %}{% include "ui_header.html" with portal="teacher" active="day" %}{% endif %}{% elif mode == 'roster' and not admin_roster %}{% include "ui_header.html" with portal="teacher" active="roster" %}{% elif mode == 'master' %}{% include "ui_header.html" with portal="admin" active="master" %}{% elif mode == 'classes' or mode == 'roster' %}{% include "ui_header.html" with portal="admin" active="classes" %}{% else %}{% include "ui_header.html" with portal="admin" active="publish" %}{% endif %}
+<main id="main-content" class="rf-page">
 {% for message in messages %}<p class="{{ message.tags }}" role="status">{{ message }}</p>{% endfor %}
 {% if publication %}<p class="hint">Published: {{ publication.name }} · {{ publication.starts|date:"j M Y" }} – {{ publication.ends|date:"j M Y" }}. Weekly planning schedule, not a live daily OneSchool feed.</p>{% endif %}
 {% if mode == 'publish' %}
-<h1>Review and publish school data</h1><p><a class="btn" href="{% url 'automated-school-setup' %}">Automated School Setup — detect times and prepare teacher accounts</a></p>
+<h1>Review and publish school data</h1><p class="rf-page-intro">Review imported sources, confirm teacher identity mappings, then publish a new school timetable snapshot.</p><p><a class="btn" href="{% url 'automated-school-setup' %}">Automated School Setup — detect times and prepare teacher accounts</a></p>
 <p>Publish the latest approved set of four OneSchool imports without overwriting the existing database, source files or manual records. A publication is a fixed term snapshot; new imports do not alter it automatically.</p>
 <section class="panel"><h2>1. Approved source reports</h2>
 {% if source_error %}<p class="note">{{ source_error }}</p><a href="{% url 'oneschool-documents' %}">Finish the import steps</a>{% else %}
