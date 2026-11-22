@@ -2,9 +2,9 @@ name: V3 foundation tests
 on:
   workflow_dispatch:
   push:
-    branches: [v3.0-foundation, feature/v3.6.5-connected-school-data, feature/v3.6.6-automated-school-setup]
+    branches: [v3.0-foundation, feature/v3.6.5-connected-school-data, feature/v3.6.6-automated-school-setup, feature/v3.6.7-unified-ui]
   pull_request:
-    branches: [main, v3.0-foundation, integration/v3.6.1-windows-teacher-portal, feature/v3.6.2-oneschool-import-centre, feature/v3.6.4-real-oneschool-format-support, fix/v3.6.4-oneschool-unknown-worksheet-size, fix/v3.6.4.2-empty-staff-pdf-legends, fix/v3.6.4.3-cross-line-alignment, feature/v3.6.5-connected-school-data]
+    branches: [main, v3.0-foundation, integration/v3.6.1-windows-teacher-portal, feature/v3.6.2-oneschool-import-centre, feature/v3.6.4-real-oneschool-format-support, fix/v3.6.4-oneschool-unknown-worksheet-size, fix/v3.6.4.2-empty-staff-pdf-legends, fix/v3.6.4.3-cross-line-alignment, feature/v3.6.5-connected-school-data, feature/v3.6.6-automated-school-setup]
 permissions:
   contents: read
 jobs:
@@ -39,7 +39,7 @@ jobs:
       - run: python deployment/ci_smoke.py
 
   windows-offline-bundle:
-    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/v3.0-foundation' || github.ref == 'refs/heads/feature/v3.6.5-connected-school-data' || github.ref == 'refs/heads/feature/v3.6.6-automated-school-setup'
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/v3.0-foundation' || github.ref == 'refs/heads/feature/v3.6.5-connected-school-data' || github.ref == 'refs/heads/feature/v3.6.6-automated-school-setup' || github.ref == 'refs/heads/feature/v3.6.7-unified-ui'
     runs-on: windows-2025
     timeout-minutes: 25
     steps:
@@ -125,9 +125,11 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Existing database or archive preservation smoke failed' }
           & "$bundle/python/python.exe" -m deployment.native --state $state manage shell -c "from accounts.models import PendingTeacherSetup, ConnectedSchoolPublication; from django.db import connection; from django.urls import reverse; assert ConnectedSchoolPublication.objects.get(active=True).snapshot=={'preservation_marker':'FICTIONAL-KEEP'}; assert PendingTeacherSetup._meta.db_table in connection.introspection.table_names(); assert reverse('automated-school-setup') == '/manage/connected/setup/'"
           if ($LASTEXITCODE -ne 0) { throw 'V3.6.6 setup schema or route unavailable' }
+          & "$bundle/python/python.exe" -m deployment.native --state $state manage shell -c "from django.template.loader import get_template; from django.conf import settings; from pathlib import Path; expected=['ui_system.html','ui_header.html','staff_portal.html','connected_school.html','automated_setup.html','teacher_week.html','teacher_timetable.html','oneschool_documents.html']; assert all(get_template(x) for x in expected); text=(Path(settings.BASE_DIR)/'index.html').read_text(encoding='utf-8'); assert text.count('<!-- ROLLFLOW_SERVER_BOOTSTRAP -->')==1 and '--green:#168a38' in text"
+          if ($LASTEXITCODE -ne 0) { throw 'V3.6.7 unified design system, portal template or legacy teacher bootstrap missing' }
       - uses: actions/upload-artifact@v4
         with:
-          name: RollFlow-V3.6.6-Windows-x64-STAGING
+          name: RollFlow-V3.6.7-Windows-x64-STAGING
           path: ${{ runner.temp }}/RollFlow/
           if-no-files-found: error
           retention-days: 14
