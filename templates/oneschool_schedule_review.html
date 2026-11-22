@@ -14,9 +14,10 @@ th,td{padding:10px;border-bottom:1px solid #e1e8ed;font-size:14px}
 th{background:#f5f8fa;color:#425c68}
 .scroll{overflow:auto}.links{display:flex;gap:15px;flex-wrap:wrap;padding:15px 0}
 .note{background:#fff9e9;border-left:4px solid #b98536;padding:12px 15px}
-</style></head><body>
-<header><strong>RollFlow · OneSchool Evidence</strong> · <a href="{% url 'oneschool-documents' %}">Import Centre</a></header>
-<main><h1>Approved timetable evidence</h1>
+</style>{% include "ui_system.html" %}</head><body>
+<a class="rf-skip" href="#main-content">Skip to main content</a>
+{% include "ui_header.html" with portal="admin" active="imports" %}
+<main id="main-content" class="rf-page"><h1>Approved timetable evidence</h1>
 <p class="note">Administrator-only source checks. A printed staff code is not a verified OneSchool staff ID. This page does not assign staff account access or modify attendance.</p>
 <nav class="links" aria-label="Evidence kind">
 <a href="?source=lines">Weekly line allocations</a>
