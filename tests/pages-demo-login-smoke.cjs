@@ -129,17 +129,32 @@ async function test() {
       'The overdue message should only say Roll overdue');
     const monEnglish = page.locator('[data-timetable-class="ENG081C"]');
     await monEnglish.locator('[data-open-report]').click();
-    assert.equal((await page.locator('.page-bar h1').innerText()).trim(),
-      'Take Attendance', 'Attendance screen needs a clear top-level heading');
+    const hero = page.locator('.rf-example1-hero');
+    assert(await hero.isVisible(), 'Example 1 green title bar should be visible');
+    assert.equal((await hero.locator('h1').innerText()).trim(),
+      'Take Attendance', 'Green hero must carry the primary page heading');
+    const heroGradient = await hero.evaluate(el => getComputedStyle(el).backgroundImage);
+    assert(heroGradient.includes('linear-gradient'),
+      'Example 1 requires a prominent green title background');
+    assert(await page.locator('.page-bar').isHidden(),
+      'The old white page heading must not duplicate the green hero title');
     assert.match(await page.locator('#attendance-class-title').innerText(), /ENG081C.*English/,
-      'Class identity should be the prominent heading');
-    const header = page.locator('.rf-attendance-heading');
-    assert.match(await header.innerText(), /PERIOD 2/);
-    assert.match(await header.innerText(), /10:15/);
-    assert.match(await header.innerText(), /Room B17/);
-    assert.match(await header.innerText(), /27 students/);
-    assert.equal((await page.locator('.rf-attendance-switch label').innerText()).trim(),
-      'Switch class', 'Class chooser needs a visible label');
+      'Class identity should be on its own clear strip below the hero');
+    assert(await page.locator('.rf-example1-class-row').isVisible(),
+      'Separate class heading strip should render');
+    const heroText = await hero.innerText();
+    assert.match(heroText, /Monday 9 March 2026/);
+    assert.match(heroText, /PERIOD 2/);
+    assert.match(heroText, /10:15/);
+    assert.match(heroText, /Room B17/);
+    assert.equal(await page.locator('.rf-example1-date-picker input[data-date]').inputValue(),
+      '2026-03-09', 'Date picker should stay usable within the green hero');
+    assert.equal((await page.locator('.rf-example1-class-select label').innerText()).trim(),
+      'Switch class', 'Keep the class chooser accessible in the class strip');
+    assert.match(await page.locator('.photo-roll-caption').innerText(), /27 students/,
+      'Student count should remain above the attendance grid');
+    assert(await page.locator('.student-grid .photo-mark').count() > 20,
+      'The attendance photo grid must remain available');
     const choices = await page.locator('#rf-attendance-class-select option').allInnerTexts();
     assert(choices.some(x => x.includes('PERIOD 4') && x.includes('ENG101B')),
       'Switch class options should reflect Sarah\'s chosen date');
@@ -151,6 +166,8 @@ async function test() {
     }));
     assert(backCss.height >= 30 && backCss.borderWidth !== '0px',
       'Back button should be a genuine visible control, not a tiny text link');
+    assert(await backButton.evaluate(el => el.closest('.rf-example1-hero') !== null),
+      'Back to Daily Schedule must sit inside the green header');
     await backButton.click();
     assert.equal((await page.locator('.page-bar h1').innerText()).trim(), 'Daily Schedule');
     assert.match(await page.locator('#dayScheduleTitle').innerText(), /Lessons for selected date/,
