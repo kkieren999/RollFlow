@@ -318,7 +318,7 @@ async function test() {
       'The period view must filter on the selected date');
     assert(await page.locator('.rf-day-quick-picks').isVisible(),
       'Students with service movements on this date must be directly selectable');
-    assert(await page.locator('.rf-day-quick-pick[data-rf-day-student="S7001"]').isVisible());
+    assert(await page.locator('.rf-day-quick-pick[data-rf-day-quick-student="S7001"]').isVisible());
     const logVisitRow = page.locator('.rf-movement-table tbody tr').filter({hasText:'S7001'}).first();
     assert(await logVisitRow.locator('[data-rf-view-day="S7001"]').isVisible(),
       'A recorded service visit should offer View in template from the Movement log');
