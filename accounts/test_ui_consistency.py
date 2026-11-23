@@ -133,6 +133,30 @@ class SharedInterfaceTests(TestCase):
         self.assertIn('id="rollflow-server-identity"', html)
         self.assertNotIn("href=\"/manage/", html)
 
+    def test_offline_teacher_demo_has_example_one_movement_dashboard(self):
+        """The Windows bundle packages index.html for the offline fallback teacher UI.
+
+        These are fictional browser-local movements, not the published school
+        timetable's authenticated database records.
+        """
+        html = (settings.BASE_DIR / "index.html").read_text(encoding="utf-8")
+        for marker in (
+            "function rfMovementEntriesForDate()",
+            'class="rf-movements-hero"',
+            'class="rf-movement-stats"',
+            'id="movementStudentSearch"',
+            'id="movementDestination"',
+            'id="movementIssueButton"',
+            'id="rfMovementView"',
+            'data-action="returnMovement"',
+            "rfMovementExample1Style",
+            "date!==brisbaneToday()",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, html)
+        self.assertEqual(html.count("function movementRows()"), 1)
+        self.assertEqual(html.count("function movementsPage()"), 1)
+
     def test_login_and_templates_compile_with_shared_components(self):
         anon = Client()
         for path in ("/", "/admin-login/"):
