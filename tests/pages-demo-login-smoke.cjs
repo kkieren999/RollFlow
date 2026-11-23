@@ -310,6 +310,7 @@ async function test() {
       JSON.parse(localStorage.getItem('rollflow_demo_movement_destinations_v1'))
     )).includes('Wellbeing Centre'), 'New destination was not saved');
     await page.reload();
+    await page.locator('[data-admin-page="movements"]').first().click();
     assert(await page.getByRole('button', {name:'Remove Wellbeing Centre'}).isVisible(),
       'Admin destination changes should survive a reload');
 
