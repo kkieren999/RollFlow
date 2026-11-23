@@ -6,6 +6,25 @@ The **public browser-only demonstration** now accepts `swilliams / swilliams` in
 
 The two teacher demos have separate **browser-local** attendance and workspace storage keys. Signing out of Sarah Williams returns to the public login, and changing teacher reloads the demo identity to avoid sharing in-memory teacher state. This is **not real authentication**; credentials are public and any browser user can enter either identity. School planning preview and other shared fictional fixture data remain browser-local. No real school or Windows user credentials and no private PostgreSQL records are involved. GitHub Pages cannot log into or synchronise with a Windows school database.
 
+### Administrator-managed Student Movement destinations (fictional demo)
+
+On the GitHub Pages demonstration, sign in as `admin / admin` and open
+**Student Movements → Manage movement destinations**. Administrators can
+add unique destinations (2–50 characters, maximum 30) and remove any
+destination except the final remaining one. New student passes issued
+from the teacher demo use this list instead of hardcoded choices. A
+removed destination is no longer available for **new** passes, but
+existing browser-issued passes and historical sample visits retain their
+original destination names in movement logs and student-history filters.
+
+The settings are saved separately under
+`rollflow_demo_movement_destinations_v1` in browser localStorage, so all
+demo identities in **the same browser** see the same list. Other browsers,
+machines, and the installed Windows app are **not synchronised**.
+The public `admin / admin` account is a fictional interface and **not
+secure administrator authorisation**. Never record real school movements
+or assume these browser-local settings are centrally enforced.
+
 ### Student Movements — Example 1 dashboard
 
 The public GitHub Pages demo now uses the compact green **Student Movements**

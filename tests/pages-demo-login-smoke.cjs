@@ -294,6 +294,92 @@ async function test() {
     await page.locator('#demo-login-form').waitFor();
     await logIn(page, 'admin', 'admin', '.v31-admin');
     assert(await page.locator('.v31-admin').count(), 'Admin demo login broke');
+
+    // Admin-managed destinations must persist in this browser, be shared
+    // between demo roles, and never mutate historical movement records.
+    await page.locator('[data-admin-page="movements"]').first().click();
+    assert.equal((await page.locator('#rf-admin-destinations-title').innerText()).trim(),
+      'Manage movement destinations');
+    assert.equal(await page.locator('.rf-admin-destination-item').count(), 4,
+      'The four defaults should be available initially');
+    await page.locator('#rf-new-movement-destination').fill('Wellbeing Centre');
+    await page.locator('#rf-add-movement-destination button[type="submit"]').click();
+    assert.equal(await page.locator('.rf-admin-destination-item').count(), 5);
+    assert(await page.getByRole('button', {name:'Remove Wellbeing Centre'}).isVisible());
+    assert((await page.evaluate(() =>
+      JSON.parse(localStorage.getItem('rollflow_demo_movement_destinations_v1'))
+    )).includes('Wellbeing Centre'), 'New destination was not saved');
+    await page.reload();
+    await page.locator('[data-admin-page="movements"]').first().click();
+    assert(await page.getByRole('button', {name:'Remove Wellbeing Centre'}).isVisible(),
+      'Admin destination changes should survive a reload');
+
+    await page.locator('#rf-new-movement-destination').fill('wellbeing centre');
+    await page.locator('#rf-add-movement-destination button[type="submit"]').click();
+    assert.equal(await page.locator('.rf-admin-destination-item').count(), 5,
+      'Duplicate destination should be rejected case-insensitively');
+    assert.match(await page.locator('.v31-message').innerText(), /already exists/i);
+
+    await page.locator('#rf-new-movement-destination').fill('Bad <tag>');
+    await page.locator('#rf-add-movement-destination button[type="submit"]').click();
+    assert.equal(await page.locator('.rf-admin-destination-item').count(), 5,
+      'HTML-like destination names must be rejected');
+
+    await page.locator('[data-demo-signout]').first().click();
+    await page.locator('#demo-login-form').waitFor();
+    await logIn(page, 'swilliams', 'swilliams');
+    await page.locator('[data-nav="movements"]').first().click();
+    await page.locator('#rf-movements-date').fill(today);
+    await page.locator('#rf-movements-date').dispatchEvent('change');
+    assert(await page.locator('#movementDestination option[value="Wellbeing Centre"]').count(),
+      'Teacher should see the new administrator destination');
+    assert.equal(await page.locator('[data-rf-remove-movement-destination]').count(), 0,
+      'Teacher page must not expose admin removal controls');
+
+    await page.locator('#movementStudentSearch').fill('S7001');
+    await page.locator('[data-movement-choice="S7001"]').click();
+    await page.locator('#movementDestination').selectOption('Wellbeing Centre');
+    await page.locator('#movementIssueButton').click();
+    assert.equal(await page.locator('.rf-movement-return-button').count(), 1,
+      'New destination needs to work with the existing live pass action');
+    await page.locator('.rf-movement-return-button').click();
+    assert.match(await page.locator('.rf-movement-table tbody').innerText(), /Wellbeing Centre/);
+
+    await page.locator('[data-demo-signout]').first().click();
+    await page.locator('#demo-login-form').waitFor();
+    await logIn(page, 'admin', 'admin', '.v31-admin');
+    await page.locator('[data-admin-page="movements"]').first().click();
+    page.once('dialog', dialog => dialog.accept());
+    await page.getByRole('button', {name:'Remove Wellbeing Centre'}).click();
+    assert.equal(await page.locator('.rf-admin-destination-item').count(), 4);
+    assert.equal(await page.getByRole('button', {name:'Remove Wellbeing Centre'}).count(), 0);
+    assert(!(await page.evaluate(() =>
+      JSON.parse(localStorage.getItem('rollflow_demo_movement_destinations_v1'))
+    )).includes('Wellbeing Centre'));
+
+    await page.locator('[data-demo-signout]').first().click();
+    await page.locator('#demo-login-form').waitFor();
+    await logIn(page, 'swilliams', 'swilliams');
+    await page.locator('[data-nav="movements"]').first().click();
+    await page.locator('#rf-movements-date').fill(today);
+    await page.locator('#rf-movements-date').dispatchEvent('change');
+    assert.equal(await page.locator('#movementDestination option[value="Wellbeing Centre"]').count(), 0,
+      'Removed destination must not be selectable for new passes');
+    assert.match(await page.locator('.rf-movement-table tbody').innerText(), /Wellbeing Centre/,
+      'Previously returned passes must keep their destination after deletion');
+
+    await page.locator('#movementStudentSearch').fill('S7001');
+    await page.locator('[data-movement-choice="S7001"]').click();
+    await page.evaluate(() => {
+      const select = document.getElementById('movementDestination');
+      select.add(new Option('Wellbeing Centre', 'Wellbeing Centre'));
+      select.value = 'Wellbeing Centre';
+    });
+    const beforeInvalid = await page.locator('.rf-movement-stat-total strong').innerText();
+    await page.locator('#movementIssueButton').click();
+    assert.equal(await page.locator('.rf-movement-stat-total strong').innerText(), beforeInvalid,
+      'A stale/forged removed destination should not create a pass');
+
     console.log('PASS: swilliams login, separate class ownership, teacher switch and admin login.');
   }
   finally {
