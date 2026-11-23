@@ -170,4 +170,17 @@ header.rf-appbar{
 @media(prefers-reduced-motion:reduce){
  *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}
 }
+
+/* School-specific branding; neutral surfaces and semantic feedback stay standard. */
+:root{--school-primary:#193a80;--school-secondary:#0076a8;--school-secondary-end:#007e9f;--school-accent:#ffc928;--rf-heading-gradient:linear-gradient(110deg,var(--school-secondary),var(--school-secondary-end));--rf-canvas:#edf0f2}
+header.rf-appbar,.rf-legacy-admin .top,body.rf-login>header{background:var(--school-primary);border-bottom:3px solid var(--school-accent)}
+.rf-brand .rf-mark,.rf-legacy-admin .brand-icon{background:var(--school-primary)}
+.rf-appbar .rf-navlink[aria-current="page"],.rf-legacy-admin .nav-link[aria-current="page"]{background:var(--rf-navy-soft);box-shadow:inset 3px 0 var(--school-accent);color:white}
+.rf-page :is(.btn.primary,button.primary,button[type=submit]:not(.secondary):not(.danger),button[name=action][value=publish],button[name=action][value=prepare],button[name=action][value=activate]),.rf-legacy-admin .btn.primary,body.rf-login .card button{background:var(--school-primary);border-color:var(--school-primary);color:white}
+.rf-page :is(.btn.primary,button.primary,button[type=submit]:not(.secondary):not(.danger)):hover,.rf-legacy-admin .btn.primary:hover{background:var(--school-secondary);border-color:var(--school-secondary)}
+.rf-page>h1,.rf-legacy-admin .main>.title,body.rf-login .card>h1{background:var(--rf-heading-gradient);color:#fff;border:1px solid #dbe4e6;border-radius:10px 10px 0 0;padding:16px 21px;margin:0;font-size:26px;font-weight:800;line-height:1.15;letter-spacing:-.5px}
+.rf-legacy-admin .main>.title h1,.rf-legacy-admin .main>.title .eyebrow{color:white}
+.rf-page>h1+p,.rf-page>h1+.rf-page-intro,body.rf-login .card>h1+p{background:#f9fbfb;color:#243a48;border:1px solid #dbe4e6;border-top:0;border-radius:0 0 10px 10px;padding:13px 21px;min-height:48px;margin:0 0 12px;font-weight:700}
+@media(max-width:900px){.rf-page>h1,.rf-legacy-admin .main>.title,body.rf-login .card>h1{font-size:22px;padding:12px 14px}.rf-page>h1+p,.rf-page>h1+.rf-page-intro{padding:11px 14px}}
+
 </style>

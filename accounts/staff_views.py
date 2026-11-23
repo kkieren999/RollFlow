@@ -36,11 +36,9 @@ def administrator(view):
     return wrapped
 
 def page(request, section, **context):
-    navigation=NAVIGATION
-    if settings.ROLLFLOW_LIVE_TIMETABLE:
-        available={"dashboard","staff","students","classes","timetable","master","data","oneschool","audit"}
-        navigation=tuple((group,tuple(item for item in items if item[0] in available)) for group,items in NAVIGATION)
-        navigation=tuple((group,items) for group,items in navigation if items)
+    available={"dashboard","staff","students","classes","timetable","master","data","oneschool","audit","roles"}
+    navigation=tuple((group,tuple(item for item in items if item[0] in available)) for group,items in NAVIGATION)
+    navigation=tuple((group,items) for group,items in navigation if items)
     return render(request, "staff_portal.html", {"section": section, "title": TITLES[section], "navigation": navigation, "live_timetable": settings.ROLLFLOW_LIVE_TIMETABLE, **context})
 
 def revoke_sessions(user):
@@ -100,7 +98,7 @@ def dashboard(request):
 def section(request, section):
     if section == "dashboard":
         return redirect("management-dashboard")
-    if section not in TITLES:
+    if section not in {"dashboard","staff","students","classes","timetable","master","data","oneschool","audit","roles"}:
         return HttpResponseBadRequest("Unknown section.")
     if section == "students":
         return redirect("management-student-directory")

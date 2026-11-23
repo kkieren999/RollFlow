@@ -146,7 +146,7 @@ code{overflow-wrap:anywhere}
         </div>
         {% if class_preview.matched_examples %}
           <h3>Example matched EQID and class-code pairs (first 15)</h3>
-          <p class="help">Administrator-only preview; review these alongside the counts. Full source remains in the encrypted archive.</p>
+          <p class="help">Administrator-only review; check these alongside the counts. Full source remains in the encrypted archive.</p>
           <div class="table-wrap"><table><thead><tr><th>EQID</th><th>Class code</th></tr></thead><tbody>
           {% for example in class_preview.matched_examples %}
           <tr><td>{{ example.eqid }}</td><td>{{ example.class_code }}</td></tr>
@@ -183,7 +183,7 @@ code{overflow-wrap:anywhere}
     {% if batch.source_purged_at %}<p class="notice error">The original source has been purged and can no longer be applied.</p>{% else %}
     <form method="post" action="{% url 'oneschool-documents-apply' pk=batch.pk %}">
       {% csrf_token %}
-      <label><input type="checkbox" name="confirm_apply" value="yes" required> I have reviewed this fictional or authorised student import and approve its directory changes.</label>
+      <label><input type="checkbox" name="confirm_apply" value="yes" required> I have reviewed this authorised or training student import and approve its directory changes.</label>
       <div class="actions"><button class="primary" type="submit">Apply student directory update</button></div>
     </form>{% endif %}
     </section>
@@ -262,7 +262,7 @@ code{overflow-wrap:anywhere}
   </div>
   <section class="panel" id="upload">
     <h2>Step 1 — Select and stage files</h2>
-    <p class="help">Start with fictional exports or authorised de-identified files. Genuine school records must stay inside an approved school-hosted installation, not a home test.</p>
+    <p class="help">Use training exports or authorised de-identified files. Genuine school records must stay inside an approved school-hosted installation.</p>
     {% if form.non_field_errors %}<div class="notice error">{{ form.non_field_errors }}</div>{% endif %}
     <form method="post" enctype="multipart/form-data" autocomplete="off">
       {% csrf_token %}
@@ -277,7 +277,7 @@ code{overflow-wrap:anywhere}
     </form>
   </section>
   <section class="panel"><h2>Need the existing CSV timetable importer?</h2>
-    <p>For the supported date-specific <b>OneSchool Timetable Export CSV</b>, continue using the existing <a href="{% url 'oneschool-centre' %}">Timetable CSV Import Centre</a>. Its draft/review/publish process remains available.</p>
+    <p>For the supported date-specific <b>OneSchool Timetable Export CSV</b>, continue using the existing <a href="{% url 'oneschool-centre' %}">Timetable CSV Import Centre</a>. Its review and publication process remains available.</p>
   </section>
   <section class="panel">
     <h2>Offline archive history</h2>
