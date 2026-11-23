@@ -1894,7 +1894,67 @@ function osPlanningPage(){
  const index={lessons:0,rooms:1,periods:2}[osTab];return tabs+original.slice(indexes[index],indexes[index+1]);
 }
 
+function rfAdminMovementDestinationsPage(){
+ const options=rfMovementDestinations;
+ return `<section class="v31-panel rf-admin-destinations" aria-labelledby="rf-admin-destinations-title">
+  <h2 id="rf-admin-destinations-title">Manage movement destinations</h2>
+  <p>Choose which destinations teachers can select when issuing new student passes. Removing an option does not delete or rename past movement records.</p>
+  <form id="rf-add-movement-destination" class="rf-admin-destination-form">
+   <label for="rf-new-movement-destination">New destination</label>
+   <div class="rf-admin-destination-add">
+    <input id="rf-new-movement-destination" name="destination" maxlength="50" required
+     autocomplete="off" placeholder="e.g. Wellbeing Centre" aria-describedby="rf-destination-help">
+    <button type="submit" class="v31-btn primary">Add destination</button>
+   </div>
+   <small id="rf-destination-help">2–50 characters. Destination names must be unique; maximum 30.</small>
+  </form>
+  <div class="rf-admin-destination-list" aria-label="Available movement destinations">
+   <h3>Available for new passes (${options.length})</h3>
+   ${options.map(name=>`<div class="rf-admin-destination-item">
+    <strong>${esc(name)}</strong>
+    <button type="button" class="v31-btn" data-rf-remove-movement-destination="${esc(name)}"
+     aria-label="Remove ${esc(name)}"${options.length===1?' disabled title="At least one destination is required"':''}>Remove</button>
+   </div>`).join('')}
+  </div>
+  <p class="rf-admin-destination-note">Public demonstration only: these settings are stored in this browser and shared by its demo teacher and admin logins. Other browsers and the installed Windows app will not synchronise automatically. Do not use with real student records.</p>
+ </section>`;
+}
+document.addEventListener('submit',event=>{
+ if(event.target?.id!=='rf-add-movement-destination')return;
+ event.preventDefault();
+ event.stopImmediatePropagation();
+ if(demoRole!=='admin')return;
+ try{
+  const name=rfNormaliseMovementDestination(new FormData(event.target).get('destination'));
+  if(rfMovementDestinations.some(item=>item.toLocaleLowerCase()===name.toLocaleLowerCase()))
+   throw Error('That destination already exists.');
+  rfSaveMovementDestinations([...rfMovementDestinations,name]);
+  adminMessage='Destination added: '+name+' (this browser only)';
+ }catch(error){adminMessage=error.message||'The destination could not be added.'}
+ render();
+},true);
+document.addEventListener('click',event=>{
+ const button=event.target.closest('[data-rf-remove-movement-destination]');
+ if(!button)return;
+ event.preventDefault();
+ event.stopImmediatePropagation();
+ if(demoRole!=='admin')return;
+ const name=button.getAttribute('data-rf-remove-movement-destination');
+ if(!rfMovementDestinations.includes(name))return;
+ if(rfMovementDestinations.length===1){
+  adminMessage='Keep at least one destination for new passes.';
+  render();return;
+ }
+ if(!confirm('Remove "'+name+'" from future student passes? Historical records will keep their original destination.'))return;
+ try{
+  rfSaveMovementDestinations(rfMovementDestinations.filter(item=>item!==name));
+  adminMessage='Destination removed: '+name+' (historical visits retained)';
+ }catch(error){adminMessage=error.message||'The destination could not be removed.'}
+ render();
+},true);
+
 function demoAdminContent(){
+ if(adminPage==='movements')return rfAdminMovementDestinationsPage();
  if(adminPage==='oneschool')return osImportPage();
  if(adminPage==='master')return osPublished()?osDatedContent(false):masterContent();
  if(adminPage==='classes')return demoPlanning();
@@ -2029,6 +2089,7 @@ setInterval(()=>{if(document.hidden||!osPublished()||osDate!==brisbaneToday()||!
 window.addEventListener('storage',e=>{if(e.key===OS_SIGNAL)osSync()});window.addEventListener('focus',()=>osSync());document.addEventListener('visibilitychange',()=>{if(!document.hidden)osSync()});
 const reliabilityStyle=document.createElement('style');reliabilityStyle.textContent='.rf-coverage{border-left:4px solid #b27718;background:#fff6df;color:#694b0b;padding:10px 13px;border-radius:5px;line-height:1.5}.mt-button:focus-visible,.mt-day:focus-visible,.rf-lookup:focus-visible,.v31-btn:focus-visible,.rf-sort:focus-visible{outline:3px solid #c88b22;outline-offset:2px}';document.head.appendChild(reliabilityStyle);
 
+const rfAdminDestinationStyle=document.createElement('style');rfAdminDestinationStyle.textContent="\n.rf-admin-destinations{max-width:880px}\n.rf-admin-destinations>p{color:#536977;margin:7px 0 17px}\n.rf-admin-destination-form{display:grid;gap:7px;margin:10px 0 20px}\n.rf-admin-destination-form>label{font-weight:750;color:#2f4754}\n.rf-admin-destination-add{display:flex;gap:10px;align-items:stretch;flex-wrap:wrap}\n.rf-admin-destination-add input{min-width:225px;max-width:430px;flex:1 1 240px;border:1px solid #aabbc5;border-radius:6px;padding:9px 11px;background:#fff;min-height:41px;color:#263d48}\n.rf-admin-destination-add button{min-height:41px}\n.rf-admin-destination-form small{font-size:11px;color:#687b85}\n.rf-admin-destination-list{border:1px solid #d7e1e6;border-radius:9px;background:#fff;overflow:hidden}\n.rf-admin-destination-list h3{font-size:14px;font-weight:800;padding:13px 15px;margin:0;background:#edf5f0;border-bottom:1px solid #d7e1e6}\n.rf-admin-destination-item{display:flex;align-items:center;justify-content:space-between;padding:10px 15px;border-top:1px solid #e9eeee;gap:12px}\n.rf-admin-destination-item:first-of-type{border-top:0}\n.rf-admin-destination-item strong{overflow-wrap:anywhere}\n.rf-admin-destination-item button{font-weight:700;min-width:88px}\n.rf-admin-destination-item button:disabled{opacity:.45}\n.rf-admin-destination-note{padding-top:8px;font-size:12px;line-height:1.5}\n@media(max-width:520px){.rf-admin-destination-add{flex-direction:column}.rf-admin-destination-add input{width:100%;max-width:none;flex:auto}.rf-admin-destination-add button{width:100%}}\n";document.head.appendChild(rfAdminDestinationStyle);
 render();
 })();
 </script></body></html>
