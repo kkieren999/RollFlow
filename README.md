@@ -24,6 +24,8 @@ Django timetable uses a separate interface and requires an approved Windows
 build and manual upgrade. No browser movement records or credentials
 synchronise between machines. Do not enter real school records.
 
+**Example movement data (fictional):** The older auto-generated counts (6–10 visits for *every* student) have been replaced by a smaller set of completed demonstration visits for 18 selected fictional students. Four have frequent visits (10–15), six have occasional visits (3–6), and eight have just 1–2; other students have no generated history. The dates cover past 2026 school days, with a few completed examples on the latest school day. Their records appear in the normal movement log, clearly marked **Fictional sample**, and in Student Finder's movement history. No sample is an active pass. Existing passes issued in this browser remain unchanged; recognisable legacy auto-generated samples are migrated once, while custom sample history is preserved. The redundant **Daily Service Usage**, **Students Using Each Service** and **Visits to Each Service** panels have been removed from Student Movements. New passes remain browser-only and do not sync to Windows.
+
 ### Sarah Williams's fictional 2026 timetable
 
 The browser demo generates Sarah Williams's schedule **for any selected 2026 school date**, including past school dates. It is a *fictional weekly template*, not a copy of OneSchool or a timetable synced from Windows. It repeats throughout the Queensland term dates below; there is no data upload or migration. The existing Sarah-specific local attendance and preferences are retained.

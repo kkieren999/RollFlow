@@ -209,8 +209,42 @@ async function test() {
     await movementDate.fill(today);
     await movementDate.dispatchEvent('change');
     assert.equal(await page.locator('.rf-movement-stat-out strong').innerText(), '0');
-    assert.equal(await page.locator('.rf-movement-stat-returned strong').innerText(), '0');
-    assert.equal(await page.locator('.rf-movement-stat-total strong').innerText(), '0');
+    const initialReturned = Number(await page.locator('.rf-movement-stat-returned strong').innerText());
+    const initialTotal = Number(await page.locator('.rf-movement-stat-total strong').innerText());
+    assert.equal(initialTotal, initialReturned,
+      'Prefilled examples must all be completed, not active live passes');
+    assert.equal(await page.getByText('DAILY SERVICE USAGE', { exact: false }).count(), 0,
+      'Unused Daily Service Usage section should be removed');
+    assert.equal(await page.getByText('STUDENTS USING EACH SERVICE', { exact: false }).count(), 0);
+    assert.equal(await page.getByText('VISITS TO EACH SERVICE', { exact: false }).count(), 0);
+    assert.equal(await page.locator('.movement-chart-grid').count(), 0,
+      'Student Movements should show the compact dashboard without service-usage charts');
+
+    const samples = await page.evaluate(() => {
+      const key = Object.keys(localStorage).find(x => x.startsWith('rollflow_workspace_swilliams_'));
+      const stored = JSON.parse(localStorage.getItem(key) || '{}');
+      return stored.sampleMovementHistory || [];
+    });
+    assert(samples.length >= 50 && samples.length < 150,
+      'Sample movement history should be varied, not generated for every student');
+    assert(samples.every(m => m.sample && m.returnedAt && m.minutes > 0 &&
+      m.id.startsWith('rf-fictional-2026-')), 'Samples must all be visibly completed fictional visits');
+    const countsByStudent = Object.values(samples.reduce((acc, m) => {
+      acc[m.studentId] = (acc[m.studentId] || 0) + 1; return acc;
+    }, {}));
+    assert(Math.max(...countsByStudent) >= 12, 'At least one fictional student should use services frequently');
+    assert(Math.min(...countsByStudent) === 1, 'Some fictional students should only have one visit');
+    assert(new Set(samples.map(m => m.destination)).size === 4,
+      'Include a variety of destinations');
+    const newestSampleDate = samples.map(m => m.date).sort().at(-1);
+    await page.locator('#rf-movements-date').fill(newestSampleDate);
+    await page.locator('#rf-movements-date').dispatchEvent('change');
+    assert(Number(await page.locator('.rf-movement-stat-returned strong').innerText()) > 0,
+      'Fictional completed movements should appear in the dated movement log');
+    assert.match(await page.locator('.rf-movement-table tbody').innerText(), /Fictional sample/,
+      'Sample history must be clearly labelled rather than mistaken for real passes');
+    await page.locator('#rf-movements-date').fill(today);
+    await page.locator('#rf-movements-date').dispatchEvent('change');
 
     await page.locator('#movementStudentSearch').fill('S7001');
     await page.locator('[data-movement-choice="S7001"]').click();
@@ -218,7 +252,7 @@ async function test() {
     await page.locator('#movementDestination').selectOption('Library');
     await page.locator('#movementIssueButton').click();
     assert.equal(await page.locator('.rf-movement-stat-out strong').innerText(), '1');
-    assert.equal(await page.locator('.rf-movement-stat-total strong').innerText(), '1');
+    assert.equal(Number(await page.locator('.rf-movement-stat-total strong').innerText()), initialTotal + 1);
     assert.match(await page.locator('.rf-movement-table tbody').innerText(), /Library/);
     assert.equal(await page.locator('.rf-movement-return-button').count(), 1);
 
@@ -230,8 +264,8 @@ async function test() {
     await page.locator('#rfMovementView').selectOption('all');
     await page.locator('.rf-movement-return-button').click();
     assert.equal(await page.locator('.rf-movement-stat-out strong').innerText(), '0');
-    assert.equal(await page.locator('.rf-movement-stat-returned strong').innerText(), '1');
-    assert.equal(await page.locator('.rf-movement-stat-total strong').innerText(), '1');
+    assert.equal(Number(await page.locator('.rf-movement-stat-returned strong').innerText()), initialReturned + 1);
+    assert.equal(Number(await page.locator('.rf-movement-stat-total strong').innerText()), initialTotal + 1);
     assert.match(await page.locator('.rf-movement-table tbody').innerText(), /Returned/);
 
     await page.locator('#rf-movements-date').fill('2026-03-09');
