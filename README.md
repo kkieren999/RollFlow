@@ -6,6 +6,24 @@ The **public browser-only demonstration** now accepts `swilliams / swilliams` in
 
 The two teacher demos have separate **browser-local** attendance and workspace storage keys. Signing out of Sarah Williams returns to the public login, and changing teacher reloads the demo identity to avoid sharing in-memory teacher state. This is **not real authentication**; credentials are public and any browser user can enter either identity. School planning preview and other shared fictional fixture data remain browser-local. No real school or Windows user credentials and no private PostgreSQL records are involved. GitHub Pages cannot log into or synchronise with a Windows school database.
 
+### Student Movements — Example 1 dashboard
+
+The public GitHub Pages demo now uses the compact green **Student Movements**
+dashboard: Currently out / Returned / Total passes counters, the existing
+student search and destination selector, **Issue pass**, and a dated movement
+log with student photos, duration, status, **Mark returned** and an
+All / Currently out / Returned filter. It keeps demo movement records in
+browser localStorage and preserves the original live-pass validation.
+Past dates are for review only, not issuing new live passes.
+
+This is **fictional demo UI**, not a production movement register. The
+installed Windows app is a separate build and does **not** automatically
+update when GitHub Pages is published. The V3.6.7 Windows staging branch
+has a corresponding update to its bundled offline demo; its connected-school
+Django timetable uses a separate interface and requires an approved Windows
+build and manual upgrade. No browser movement records or credentials
+synchronise between machines. Do not enter real school records.
+
 ### Sarah Williams's fictional 2026 timetable
 
 The browser demo generates Sarah Williams's schedule **for any selected 2026 school date**, including past school dates. It is a *fictional weekly template*, not a copy of OneSchool or a timetable synced from Windows. It repeats throughout the Queensland term dates below; there is no data upload or migration. The existing Sarah-specific local attendance and preferences are retained.
