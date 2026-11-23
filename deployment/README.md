@@ -1,3 +1,115 @@
+# Recording services in the student day template (offline demo)
+
+The V3.6.7 Windows staging **fictional browser fallback** now uses the same
+movement log as its searchable student day template. When an example student
+uses a service, the template displays the destination, departure/return
+status and duration under Care class or the correct Period 1–4 based on
+the recorded Brisbane time. New passes also store a session identifier for
+consistent grouping. The Movement log provides a **View in template** control
+that opens the matching student and date; names of students with recorded
+visits on that date are also offered as shortcuts. No-visit period cells
+remain blank, and records outside the five periods remain visible.
+
+The feature changes only offline demo UI and browser-local fictional passes.
+The authenticated Django/Windows connected-school system does not share this
+data or receive this new template automatically. Installing an approved
+Windows staging build requires backup-first manual upgrade instructions below.
+
+# Student movements by period — Windows offline demo
+
+The fictional browser-based fallback teacher UI packaged in the Windows
+V3.6.7 staging bundle has a student lookup **below Movement log**, with a
+read-only five-row **Care class through Period 4** template. Existing sample
+and browser-issued passes are grouped by departure time on the selected date,
+with empty period cells where no movement was recorded. Multiple passes per
+period remain visible and out-of-period visits are listed separately.
+
+This is matching demo source, **not** a new connected-school Django route,
+not a PostgreSQL movement register, and not an automatic Windows update.
+An approved Windows bundle must pass staging tests and be installed through
+the backup-first manual upgrade process below; real school records must never
+be entered into the public fictional demo.
+
+# Administrator-managed movement destinations — V3.6.7 offline demo
+
+The offline fictional browser UI shipped as `index.html` now provides
+**Student Movements → Manage movement destinations** in its demonstration
+administrator interface. Destinations may be added or removed (with
+validation, duplicate prevention, and at least one required option);
+the teacher demo uses the resulting list for new passes. Removing a
+destination preserves past movement logs and historical student filters.
+
+This is a browser-local demonstration feature, **not** a centrally
+managed Windows/Django school setting. It does not grant management
+permissions in the authenticated connected-school Django portal,
+which does not currently implement production student movement passes.
+The public demo's `admin / admin` is not secure authentication, and
+changes made on GitHub Pages do not travel automatically to a Windows
+installation. The updated offline demo must be bundled in a new,
+successfully tested Windows staging build and applied by an approved,
+backup-first manual upgrade; do not run First Setup on existing data.
+
+# Student Movements Example 1 — Windows bundle and GitHub Pages parity
+
+The **fictional browser-local Student Movements demo** in this branch's `index.html`
+now has the same Example 1 compact dashboard as GitHub Pages, including the
+three movement counters, student search, destinations, Issue pass, duration,
+Returned actions and the All / Currently out / Returned filter. Source parity
+does **not** imply installed-app parity or shared data.
+
+**What Windows actually runs:** `deployment/build_windows.py` includes
+`index.html` in the offline bundle. The protected Django `/teacher/` route
+renders that demo only for eligible teachers with **no connected publication**.
+When a connected timetable is active, teachers are redirected to the
+independent Django timetable and roster views; those do not yet have a
+production student-movements backend or this demo page. Do not use a browser
+demo to record real student movements.
+
+**A GitHub push does not update a user's existing Windows installation.**
+To apply this source change to the offline staging bundle, obtain a **new
+tested V3.6.7 Windows-x64 STAGING artifact** built from the updated
+`feature/v3.6.7-unified-ui` branch. Confirm the artifact's workflow completed
+successfully. On the machine, with appropriate IT authorisation:
+
+1. Stop RollFlow first; back up the local staging instance and any data.
+2. Extract the *new* bundle to a **separate directory**, keeping the previous
+   directory because the PostgreSQL configuration may refer to its runtime.
+3. Run `Upgrade Existing.cmd` from the new bundle. It creates a private
+   backup and checks migrations. **Never use First Setup.cmd on an existing
+   instance.**
+4. Start with `Start RollFlow.cmd`; test the protected login and existing
+   timetable in the new bundle on the isolated staging port `18085`.
+5. If needed, roll back only according to your authorised restore procedure;
+   do not overwrite or delete the prior PostgreSQL runtime directory.
+
+The staging database under
+`%LOCALAPPDATA%\\RollFlow-V3641-Staging` is **not** the website's localStorage.
+No school records, credentials, timetable allocations or data synchronisation
+are transferred by this visual update. A secure shared backend, authenticated
+movements feature and a separately approved Windows update mechanism would be
+required for automatic multi-device parity. Never commit school data or private
+archives to the public GitHub repository.
+
+**Student Movements cleanup (fictional demo):** The V3.6.7 offline fallback demo now matches GitHub Pages: it no longer inserts **Daily Service Usage**, **Students Using Each Service**, or **Visits to Each Service** above the dashboard. The earlier 6–10 visits-for-every-student generated history is replaced by a smaller set of 18 selected fictional students with varying levels of completed visits, including frequent users (10–15), occasional users (3–6) and infrequent users (1–2). These show as clearly labeled **Fictional sample** in the dashboard log and in student histories. Existing browser-issued passes and unrecognised user-modified history are not overwritten. The connected-school Django installation remains separate, and updating source does **not** update an installed Windows instance automatically.
+
+# V3.6.7 — Unified Teacher & Administration Interface (draft staging)
+
+This is a UI-only update on top of V3.6.6: shared offline design tokens,
+administrator and teacher navigation, page layouts, tables, forms, focus
+styles, responsive handling and version labels. No school records, account
+roles, imported files, published timetable allocations, or database schema
+are modified by these UI changes.
+
+For an existing instance: stop RollFlow, extract the new Windows bundle into
+a NEW directory, retain the previous extracted directory because instance.json
+holds the PostgreSQL runtime path, run Upgrade Existing.cmd for a new private
+backup and migration checks, then start with Start RollFlow.cmd. Never run
+First Setup on an existing installation. The native staging state and port
+remain %LOCALAPPDATA%\RollFlow-V3641-Staging and 18085.
+
+See deployment/UI_AUDIT_V367.md for route-by-route functional and responsive
+review. Existing OneSchool archive and current teacher timetable are preserved.
+
 # V3.6.6 — Automated School Setup (draft staging)
 
 Stop the existing instance, extract the new package separately, keep the

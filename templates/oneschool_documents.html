@@ -50,16 +50,11 @@ strong.number{font-size:26px;display:block}
 code{overflow-wrap:anywhere}
 @media(max-width:650px){main{padding:16px 10px 32px}.panel{padding:14px}h1{font-size:25px}}
 </style>
-</head>
+{% include "ui_system.html" %}</head>
 <body>
-<header><strong>RollFlow · OneSchool Import Centre</strong>
-<nav aria-label="Administrator navigation">
-<a href="{% url 'management-dashboard' %}">Dashboard</a>
-<a href="{% url 'oneschool-centre' %}">Timetable CSV</a>
-<a href="{% url 'management-student-directory' %}">Students</a>
-<a href="{% url 'management-section' section='staff' %}">Staff</a>
-</nav></header>
-<main>
+<a class="rf-skip" href="#main-content">Skip to main content</a>
+{% include "ui_header.html" with portal="admin" active="imports" %}
+<main id="main-content" class="rf-page">
 {% for message in messages %}<div class="notice {{ message.tags }}" role="status">{{ message }}</div>{% endfor %}
 {% if batch %}
   <p><a href="{% url 'oneschool-documents' %}">← All OneSchool uploads</a></p>

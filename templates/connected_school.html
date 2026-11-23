@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en-AU"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex,nofollow"><title>RollFlow V3.6.6 · Connected School Data</title>
+<meta name="robots" content="noindex,nofollow"><title>RollFlow V3.6.7 · Connected School Data</title>
 <style>
 *{box-sizing:border-box}body{margin:0;background:#edf3f5;color:#203b49;font:15px/1.55 Arial,sans-serif}
 header{background:#112c3b;color:white;padding:16px max(18px,calc((100% - 1150px)/2));display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
@@ -14,20 +14,14 @@ button.secondary{background:white;color:#244754;border-color:#a7bac4}
 button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #d9a442;outline-offset:3px}
 input[type=checkbox]{margin-right:6px}table{width:100%;text-align:left;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid #dce6eb}th{font-size:12px;background:#f2f6f8;color:#4e6975}.scroll{overflow-x:auto}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px}.metric{background:#f3f7f8;padding:14px;border-radius:6px}.metric strong{display:block;font-size:24px}.actions{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:14px 0}.inline{display:inline-block}header button{background:transparent;border-color:#b1c4cd}small{color:#536e79}
-</style></head><body>
-<header><strong>ROLLFLOW · V3.6.6</strong><nav>
-{% if mode == 'teacher' or mode == 'roster' and not admin_roster %}
-<a href="{% url 'teacher-timetable' %}">My day</a><a href="{% url 'teacher-week' %}">My week</a>
-{% else %}
-<a href="{% url 'management-dashboard' %}">Dashboard</a><a href="{% url 'oneschool-documents' %}">Imports</a><a href="{% url 'connected-school' %}">Publish school data</a>
-{% if publication %}<a href="{% url 'connected-classes' %}">Classes</a><a href="{% url 'connected-master' %}">Master timetable</a>{% endif %}
-{% endif %}
-<form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit">Sign out</button></form></nav></header>
-<main>
+</style>{% include "ui_system.html" %}</head><body>
+<a class="rf-skip" href="#main-content">Skip to main content</a>
+{% if mode == 'teacher' %}{% if week_view %}{% include "ui_header.html" with portal="teacher" active="week" %}{% else %}{% include "ui_header.html" with portal="teacher" active="day" %}{% endif %}{% elif mode == 'roster' and not admin_roster %}{% include "ui_header.html" with portal="teacher" active="roster" %}{% elif mode == 'master' %}{% include "ui_header.html" with portal="admin" active="master" %}{% elif mode == 'classes' or mode == 'roster' %}{% include "ui_header.html" with portal="admin" active="classes" %}{% else %}{% include "ui_header.html" with portal="admin" active="publish" %}{% endif %}
+<main id="main-content" class="rf-page">
 {% for message in messages %}<p class="{{ message.tags }}" role="status">{{ message }}</p>{% endfor %}
 {% if publication %}<p class="hint">Published: {{ publication.name }} · {{ publication.starts|date:"j M Y" }} – {{ publication.ends|date:"j M Y" }}. Weekly planning schedule, not a live daily OneSchool feed.</p>{% endif %}
 {% if mode == 'publish' %}
-<h1>Review and publish school data</h1><p><a class="btn" href="{% url 'automated-school-setup' %}">Automated School Setup — detect times and prepare teacher accounts</a></p>
+<h1>Review and publish school data</h1><p class="rf-page-intro">Review imported sources, confirm teacher identity mappings, then publish a new school timetable snapshot.</p><p><a class="btn" href="{% url 'automated-school-setup' %}">Automated School Setup — detect times and prepare teacher accounts</a></p>
 <p>Publish the latest approved set of four OneSchool imports without overwriting the existing database, source files or manual records. A publication is a fixed term snapshot; new imports do not alter it automatically.</p>
 <section class="panel"><h2>1. Approved source reports</h2>
 {% if source_error %}<p class="note">{{ source_error }}</p><a href="{% url 'oneschool-documents' %}">Finish the import steps</a>{% else %}
@@ -81,7 +75,10 @@ input[type=checkbox]{margin-right:6px}table{width:100%;text-align:left;border-co
 {% elif mode == 'master' or mode == 'teacher' %}
 <h1>{% if mode == 'master' %}School master timetable{% elif week_view %}My teaching week{% else %}My teaching day{% endif %}</h1>
 {% if no_mapping %}<p class="note">Your account has no currently verified mapping in this publication. Ask your administrator to verify the staff ID/code and publish again.</p>{% endif %}
-<form method="get"><label for="date">Choose a date in the published term</label><input id="date" name="date" type="date" value="{{ day|date:'Y-m-d' }}" min="{{ publication.starts|date:'Y-m-d' }}" max="{{ publication.ends|date:'Y-m-d' }}"><button>View</button></form>
+<form method="get"><label for="date">Choose a date in the published term</label><div class="rf-page-actions"><input id="date" name="date" type="date" value="{{ day|date:'Y-m-d' }}" min="{{ publication.starts|date:'Y-m-d' }}" max="{{ publication.ends|date:'Y-m-d' }}"><button type="submit">View date</button>
+<a class="btn" href="?date={{ previous_date|date:'Y-m-d' }}">Previous {% if week_view %}week{% else %}day{% endif %}</a>
+<a class="btn" href="?date={{ next_date|date:'Y-m-d' }}">Next {% if week_view %}week{% else %}day{% endif %}</a>
+</div></form>
 {% for d in days %}<section class="panel"><h2>{{ d.date|date:"l j F" }}</h2><div class="scroll"><table><thead><tr><th>Period</th><th>Time</th><th>Class</th><th>Subject / class name</th><th>Room</th>{% if mode == 'master' %}<th>Source staff code</th>{% endif %}<th></th></tr></thead><tbody>
 {% for row in d.rows %}<tr><td>P{{ row.period }}</td><td>{{ row.start }}–{{ row.end }}</td><td>{{ row.code }}</td><td>{{ row.name }}</td><td>{{ row.room|default:"Unassigned" }}</td>{% if mode == 'master' %}<td>{{ row.staff|default:"Unassigned" }}</td>{% endif %}<td>{% if mode == 'master' %}<a href="{% url 'connected-admin-roster' row.code %}">Class roster</a>{% else %}<a href="{% url 'connected-teacher-roster' row.code %}">My class roster</a>{% endif %}</td></tr>
 {% empty %}<tr><td colspan="7">No scheduled lessons for this date. It may be a weekend, closure, outside term or an unassigned day.</td></tr>{% endfor %}
@@ -94,18 +91,71 @@ input[type=checkbox]{margin-right:6px}table{width:100%;text-align:left;border-co
 {% endif %}
 </main><script>
 (function(){
-const csv=document.getElementById('id_times'),mount=document.getElementById('visual-times');
-if(!csv||!mount)return;
-const days=['Monday','Tuesday','Wednesday','Thursday','Friday'];
-const values=new Map(csv.value.split(/\r?\n/).map(s=>{const a=s.split(',');return [a[0]+':'+a[1],a.slice(2,4)]}));
-const table=document.createElement('table'),head=table.createTHead().insertRow(),body=table.createTBody(),inputs=[];
-['Period',...days].forEach(x=>{const c=document.createElement('th');c.textContent=x;head.appendChild(c)});
-function sync(){csv.value=days.flatMap((d,i)=>[1,2,3,4].map((p,j)=>[d,p,...inputs[j][i].map(e=>e.value)].join(','))).join('\n');}
-for(let p=1;p<=4;p++){const tr=body.insertRow();tr.insertCell().textContent='P'+p;const row=[];inputs.push(row);
-for(const d of days){const cell=tr.insertCell(),pair=[];row.push(pair);
-for(let i=0;i<2;i++){const el=document.createElement('input');el.type='time';el.value=(values.get(d+':'+p)||[])[i]||'';el.required=true;el.setAttribute('aria-label',d+' period '+p+(i?' end':' start'));el.addEventListener('input',sync);cell.appendChild(el);pair.push(el);}}}
-mount.classList.add('scroll');mount.appendChild(table);
-const btn=document.createElement('button');btn.type='button';btn.textContent='Copy Tuesday times to Wednesday–Friday';btn.addEventListener('click',()=>{inputs.forEach(r=>{for(let d=2;d<5;d++)r[d].forEach((e,i)=>e.value=r[1][i].value)});sync()});mount.appendChild(btn);
-csv.parentElement.style.display='none';csv.form.addEventListener('submit',sync);
+  'use strict';
+  const csv=document.getElementById('id_times'), mount=document.getElementById('visual-times');
+  if(!csv||!mount)return;
+  const weekdays=['Monday','Tuesday','Wednesday','Thursday','Friday'];
+  const values=new Map();
+  for(const line of csv.value.split(/\r?\n/)){
+    const fields=line.split(',');
+    if(fields.length===4)values.set(fields[0]+':'+fields[1],fields.slice(2));
+  }
+  const intro=document.createElement('p');
+  intro.className='rf-page-intro';
+  intro.textContent='Edit the start and end time for each period. Times detected from the PDF are suggestions; please check every day before publishing.';
+  mount.appendChild(intro);
+  const wrap=document.createElement('div');
+  wrap.className='rf-time-grid';
+  const table=document.createElement('table');
+  const caption=document.createElement('caption');
+  caption.textContent='Teaching period start and finish times';
+  caption.style.cssText='text-align:left;font-weight:700;padding:8px 0';
+  table.appendChild(caption);
+  const head=table.createTHead().insertRow();
+  ['Period',...weekdays].forEach(name=>{
+    const th=document.createElement('th');th.scope='col';th.textContent=name;head.appendChild(th);
+  });
+  const rows=table.createTBody(),entries=[];
+  for(let period=1;period<=4;period++){
+    const tr=rows.insertRow(),first=document.createElement('th');
+    first.scope='row';first.textContent='P'+period;tr.appendChild(first);
+    const record=[];entries.push(record);
+    for(const day of weekdays){
+      const cell=tr.insertCell(),pair=document.createElement('div'),inputs=[];
+      pair.className='rf-time-pair';
+      const current=values.get(day+':'+period)||['',''];
+      ['Start','End'].forEach((label,i)=>{
+        const el=document.createElement('input');
+        el.type='time';el.required=true;el.value=current[i]||'';
+        el.id='period-'+period+'-'+day.toLowerCase()+'-'+label.toLowerCase();
+        el.setAttribute('aria-label',day+' period '+period+' '+label.toLowerCase()+' time');
+        const group=document.createElement('label');
+        group.htmlFor=el.id;group.textContent=label;group.appendChild(el);
+        pair.appendChild(group);inputs.push(el);
+        el.addEventListener('input',sync);
+      });
+      cell.appendChild(pair);record.push(inputs);
+    }
+  }
+  wrap.appendChild(table);mount.appendChild(wrap);
+  const toolbar=document.createElement('div');toolbar.className='rf-time-toolbar';
+  const copy=document.createElement('button');copy.type='button';
+  copy.className='secondary';copy.textContent='Copy Tuesday times to Wednesday–Friday';
+  copy.addEventListener('click',()=>{entries.forEach(row=>{for(let col=2;col<5;col++)
+    row[col].forEach((el,i)=>{el.value=row[1][i].value;});});sync();});
+  toolbar.appendChild(copy);
+  const toggle=document.createElement('button');toggle.type='button';
+  toggle.className='secondary';toggle.setAttribute('aria-controls','id_times');
+  const field=csv.parentElement;
+  let open=Boolean(field.querySelector('.errorlist'));
+  function setOpen(value){open=value;field.hidden=!open;toggle.textContent=open?'Hide CSV editor':'Show advanced CSV editor';
+    toggle.setAttribute('aria-expanded',String(open));}
+  setOpen(open);
+  toggle.addEventListener('click',()=>setOpen(!open));
+  toolbar.appendChild(toggle);mount.appendChild(toolbar);
+  function sync(){csv.value=weekdays.flatMap((day,d)=>[1,2,3,4].map((period,p)=>
+    [day,period,...entries[p][d].map(el=>el.value)].join(','))).join('\n');}
+  // Keep the underlying existing PublishForm field, validation and digest unchanged.
+  csv.form.addEventListener('submit',sync);
 })();
 </script></body></html>

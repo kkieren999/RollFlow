@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>RollFlow · My week</title>
+<meta name="robots" content="noindex,nofollow"><title>RollFlow · My week</title>
 <style>
 :root{color-scheme:light}
 *{box-sizing:border-box}
@@ -37,18 +37,11 @@ p{margin:6px 0}
 .summary{color:#526b7a;font-size:13px}
 @media(max-width:600px){main{padding:15px 12px 36px}header{padding:12px}.days{grid-template-columns:1fr}}
 </style>
-</head>
+{% include "ui_system.html" %}</head>
 <body>
-<header>
-  <strong>RollFlow · Teacher Portal</strong>
-  <nav aria-label="Teacher timetable">
-    <a href="{% url 'teacher-timetable' %}">My day</a>
-    <a href="{% url 'teacher-week' %}" aria-current="page">My week</a>
-    {% if not live_timetable %}<a href="{% url 'teacher-master' %}">Fictional master timetable</a>{% endif %}
-  </nav>
-  <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit">Sign out</button></form>
-</header>
-<main>
+<a class="rf-skip" href="#main-content">Skip to main content</a>
+{% include "ui_header.html" with portal="teacher" active="week" %}
+<main id="main-content" class="rf-page">
   <h1>My teaching week</h1>
   <p class="muted">{{ request.user.get_full_name|default:request.user.username }} · {{ week_start|date:"j F Y" }} · Published version: {{ version.name }}</p>
   <p class="summary">Your personal timetable is read-only. It comes from the currently published OneSchool snapshot; it is not an attendance register.</p>

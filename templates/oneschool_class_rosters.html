@@ -12,9 +12,10 @@ input,button{font:inherit;padding:9px 12px;border-radius:6px;border:1px solid #9
 a{color:#075f85}a:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid #dea62b;outline-offset:3px}
 table{border-collapse:collapse;width:100%;text-align:left}td,th{padding:10px;border-bottom:1px solid #e5eaee}th{color:#526c78;background:#f5f8fa;font-size:12px}
 .wrap{overflow:auto}.muted{color:#566f7b;font-size:13px}.actions{display:flex;gap:12px;flex-wrap:wrap;margin:14px 0}
-</style></head>
-<body><header><strong>RollFlow · OneSchool</strong> · <a href="{% url 'oneschool-documents' %}">Back to import centre</a></header>
-<main><h1>Imported student-class memberships</h1>
+</style>{% include "ui_system.html" %}</head>
+<body><a class="rf-skip" href="#main-content">Skip to main content</a>
+{% include "ui_header.html" with portal="admin" active="imports" %}
+<main id="main-content" class="rf-page"><h1>Imported student-class memberships</h1>
 <p class="info">Administrator review only. Each membership is linked by an existing student EQID and an approved class code. This directory does not change teaching assignments or attendance, and must not be made public.</p>
 <section class="panel"><h2>Class codes with imported memberships</h2>
 <div class="wrap"><table><thead><tr><th>Class code</th><th>Student links</th><th>Action</th></tr></thead><tbody>
