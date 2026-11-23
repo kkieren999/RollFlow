@@ -151,9 +151,21 @@ class SharedInterfaceTests(TestCase):
             'data-action="returnMovement"',
             "rfMovementExample1Style",
             "date!==brisbaneToday()",
+            "function rfMakeVariedMovementSamples()",
+            "rfIsOldAutoSample",
+            "rf-fictional-2026-",
+            "Fictional sample · ",
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, html)
+        for removed_section in (
+            "DAILY SERVICE USAGE", "STUDENTS USING EACH SERVICE",
+            "VISITS TO EACH SERVICE",
+        ):
+            self.assertNotIn(removed_section, html)
+        # The previous blanket-generated set of 6–10 visits per fictional
+        # student must never return, especially in new Windows bundles.
+        self.assertNotIn("people.flatMap((person,index)=>Array.from({length:6+index%5}", html)
         self.assertEqual(html.count("function movementRows()"), 1)
         self.assertEqual(html.count("function movementsPage()"), 1)
 
