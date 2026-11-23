@@ -154,6 +154,13 @@ class SharedInterfaceTests(TestCase):
             "function rfMakeVariedMovementSamples()",
             "rfIsOldAutoSample",
             "rf-fictional-2026-",
+            "RF_MOVEMENT_DESTINATIONS_KEY",
+            "function rfAdminMovementDestinationsPage()",
+            "rfSaveMovementDestinations(",
+            'id="rf-add-movement-destination"',
+            'data-rf-remove-movement-destination',
+            'rfMovementDestinations.map(name=>',
+            'rfMovementHistoryDestinations()',
             "Fictional sample · ",
         ):
             with self.subTest(marker=marker):
@@ -166,6 +173,9 @@ class SharedInterfaceTests(TestCase):
         # The previous blanket-generated set of 6–10 visits per fictional
         # student must never return, especially in new Windows bundles.
         self.assertNotIn("people.flatMap((person,index)=>Array.from({length:6+index%5}", html)
+        self.assertEqual(html.count("function rfAdminMovementDestinationsPage()"), 1)
+        self.assertEqual(html.count("const RF_MOVEMENT_DESTINATIONS_KEY="), 1)
+        self.assertIn("if(adminPage==='movements')return rfAdminMovementDestinationsPage();", html)
         self.assertEqual(html.count("function movementRows()"), 1)
         self.assertEqual(html.count("function movementsPage()"), 1)
 
