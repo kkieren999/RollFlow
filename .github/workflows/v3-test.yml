@@ -2,7 +2,7 @@ name: V3 foundation tests
 on:
   workflow_dispatch:
   push:
-    branches: [v3.0-foundation, feature/v3.6.5-connected-school-data, feature/v3.6.6-automated-school-setup, feature/v3.6.7-unified-ui, feature/v3.6.7-student-movements-dashboard]
+    branches: [v3.0-foundation, feature/v3.6.5-connected-school-data, feature/v3.6.6-automated-school-setup, feature/v3.6.7-unified-ui, feature/v3.6.7-student-movements-dashboard, feature/v3.6.7-varied-fictional-movements]
   pull_request:
     branches: [main, v3.0-foundation, integration/v3.6.1-windows-teacher-portal, feature/v3.6.2-oneschool-import-centre, feature/v3.6.4-real-oneschool-format-support, fix/v3.6.4-oneschool-unknown-worksheet-size, fix/v3.6.4.2-empty-staff-pdf-legends, fix/v3.6.4.3-cross-line-alignment, feature/v3.6.5-connected-school-data, feature/v3.6.6-automated-school-setup, feature/v3.6.7-unified-ui]
 permissions:
@@ -42,7 +42,7 @@ jobs:
       - run: python deployment/ci_smoke.py
 
   windows-offline-bundle:
-    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/v3.0-foundation' || github.ref == 'refs/heads/feature/v3.6.5-connected-school-data' || github.ref == 'refs/heads/feature/v3.6.6-automated-school-setup' || github.ref == 'refs/heads/feature/v3.6.7-unified-ui' || github.ref == 'refs/heads/feature/v3.6.7-student-movements-dashboard'
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/v3.0-foundation' || github.ref == 'refs/heads/feature/v3.6.5-connected-school-data' || github.ref == 'refs/heads/feature/v3.6.6-automated-school-setup' || github.ref == 'refs/heads/feature/v3.6.7-unified-ui' || github.ref == 'refs/heads/feature/v3.6.7-student-movements-dashboard' || github.ref == 'refs/heads/feature/v3.6.7-varied-fictional-movements'
     runs-on: windows-2025
     timeout-minutes: 25
     steps:
