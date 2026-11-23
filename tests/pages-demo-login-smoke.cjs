@@ -147,8 +147,12 @@ async function test() {
     assert.match(heroText, /PERIOD 2/);
     assert.match(heroText, /10:15/);
     assert.match(heroText, /Room B17/);
-    assert.equal(await page.locator('.rf-example1-date-picker input[data-date]').inputValue(),
-      '2026-03-09', 'Date picker should stay usable within the green hero');
+    assert.equal(await page.locator('input[type="date"]').count(), 0,
+      'Take Attendance must not offer date changes; use Daily Schedule instead');
+    assert.equal(await page.locator('.rf-example1-date-picker').count(), 0,
+      'The green hero must not show Change date');
+    assert.match(heroText, /Monday 9 March 2026/,
+      'The chosen attendance date must remain visible');
     assert.equal(await page.locator('[data-class-select]').count(), 0,
       'Take Attendance should not have a Switch class control');
     assert.match(await page.locator('.photo-roll-caption').innerText(), /27 students/,
@@ -173,6 +177,8 @@ async function test() {
       'Historical daily schedule heading should not say Today');
     assert.equal(await page.locator('input[data-date]').first().inputValue(), '2026-03-09',
       'Back navigation must preserve the selected historical date');
+    assert(await page.locator('input[data-date]').first().isVisible(),
+      'Daily Schedule must keep the date picker for changing attendance dates');
 
     // Class Finder details should show multiple lessons, not the stale
     // single-day seed for the 2026 fictional weekly timetable.
