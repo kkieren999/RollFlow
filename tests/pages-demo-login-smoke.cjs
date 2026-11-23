@@ -149,15 +149,14 @@ async function test() {
     assert.match(heroText, /Room B17/);
     assert.equal(await page.locator('.rf-example1-date-picker input[data-date]').inputValue(),
       '2026-03-09', 'Date picker should stay usable within the green hero');
-    assert.equal((await page.locator('.rf-example1-class-select label').innerText()).trim(),
-      'Switch class', 'Keep the class chooser accessible in the class strip');
+    assert.equal(await page.locator('[data-class-select]').count(), 0,
+      'Take Attendance should not have a Switch class control');
     assert.match(await page.locator('.photo-roll-caption').innerText(), /27 students/,
       'Student count should remain above the attendance grid');
     assert(await page.locator('.student-grid .photo-mark').count() > 20,
       'The attendance photo grid must remain available');
-    const choices = await page.locator('#rf-attendance-class-select option').allInnerTexts();
-    assert(choices.some(x => x.includes('PERIOD 4') && x.includes('ENG101B')),
-      'Switch class options should reflect Sarah\'s chosen date');
+    assert.equal((await page.locator('#attendance-class-title').innerText()).trim(),
+      'ENG081C — English', 'The class identity must stay visible after removing the switcher');
     const backButton = page.getByRole('button', { name: 'Back to Daily Schedule' });
     assert(await backButton.isVisible(), 'Back to Daily Schedule must be obvious');
     const backCss = await backButton.evaluate(el => ({
