@@ -419,6 +419,55 @@ function studentSearchPage(){const body=`<div class="section-intro"><h2>Find a s
  * Demo records remain local to the user's browser; no backend is added.
  */
 
+// Demo-only catalogue shared between administrator and teacher logins in THIS
+// browser. This is not a school server setting or cloud synchronisation.
+const RF_MOVEMENT_DESTINATIONS_KEY='rollflow_demo_movement_destinations_v1';
+const RF_DEFAULT_MOVEMENT_DESTINATIONS=['Toilet','Student services','School office','Library'];
+function rfNormaliseMovementDestination(input){
+ const name=String(input||'').trim().replace(/\s+/g,' ');
+ if(name.length<2||name.length>50||!/^[A-Za-z0-9]$/.test(name.charAt(0))||/[<>"\x00-\x1f\x7f]/.test(name))
+  throw Error('Use a destination name of 2–50 characters, starting with a letter or number.');
+ return name;
+}
+function rfReadMovementDestinations(){
+ try{
+  const stored=JSON.parse(localStorage.getItem(RF_MOVEMENT_DESTINATIONS_KEY)||'null');
+  if(!Array.isArray(stored)||!stored.length||stored.length>30)return [...RF_DEFAULT_MOVEMENT_DESTINATIONS];
+  const result=[];
+  for(const value of stored){
+   const name=rfNormaliseMovementDestination(value);
+   if(result.some(existing=>existing.toLocaleLowerCase()===name.toLocaleLowerCase()))
+    return [...RF_DEFAULT_MOVEMENT_DESTINATIONS];
+   result.push(name);
+  }
+  return result;
+ }catch{return [...RF_DEFAULT_MOVEMENT_DESTINATIONS]}
+}
+let rfMovementDestinations=rfReadMovementDestinations();
+function rfSaveMovementDestinations(next){
+ if(!Array.isArray(next)||!next.length||next.length>30)
+  throw Error('Keep between 1 and 30 movement destinations.');
+ const cleaned=next.map(rfNormaliseMovementDestination);
+ if(new Set(cleaned.map(name=>name.toLocaleLowerCase())).size!==cleaned.length)
+  throw Error('Each destination needs a different name.');
+ try{localStorage.setItem(RF_MOVEMENT_DESTINATIONS_KEY,JSON.stringify(cleaned))}
+ catch{throw Error('Browser storage is unavailable. No destinations were changed.')}
+ rfMovementDestinations=cleaned;
+}
+function rfMovementHistoryDestinations(){
+ const history=[
+  ...state.movements.map(item=>item.destination),
+  ...(Array.isArray(workspace.sampleMovementHistory)?workspace.sampleMovementHistory:[]).map(item=>item.destination)
+ ];
+ return [...new Set([...rfMovementDestinations,...history].filter(Boolean))];
+}
+window.addEventListener('storage',event=>{
+ if(event.key!==RF_MOVEMENT_DESTINATIONS_KEY)return;
+ rfMovementDestinations=rfReadMovementDestinations();
+ if((demoRole==='teacher'&&state.page==='movements')||
+    (demoRole==='admin'&&adminPage==='movements'))render();
+});
+
 let rfMovementListFilter = 'all';
 
 function rfMovementEntriesForDate() {
@@ -572,10 +621,7 @@ function movementsPage() {
         <div class="rf-movement-destination-field">
           <label for="movementDestination">Destination</label>
           <select id="movementDestination" class="field-select">
-            <option>Toilet</option>
-            <option>Student services</option>
-            <option>School office</option>
-            <option>Library</option>
+            ${rfMovementDestinations.map(name=>`<option value="${esc(name)}">${esc(name)}</option>`).join('')}
           </select>
         </div>
         <button id="movementIssueButton" type="button"
@@ -906,7 +952,7 @@ function nav(page){if(page==='master')osSetView(false);if(page==='master'&&serve
 document.addEventListener('change',e=>{if(e.target.matches('[data-pref]')){state.prefs[e.target.dataset.pref]=e.target.checked;persist();render()}if(e.target.matches('[data-date]')){state.date=e.target.value||state.date;state.history=[];render()}if(e.target.matches('[data-class-select]'))openClass(e.target.value);if(e.target.matches('select[data-finder-field]')){state.finder[e.target.dataset.finderField]=e.target.value;refreshFinderResults();}if(e.target.matches('[data-image]')){const file=e.target.files?.[0];if(!file)return;if(!/^image\/(png|jpeg|webp)$/.test(file.type)||file.size>2_000_000){showToast('Choose a PNG, JPEG or WebP under 2 MB');return}const reader=new FileReader();reader.onload=()=>{state.pictures[e.target.dataset.image]=reader.result;closeDrawer();render();state.drawer=e.target.dataset.image;drawDrawer();showToast('Photo updated in this browser session')};reader.readAsDataURL(file)}});
 document.addEventListener('change',e=>{if(e.target?.id==='certifyCheck'){const b=document.getElementById('confirmSubmit');if(b)b.disabled=!e.target.checked}});
 document.addEventListener('input',e=>{if(e.target?.id==='movementStudentSearch'){state.movementQuery=e.target.value;state.movementStudentId='';state.movementHighlight=0;refreshMovementSuggestions();return}if(e.target.matches('input[data-finder-field]')){state.finder[e.target.dataset.finderField]=e.target.value;refreshFinderResults();return}if(e.target?.id==='studentQuery'){state.studentQuery=e.target.value;document.getElementById('studentResults').innerHTML=studentRows();return}if(e.target?.id==='findSearch'){state.search=e.target.value;document.getElementById('searchResults').innerHTML=searchResults()}});
-app.addEventListener('click',e=>{const movementChoice=e.target.closest('[data-movement-choice]');if(movementChoice){selectMovementStudent(movementChoice.dataset.movementChoice);return}const view=e.target.closest('[data-finder-view]');if(view){state.finderSelected=view.dataset.finderView;state.classId=state.finderSelected;state.finderTab='students';state.page='class-detail';render();return}const tab=e.target.closest('[data-class-tab]');if(tab){state.finderTab=tab.dataset.classTab;render();return}const more=e.target.closest('[data-more]');if(more){e.stopPropagation();state.drawer=more.dataset.more;drawDrawer();return}const mark=e.target.closest('[data-photo-mark]');if(mark){changeMark(mark.dataset.photoMark);return}const open=e.target.closest('[data-open]');if(open){openClass(open.dataset.open);return}const navBtn=e.target.closest('[data-nav]');if(navBtn){nav(navBtn.dataset.nav);return}const act=e.target.closest('[data-action]');if(!act)return;switch(act.dataset.action){case 'togglePin':togglePin(act.dataset.pinClass);break;case 'clearFinder':clearFinder();break;case 'toggleNav':state.mobileNav=!state.mobileNav;render();break;case 'closeMobileNav':state.mobileNav=false;render();break;case 'toggleSidebar':break;case 'toggleProfile':state.profileOpen=!state.profileOpen;render();break;case 'issueMovement':{const studentId=state.movementStudentId,destination=document.getElementById('movementDestination')?.value;if(!studentId||!getPerson(studentId)||!destination){showToast('Search for and select a student first');break}if(!recordMovement(studentId,destination))break;state.movementStudentId='';state.movementQuery='';state.movementHighlight=0;render();showToast('Pass issued for '+getPerson(studentId).name);break}case 'returnMovement':{const item=state.movements.find(m=>m.id===act.dataset.movement);if(item&&!item.returnedAt){const now=new Date();item.returnedAt=brisbaneClock(now);item.returnedISO=now.toISOString();if(!persist()){item.returnedAt=null;delete item.returnedISO;return}render();showToast('Student marked as returned')}break}case 'toggleNotice':{const id=act.dataset.notice;state.readNotices=state.readNotices.includes(id)?state.readNotices.filter(x=>x!==id):[...state.readNotices,id];persist();render();break}case 'search':state.search='';showModal('search');break;case 'help':showModal('help');break;case 'undo':undo();break;case 'save':if(!isSubmitted()&&classCounts(getClass())['?']===0)completeSubmission();break;case 'submit':if(classCounts(getClass())['?']===0&&!isSubmitted())showModal('submit');break;}});
+app.addEventListener('click',e=>{const movementChoice=e.target.closest('[data-movement-choice]');if(movementChoice){selectMovementStudent(movementChoice.dataset.movementChoice);return}const view=e.target.closest('[data-finder-view]');if(view){state.finderSelected=view.dataset.finderView;state.classId=state.finderSelected;state.finderTab='students';state.page='class-detail';render();return}const tab=e.target.closest('[data-class-tab]');if(tab){state.finderTab=tab.dataset.classTab;render();return}const more=e.target.closest('[data-more]');if(more){e.stopPropagation();state.drawer=more.dataset.more;drawDrawer();return}const mark=e.target.closest('[data-photo-mark]');if(mark){changeMark(mark.dataset.photoMark);return}const open=e.target.closest('[data-open]');if(open){openClass(open.dataset.open);return}const navBtn=e.target.closest('[data-nav]');if(navBtn){nav(navBtn.dataset.nav);return}const act=e.target.closest('[data-action]');if(!act)return;switch(act.dataset.action){case 'togglePin':togglePin(act.dataset.pinClass);break;case 'clearFinder':clearFinder();break;case 'toggleNav':state.mobileNav=!state.mobileNav;render();break;case 'closeMobileNav':state.mobileNav=false;render();break;case 'toggleSidebar':break;case 'toggleProfile':state.profileOpen=!state.profileOpen;render();break;case 'issueMovement':{const studentId=state.movementStudentId,destination=document.getElementById('movementDestination')?.value;if(state.date!==brisbaneToday()||!studentId||!getPerson(studentId)||!rfMovementDestinations.includes(destination)){showToast('Select a student, today’s date and an available destination');render();break}if(!recordMovement(studentId,destination))break;state.movementStudentId='';state.movementQuery='';state.movementHighlight=0;render();showToast('Pass issued for '+getPerson(studentId).name);break}case 'returnMovement':{const item=state.movements.find(m=>m.id===act.dataset.movement);if(item&&!item.returnedAt){const now=new Date();item.returnedAt=brisbaneClock(now);item.returnedISO=now.toISOString();if(!persist()){item.returnedAt=null;delete item.returnedISO;return}render();showToast('Student marked as returned')}break}case 'toggleNotice':{const id=act.dataset.notice;state.readNotices=state.readNotices.includes(id)?state.readNotices.filter(x=>x!==id):[...state.readNotices,id];persist();render();break}case 'search':state.search='';showModal('search');break;case 'help':showModal('help');break;case 'undo':undo();break;case 'save':if(!isSubmitted()&&classCounts(getClass())['?']===0)completeSubmission();break;case 'submit':if(classCounts(getClass())['?']===0&&!isSubmitted())showModal('submit');break;}});
 document.addEventListener('click',e=>{const open=e.target.closest('[data-open-student]');if(open){const id=open.dataset.openStudent;closeModal();state.drawer=id;drawDrawer();return}const act=e.target.closest('[data-action]');const status=e.target.closest('[data-direct]');if(status){const id=state.drawer;closeDrawer();changeMark(id,status.dataset.direct);state.drawer=id;drawDrawer();return}if(!act||app.contains(act))return;switch(act.dataset.action){case 'closeDrawer':closeDrawer();break;case 'closeModal':closeModal();break;case 'confirmSubmit':if(classCounts(getClass())['?']===0&&!isSubmitted()){state.submitted[bucket()]={by:'Alex Morgan',at:new Date().toISOString()};state.dirty=false;state.history=[];persist();closeModal();render();showToast('Class roll submitted successfully')}break;case 'showTimetable':showModal('timetable');break;case 'createPass':showModal('pass');break;case 'confirmPass':{const id=state.drawer;if(!id)break;const d=document.getElementById('passDestination')?.value||'Toilet';if(!recordMovement(id,d))break;state.passes[id]??=[];state.passes[id].push(`${d} pass · ${brisbaneClock(new Date())}`);persist();closeModal();closeDrawer();state.drawer=id;drawDrawer();showToast('Pass recorded');break}case 'createNote':document.getElementById('studentNote')?.focus();break;case 'saveNote':{const id=state.drawer;state.notes[id]=document.getElementById('studentNote')?.value||'';if(persist())showToast('Student note saved');break}}});
 document.addEventListener('keydown',e=>{if(e.target?.id==='movementStudentSearch'){const matches=movementMatches();if(e.key==='ArrowDown'&&matches.length){e.preventDefault();state.movementHighlight=(state.movementHighlight+1)%matches.length;refreshMovementSuggestions();return}if(e.key==='ArrowUp'&&matches.length){e.preventDefault();state.movementHighlight=(state.movementHighlight-1+matches.length)%matches.length;refreshMovementSuggestions();return}if(e.key==='Enter'&&matches.length&&!state.movementStudentId){e.preventDefault();selectMovementStudent(matches[state.movementHighlight].id);return}if(e.key==='Escape'){document.getElementById('movementSuggestions').innerHTML='';e.target.setAttribute('aria-expanded','false');return}}if(e.key==='Escape'){closeDrawer();closeModal()};if(e.target?.matches('[data-more]')&&(e.key==='Enter'||e.key===' ')){e.preventDefault();e.target.click()}});
 window.addEventListener('resize',()=>{requestAnimationFrame(fitGrid)});
@@ -1127,8 +1173,8 @@ if(!Array.isArray(rfExistingSamples)||!rfExistingSamples.length||rfIsOldAutoSamp
 function studentMatches(){const query=state.studentQuery.trim().toLowerCase(),members=studentFilters.classId?schoolClasses.find(cls=>cls.id===studentFilters.classId)?.ids:people.map(person=>person.id);return people.filter(person=>members?.includes(person.id)&&(!studentFilters.year||String(person.year)===studentFilters.year)&&(!query||`${person.name} ${person.id}`.toLowerCase().includes(query)))}
 function movementAnalysis(){const matched=new Set(studentMatches().map(person=>person.id));return [...workspace.sampleMovementHistory,...state.movements.map(item=>({...item,classId:item.classId||'',minutes:movementDuration(item),sample:false}))].filter(item=>matched.has(item.studentId)&&(!studentFilters.classId||item.classId===studentFilters.classId)&&(!studentFilters.destination||item.destination===studentFilters.destination)&&(!studentFilters.from||item.date>=studentFilters.from)&&(!studentFilters.to||item.date<=studentFilters.to))}
 function movementBars(title,entries){const max=Math.max(1,...entries.map(([,count])=>count));return `<section class="sheet movement-chart"><div class="sheet-head">${title}</div><div class="movement-bars">${entries.map(([label,count])=>`<div class="movement-bar-row"><span>${esc(label)}</span><div class="movement-bar-track"><div style="width:${count/max*100}%"></div></div><strong>${count}</strong></div>`).join('')||'<p>No movement records match these filters.</p>'}</div></section>`}
-studentRows=function(){const matches=studentMatches(),records=movementAnalysis(),destinations=['Toilet','Student services','School office','Library'],dates=[...new Set(records.map(item=>item.date))].sort();return `<div class="directory-count">${matches.length} students · ${records.length} movement records · Fictional sample history plus movements recorded in this browser</div><div class="movement-chart-grid">${movementBars('MOVEMENTS BY DESTINATION',destinations.map(destination=>[destination,records.filter(item=>item.destination===destination).length]))}${movementBars('MOVEMENTS BY DATE',dates.map(date=>[date,records.filter(item=>item.date===date).length]))}</div><details class="sheet"><summary class="sheet-head">Movement history (${records.length})</summary><div style="max-height:360px;overflow:auto"><table class="schedule-table"><thead><tr><th>Student</th><th>Class</th><th>Date / time</th><th>Destination</th><th>Duration</th><th>Source</th></tr></thead><tbody>${records.slice().sort((first,second)=>second.date.localeCompare(first.date)).map(item=>`<tr><td>${esc(getPerson(item.studentId)?.name)}</td><td>${esc(item.classId||'Not recorded')}</td><td>${esc(item.date)} · ${esc(item.time)}</td><td>${esc(item.destination)}</td><td>${item.minutes===null?'Not recorded':item.minutes+' min'}</td><td>${item.sample?'Sample history':'Browser record'}</td></tr>`).join('')}</tbody></table>${!records.length?'<div class="empty-state">No matching movement records.</div>':''}</div></details>${matches.map(person=>`<div class="student-result"><img src="${photo(person)}" alt=""><div><strong>${esc(person.name)}</strong><span>Year ${person.year} · ${esc(person.id)} · ${records.filter(item=>item.studentId===person.id).length} matching movements</span></div><button class="btn small" data-open-student="${person.id}">Student details ›</button></div>`).join('')||'<div class="empty-state">No students match these filters.</div>'}`};
-studentSearchPage=function(){return shell(`<section class="sheet"><div class="sheet-head">FIND STUDENTS & REVIEW MOVEMENTS</div><div class="student-filter-grid"><label>Student name or ID<input type="search" id="studentQuery" value="${esc(state.studentQuery)}" placeholder="Search all sample students"></label><label>Class<select data-student-filter="classId"><option value="">All classes</option>${schoolClasses.map(cls=>`<option value="${cls.id}" ${studentFilters.classId===cls.id?'selected':''}>${esc(cls.id)} · ${esc(cls.name)}</option>`).join('')}</select></label><label>Year level<select data-student-filter="year"><option value="">All years</option>${[7,8,9,10,11,12].map(year=>`<option ${studentFilters.year===String(year)?'selected':''}>${year}</option>`).join('')}</select></label><label>Destination<select data-student-filter="destination"><option value="">All destinations</option>${['Toilet','Student services','School office','Library'].map(destination=>`<option ${studentFilters.destination===destination?'selected':''}>${destination}</option>`).join('')}</select></label><label>From date<input type="date" data-student-filter="from" value="${studentFilters.from}"></label><label>To date<input type="date" data-student-filter="to" value="${studentFilters.to}"></label><button class="btn small" data-student-clear>Clear filters</button></div><div class="settings-note">Every student has fictional completed movement history. Class filtering uses the class recorded for each movement. Sample history does not create active passes or attendance marks.</div><div id="studentResults">${studentRows()}</div></section>`,'Student Finder','Search sample students and filter movement charts','')};
+studentRows=function(){const matches=studentMatches(),records=movementAnalysis(),destinations=rfMovementHistoryDestinations(),dates=[...new Set(records.map(item=>item.date))].sort();return `<div class="directory-count">${matches.length} students · ${records.length} movement records · Fictional sample history plus movements recorded in this browser</div><div class="movement-chart-grid">${movementBars('MOVEMENTS BY DESTINATION',destinations.map(destination=>[destination,records.filter(item=>item.destination===destination).length]))}${movementBars('MOVEMENTS BY DATE',dates.map(date=>[date,records.filter(item=>item.date===date).length]))}</div><details class="sheet"><summary class="sheet-head">Movement history (${records.length})</summary><div style="max-height:360px;overflow:auto"><table class="schedule-table"><thead><tr><th>Student</th><th>Class</th><th>Date / time</th><th>Destination</th><th>Duration</th><th>Source</th></tr></thead><tbody>${records.slice().sort((first,second)=>second.date.localeCompare(first.date)).map(item=>`<tr><td>${esc(getPerson(item.studentId)?.name)}</td><td>${esc(item.classId||'Not recorded')}</td><td>${esc(item.date)} · ${esc(item.time)}</td><td>${esc(item.destination)}</td><td>${item.minutes===null?'Not recorded':item.minutes+' min'}</td><td>${item.sample?'Sample history':'Browser record'}</td></tr>`).join('')}</tbody></table>${!records.length?'<div class="empty-state">No matching movement records.</div>':''}</div></details>${matches.map(person=>`<div class="student-result"><img src="${photo(person)}" alt=""><div><strong>${esc(person.name)}</strong><span>Year ${person.year} · ${esc(person.id)} · ${records.filter(item=>item.studentId===person.id).length} matching movements</span></div><button class="btn small" data-open-student="${person.id}">Student details ›</button></div>`).join('')||'<div class="empty-state">No students match these filters.</div>'}`};
+studentSearchPage=function(){return shell(`<section class="sheet"><div class="sheet-head">FIND STUDENTS & REVIEW MOVEMENTS</div><div class="student-filter-grid"><label>Student name or ID<input type="search" id="studentQuery" value="${esc(state.studentQuery)}" placeholder="Search all sample students"></label><label>Class<select data-student-filter="classId"><option value="">All classes</option>${schoolClasses.map(cls=>`<option value="${cls.id}" ${studentFilters.classId===cls.id?'selected':''}>${esc(cls.id)} · ${esc(cls.name)}</option>`).join('')}</select></label><label>Year level<select data-student-filter="year"><option value="">All years</option>${[7,8,9,10,11,12].map(year=>`<option ${studentFilters.year===String(year)?'selected':''}>${year}</option>`).join('')}</select></label><label>Destination<select data-student-filter="destination"><option value="">All destinations</option>${rfMovementHistoryDestinations().map(destination=>`<option value="${esc(destination)}" ${studentFilters.destination===destination?'selected':''}>${esc(destination)}</option>`).join('')}</select></label><label>From date<input type="date" data-student-filter="from" value="${studentFilters.from}"></label><label>To date<input type="date" data-student-filter="to" value="${studentFilters.to}"></label><button class="btn small" data-student-clear>Clear filters</button></div><div class="settings-note">Every student has fictional completed movement history. Class filtering uses the class recorded for each movement. Sample history does not create active passes or attendance marks.</div><div id="studentResults">${studentRows()}</div></section>`,'Student Finder','Search sample students and filter movement charts','')};
 document.addEventListener('change',event=>{if(event.target.dataset.studentFilter){studentFilters[event.target.dataset.studentFilter]=event.target.value;render()}});
 document.addEventListener('click',event=>{if(event.target.closest('[data-student-clear]')){Object.keys(studentFilters).forEach(key=>studentFilters[key]='');state.studentQuery='';render()}});
 const sampleChartStyle=document.createElement('style');sampleChartStyle.textContent=`.student-filter-grid{padding:20px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.student-filter-grid label{display:grid;gap:7px}.student-filter-grid input,.student-filter-grid select{width:100%;min-width:0;padding:9px;border:1px solid #b8c6cf;border-radius:5px}.movement-chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px}.movement-bars{padding:16px;max-height:330px;overflow:auto}.movement-bar-row{display:grid;grid-template-columns:110px 1fr 30px;align-items:center;gap:10px;margin:12px 0;font-size:12px}.movement-bar-track{height:12px;border-radius:4px;background:#e9eef1}.movement-bar-track div{height:100%;border-radius:4px;background:#329756}@media(max-width:700px){.student-filter-grid{grid-template-columns:1fr 1fr}.movement-chart-grid{grid-template-columns:1fr}}@media(max-width:420px){.student-filter-grid{grid-template-columns:1fr}}`;document.head.appendChild(sampleChartStyle);
@@ -1203,8 +1249,8 @@ studentSearchPage=function(){return shell(`<section class="sheet"><div class="sh
 const individualMovement={studentId:'',from:'',to:'',destination:''};
 const serviceFilters={classId:'',destination:''};
 function allMovementHistory(){return [...workspace.sampleMovementHistory,...state.movements.map(item=>({...item,sample:false,minutes:movementDuration(item)}))]}
-function serviceChoices(attribute,value){return `<select ${attribute}><option value="">All services</option>${['Toilet','Student services','School office','Library'].map(service=>`<option ${service===value?'selected':''}>${service}</option>`).join('')}</select>`}
-function individualMovementPage(){const student=getPerson(individualMovement.studentId);const records=allMovementHistory().filter(item=>item.studentId===individualMovement.studentId&&(!individualMovement.from||item.date>=individualMovement.from)&&(!individualMovement.to||item.date<=individualMovement.to)&&(!individualMovement.destination||item.destination===individualMovement.destination));const dates=[...new Set(records.map(item=>item.date))].sort();return shell(`<button class="btn" data-nav="search">← Student Finder</button><div class="student-filter-grid"><label>From date<input type="date" data-individual="from" value="${individualMovement.from}"></label><label>To date<input type="date" data-individual="to" value="${individualMovement.to}"></label><label>Service${serviceChoices('data-individual="destination"',individualMovement.destination)}</label></div><div class="settings-note">${records.length} visits · Fictional sample history and records from this browser. Each visit counts once.</div><div class="movement-chart-grid">${movementBars('VISITS PER DAY',dates.map(date=>[date,records.filter(item=>item.date===date).length]))}${movementBars('SERVICES USED',['Toilet','Student services','School office','Library'].map(service=>[service,records.filter(item=>item.destination===service).length]))}</div><section class="sheet"><div class="sheet-head">INDIVIDUAL MOVEMENT HISTORY</div>${records.slice().sort((first,second)=>second.date.localeCompare(first.date)).map(item=>`<div class="simple-row"><div><strong>${esc(item.destination)}</strong><span>${esc(item.date)} · ${esc(item.time)} · ${esc(item.classId||'Class not recorded')}</span></div><span>${item.minutes===null?'Duration not recorded':item.minutes+' minutes'} · ${item.sample?'Sample':'Browser record'}</span></div>`).join('')||'<div class="empty-state">No visits match these filters.</div>'}</section>`,'Student Movement Data',`${esc(student?.name||'Student')} · ${esc(student?.id||'')}`,'')}
+function serviceChoices(attribute,value){return `<select ${attribute}><option value="">All services</option>${rfMovementHistoryDestinations().map(service=>`<option value="${esc(service)}" ${service===value?'selected':''}>${esc(service)}</option>`).join('')}</select>`}
+function individualMovementPage(){const student=getPerson(individualMovement.studentId);const records=allMovementHistory().filter(item=>item.studentId===individualMovement.studentId&&(!individualMovement.from||item.date>=individualMovement.from)&&(!individualMovement.to||item.date<=individualMovement.to)&&(!individualMovement.destination||item.destination===individualMovement.destination));const dates=[...new Set(records.map(item=>item.date))].sort();return shell(`<button class="btn" data-nav="search">← Student Finder</button><div class="student-filter-grid"><label>From date<input type="date" data-individual="from" value="${individualMovement.from}"></label><label>To date<input type="date" data-individual="to" value="${individualMovement.to}"></label><label>Service${serviceChoices('data-individual="destination"',individualMovement.destination)}</label></div><div class="settings-note">${records.length} visits · Fictional sample history and records from this browser. Each visit counts once.</div><div class="movement-chart-grid">${movementBars('VISITS PER DAY',dates.map(date=>[date,records.filter(item=>item.date===date).length]))}${movementBars('SERVICES USED',rfMovementHistoryDestinations().map(service=>[service,records.filter(item=>item.destination===service).length]))}</div><section class="sheet"><div class="sheet-head">INDIVIDUAL MOVEMENT HISTORY</div>${records.slice().sort((first,second)=>second.date.localeCompare(first.date)).map(item=>`<div class="simple-row"><div><strong>${esc(item.destination)}</strong><span>${esc(item.date)} · ${esc(item.time)} · ${esc(item.classId||'Class not recorded')}</span></div><span>${item.minutes===null?'Duration not recorded':item.minutes+' minutes'} · ${item.sample?'Sample':'Browser record'}</span></div>`).join('')||'<div class="empty-state">No visits match these filters.</div>'}</section>`,'Student Movement Data',`${esc(student?.name||'Student')} · ${esc(student?.id||'')}`,'')}
 // The compact Student Movements dashboard is the only movements overview.
 const movementDrawer=drawDrawer;
 drawDrawer=function(){movementDrawer();document.querySelector('#overlay .action-list')?.insertAdjacentHTML('beforeend',`<button data-view-movement="${esc(state.drawer)}">View movement data <span>›</span></button>`)};
@@ -1848,7 +1894,67 @@ function osPlanningPage(){
  const index={lessons:0,rooms:1,periods:2}[osTab];return tabs+original.slice(indexes[index],indexes[index+1]);
 }
 
+function rfAdminMovementDestinationsPage(){
+ const options=rfMovementDestinations;
+ return `<section class="v31-panel rf-admin-destinations" aria-labelledby="rf-admin-destinations-title">
+  <h2 id="rf-admin-destinations-title">Manage movement destinations</h2>
+  <p>Choose which destinations teachers can select when issuing new student passes. Removing an option does not delete or rename past movement records.</p>
+  <form id="rf-add-movement-destination" class="rf-admin-destination-form">
+   <label for="rf-new-movement-destination">New destination</label>
+   <div class="rf-admin-destination-add">
+    <input id="rf-new-movement-destination" name="destination" maxlength="50" required
+     autocomplete="off" placeholder="e.g. Wellbeing Centre" aria-describedby="rf-destination-help">
+    <button type="submit" class="v31-btn primary">Add destination</button>
+   </div>
+   <small id="rf-destination-help">2–50 characters. Destination names must be unique; maximum 30.</small>
+  </form>
+  <div class="rf-admin-destination-list" aria-label="Available movement destinations">
+   <h3>Available for new passes (${options.length})</h3>
+   ${options.map(name=>`<div class="rf-admin-destination-item">
+    <strong>${esc(name)}</strong>
+    <button type="button" class="v31-btn" data-rf-remove-movement-destination="${esc(name)}"
+     aria-label="Remove ${esc(name)}"${options.length===1?' disabled title="At least one destination is required"':''}>Remove</button>
+   </div>`).join('')}
+  </div>
+  <p class="rf-admin-destination-note">Public demonstration only: these settings are stored in this browser and shared by its demo teacher and admin logins. Other browsers and the installed Windows app will not synchronise automatically. Do not use with real student records.</p>
+ </section>`;
+}
+document.addEventListener('submit',event=>{
+ if(event.target?.id!=='rf-add-movement-destination')return;
+ event.preventDefault();
+ event.stopImmediatePropagation();
+ if(demoRole!=='admin')return;
+ try{
+  const name=rfNormaliseMovementDestination(new FormData(event.target).get('destination'));
+  if(rfMovementDestinations.some(item=>item.toLocaleLowerCase()===name.toLocaleLowerCase()))
+   throw Error('That destination already exists.');
+  rfSaveMovementDestinations([...rfMovementDestinations,name]);
+  adminMessage='Destination added: '+name+' (this browser only)';
+ }catch(error){adminMessage=error.message||'The destination could not be added.'}
+ render();
+},true);
+document.addEventListener('click',event=>{
+ const button=event.target.closest('[data-rf-remove-movement-destination]');
+ if(!button)return;
+ event.preventDefault();
+ event.stopImmediatePropagation();
+ if(demoRole!=='admin')return;
+ const name=button.getAttribute('data-rf-remove-movement-destination');
+ if(!rfMovementDestinations.includes(name))return;
+ if(rfMovementDestinations.length===1){
+  adminMessage='Keep at least one destination for new passes.';
+  render();return;
+ }
+ if(!confirm('Remove "'+name+'" from future student passes? Historical records will keep their original destination.'))return;
+ try{
+  rfSaveMovementDestinations(rfMovementDestinations.filter(item=>item!==name));
+  adminMessage='Destination removed: '+name+' (historical visits retained)';
+ }catch(error){adminMessage=error.message||'The destination could not be removed.'}
+ render();
+},true);
+
 function demoAdminContent(){
+ if(adminPage==='movements')return rfAdminMovementDestinationsPage();
  if(adminPage==='oneschool')return osImportPage();
  if(adminPage==='master')return osPublished()?osDatedContent(false):masterContent();
  if(adminPage==='classes')return demoPlanning();
@@ -1983,6 +2089,7 @@ setInterval(()=>{if(document.hidden||!osPublished()||osDate!==brisbaneToday()||!
 window.addEventListener('storage',e=>{if(e.key===OS_SIGNAL)osSync()});window.addEventListener('focus',()=>osSync());document.addEventListener('visibilitychange',()=>{if(!document.hidden)osSync()});
 const reliabilityStyle=document.createElement('style');reliabilityStyle.textContent='.rf-coverage{border-left:4px solid #b27718;background:#fff6df;color:#694b0b;padding:10px 13px;border-radius:5px;line-height:1.5}.mt-button:focus-visible,.mt-day:focus-visible,.rf-lookup:focus-visible,.v31-btn:focus-visible,.rf-sort:focus-visible{outline:3px solid #c88b22;outline-offset:2px}';document.head.appendChild(reliabilityStyle);
 
+const rfAdminDestinationStyle=document.createElement('style');rfAdminDestinationStyle.textContent="\n.rf-admin-destinations{max-width:880px}\n.rf-admin-destinations>p{color:#536977;margin:7px 0 17px}\n.rf-admin-destination-form{display:grid;gap:7px;margin:10px 0 20px}\n.rf-admin-destination-form>label{font-weight:750;color:#2f4754}\n.rf-admin-destination-add{display:flex;gap:10px;align-items:stretch;flex-wrap:wrap}\n.rf-admin-destination-add input{min-width:225px;max-width:430px;flex:1 1 240px;border:1px solid #aabbc5;border-radius:6px;padding:9px 11px;background:#fff;min-height:41px;color:#263d48}\n.rf-admin-destination-add button{min-height:41px}\n.rf-admin-destination-form small{font-size:11px;color:#687b85}\n.rf-admin-destination-list{border:1px solid #d7e1e6;border-radius:9px;background:#fff;overflow:hidden}\n.rf-admin-destination-list h3{font-size:14px;font-weight:800;padding:13px 15px;margin:0;background:#edf5f0;border-bottom:1px solid #d7e1e6}\n.rf-admin-destination-item{display:flex;align-items:center;justify-content:space-between;padding:10px 15px;border-top:1px solid #e9eeee;gap:12px}\n.rf-admin-destination-item:first-of-type{border-top:0}\n.rf-admin-destination-item strong{overflow-wrap:anywhere}\n.rf-admin-destination-item button{font-weight:700;min-width:88px}\n.rf-admin-destination-item button:disabled{opacity:.45}\n.rf-admin-destination-note{padding-top:8px;font-size:12px;line-height:1.5}\n@media(max-width:520px){.rf-admin-destination-add{flex-direction:column}.rf-admin-destination-add input{width:100%;max-width:none;flex:auto}.rf-admin-destination-add button{width:100%}}\n";document.head.appendChild(rfAdminDestinationStyle);
 render();
 })();
 </script></body></html>

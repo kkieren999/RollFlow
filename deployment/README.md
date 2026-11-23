@@ -1,3 +1,22 @@
+# Administrator-managed movement destinations — V3.6.7 offline demo
+
+The offline fictional browser UI shipped as `index.html` now provides
+**Student Movements → Manage movement destinations** in its demonstration
+administrator interface. Destinations may be added or removed (with
+validation, duplicate prevention, and at least one required option);
+the teacher demo uses the resulting list for new passes. Removing a
+destination preserves past movement logs and historical student filters.
+
+This is a browser-local demonstration feature, **not** a centrally
+managed Windows/Django school setting. It does not grant management
+permissions in the authenticated connected-school Django portal,
+which does not currently implement production student movement passes.
+The public demo's `admin / admin` is not secure authentication, and
+changes made on GitHub Pages do not travel automatically to a Windows
+installation. The updated offline demo must be bundled in a new,
+successfully tested Windows staging build and applied by an approved,
+backup-first manual upgrade; do not run First Setup on existing data.
+
 # Student Movements Example 1 — Windows bundle and GitHub Pages parity
 
 The **fictional browser-local Student Movements demo** in this branch's `index.html`
