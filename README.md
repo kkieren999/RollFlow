@@ -6,6 +6,24 @@ The **public browser-only demonstration** now accepts `swilliams / swilliams` in
 
 The two teacher demos have separate **browser-local** attendance and workspace storage keys. Signing out of Sarah Williams returns to the public login, and changing teacher reloads the demo identity to avoid sharing in-memory teacher state. This is **not real authentication**; credentials are public and any browser user can enter either identity. School planning preview and other shared fictional fixture data remain browser-local. No real school or Windows user credentials and no private PostgreSQL records are involved. GitHub Pages cannot log into or synchronise with a Windows school database.
 
+### Searchable movement timeline — Care class through Period 4
+
+Below **Movement log**, teachers can search the fictional student directory by
+name or ID and select a student. A read-only **Student movements by period**
+table shows movement departure and return details for the selected calendar
+date, grouped by the time the pass was issued. The five rows are **Care class
+(8:35–8:50 am)**, **Period 1 (9:00–10:10 am)**, **Period 2 (10:15–11:25 am)**,
+**Period 3 (11:30 am–12:40 pm)** and **Period 4 (1:20–2:30 pm)**. Rows
+without movements are left **empty**, and multiple movements within one period
+are retained. Movements outside these time windows are shown separately rather
+than dropped. Changing the date in the green Student Movements header updates
+this view; it does not display outstanding passes from other dates.
+
+The table uses only existing fictional demo records and browser-issued passes,
+does not invent visits or attendance marks, and does not alter pass actions or
+student records. This website feature is browser-local, not a centrally
+authorised student movement register, and does not install itself onto Windows.
+
 ### Administrator-managed Student Movement destinations (fictional demo)
 
 On the GitHub Pages demonstration, sign in as `admin / admin` and open

@@ -276,6 +276,93 @@ async function test() {
       'Historical dates must not allow new live movement passes');
     assert.match(await page.locator('#movementFeedback').innerText(), /selected/);
 
+    // A read-only student day template sits below the main movement log.
+    const studentDaySection = page.locator('.rf-day-review');
+    assert(await studentDaySection.isVisible());
+    assert(await page.locator('.rf-movement-log').evaluate(el =>
+      el.nextElementSibling?.classList.contains('rf-day-review') === true),
+      'Student day review must sit directly below Movement log');
+    assert.deepEqual(await page.locator('.rf-day-period-table tbody th strong').allInnerTexts(),
+      ['Care class','Period 1','Period 2','Period 3','Period 4']);
+    assert.equal(await page.locator('.rf-day-period-cell').count(), 5);
+    assert((await page.locator('.rf-day-period-cell').allInnerTexts()).every(text => text.trim() === ''),
+      'No student selected: all template cells must be visually blank');
+
+    await page.locator('#rf-day-student-search').fill('S18030');
+    assert.equal(await page.locator('[data-rf-day-student="S18030"]').count(), 1,
+      'The new search should offer matching student IDs');
+    await page.locator('#rf-day-student-search').press('Enter');
+    assert.match(await page.locator('.rf-day-selected-student').innerText(), /Daniel Murphy/);
+    assert((await page.locator('.rf-day-period-cell').allInnerTexts()).every(text => text.trim() === ''),
+      'A student with no movements must have five blank sessions');
+
+    const sampleInPeriodOne = samples.find(m => m.studentId === 'S7001' &&
+      m.date !== today && /^9:\d{2} am$/.test(m.time));
+    assert(sampleInPeriodOne, 'Expected a fictional Year 7 visit in Period 1');
+    await page.locator('#rf-movements-date').fill(sampleInPeriodOne.date);
+    await page.locator('#rf-movements-date').dispatchEvent('change');
+    assert.match(await page.locator('.rf-day-selected-student').innerText(), /Daniel Murphy/,
+      'Selecting another date should preserve the selected student');
+    assert((await page.locator('.rf-day-period-cell').allInnerTexts()).every(text => text.trim() === ''),
+      'The period view must filter on the selected date');
+    await page.locator('#rf-day-student-search').fill('S7001');
+    await page.locator('[data-rf-day-student="S7001"]').click();
+    const p1 = page.locator('[data-rf-day-period="p1"] .rf-day-period-cell');
+    assert.match(await p1.innerText(), new RegExp(sampleInPeriodOne.destination));
+    assert.match(await p1.innerText(), /Fictional sample/);
+    for (const periodId of ['care','p2','p3','p4']) {
+      assert.equal((await page.locator('[data-rf-day-period="' + periodId + '"] .rf-day-period-cell')
+        .innerText()).trim(), '', periodId + ' should remain blank without a visit');
+    }
+    await page.locator('#rf-movements-date').fill('2026-12-24');
+    await page.locator('#rf-movements-date').dispatchEvent('change');
+    assert.match(await page.locator('.rf-day-selected-student').innerText(), /S7001/);
+    assert((await page.locator('.rf-day-period-cell').allInnerTexts()).every(text => text.trim() === ''),
+      'The template must show no visits on a date without records');
+
+    // Simulate multiple completed visits on one school day in browser-only
+    // fictional attendance storage. This must never invent "present" marks.
+    await page.evaluate(() => {
+      const key = 'rollflow_teacher_swilliams_2026_v1';
+      const stored = JSON.parse(localStorage.getItem(key) || '{}');
+      const stamp = '2026-03-09';
+      const example = [
+        ['care', '8:40 am', 'Library', '8:46 am'],
+        ['p1-a', '9:15 am', 'Toilet', '9:21 am'],
+        ['p1-b', '9:42 am', 'Student services', '9:54 am'],
+        ['p4', '1:31 pm', 'School office', '1:44 pm'],
+        ['other', '3:05 pm', 'Library', '3:12 pm']
+      ].map(([id,time,destination,returnedAt]) => ({
+        id:'period-template-test-' + id,studentId:'S18030',
+        date:stamp,time,destination,returnedAt
+      }));
+      stored.movements=[...(stored.movements||[]),...example];
+      localStorage.setItem(key,JSON.stringify(stored));
+    });
+    await page.reload();
+    await page.locator('[data-nav="movements"]').first().click();
+    await page.locator('#rf-movements-date').fill('2026-03-09');
+    await page.locator('#rf-movements-date').dispatchEvent('change');
+    await page.locator('#rf-day-student-search').fill('S18030');
+    await page.locator('[data-rf-day-student="S18030"]').click();
+    assert.equal(await page.locator('[data-rf-day-period="care"] .rf-day-movement-entry').count(),1);
+    assert.equal(await page.locator('[data-rf-day-period="p1"] .rf-day-movement-entry').count(),2,
+      'Show multiple movements within the same period, not just the first');
+    assert.equal(await page.locator('[data-rf-day-period="p2"] .rf-day-movement-entry').count(),0);
+    assert.equal(await page.locator('[data-rf-day-period="p3"] .rf-day-movement-entry').count(),0);
+    assert.equal(await page.locator('[data-rf-day-period="p4"] .rf-day-movement-entry').count(),1);
+    assert.match(await page.locator('.rf-day-outside-periods').innerText(), /3:05 pm/,
+      'Keep movements outside Care–Period 4 visible without misclassifying them');
+    assert.match(await page.locator('[data-rf-day-period="p1"]').innerText(), /9:15 am.*Toilet|Toilet.*9:15 am/s);
+    await page.locator('#rf-movements-date').fill('2026-03-10');
+    await page.locator('#rf-movements-date').dispatchEvent('change');
+    assert((await page.locator('.rf-day-period-cell').allInnerTexts()).every(text => text.trim() === ''),
+      'Movements from a different date must not appear in this day template');
+    await page.locator('[data-rf-day-clear]').click();
+    assert.equal(await page.locator('#rf-day-student-search').inputValue(),'');
+    assert((await page.locator('.rf-day-period-cell').allInnerTexts()).every(text => text.trim() === ''),
+      'Clearing the selected student must return to an empty day template');
+
     // The app must use distinct attendance and workspace stores.
     const keys = await page.evaluate(() => Object.keys(localStorage));
     assert(keys.some(key => key.startsWith('rollflow_workspace_swilliams_')),

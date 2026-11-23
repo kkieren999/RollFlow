@@ -569,6 +569,152 @@ function rfMovementEntriesForDate() {
   return [...issued, ...examples];
 }
 
+// Read-only student day review; the editable movement/pass log above is
+// unchanged. A blank session cell means no movement started in that session.
+const RF_MOVEMENT_DAY_PERIODS=[
+ {id:'care',label:'Care class',time:'8:35–8:50 am',start:8*60+35,end:8*60+50},
+ {id:'p1',label:'Period 1',time:'9:00–10:10 am',start:9*60,end:10*60+10},
+ {id:'p2',label:'Period 2',time:'10:15–11:25 am',start:10*60+15,end:11*60+25},
+ {id:'p3',label:'Period 3',time:'11:30 am–12:40 pm',start:11*60+30,end:12*60+40},
+ {id:'p4',label:'Period 4',time:'1:20–2:30 pm',start:13*60+20,end:14*60+30}
+];
+let rfDayStudentId='',rfDayStudentSearch='',rfDayStudentHighlight=0;
+function rfDayMovementMinutes(text){
+ const match=/^(\d{1,2}):([0-5]\d)\s*(am|pm)?$/i.exec(String(text||'').trim());
+ if(!match)return null;
+ let hour=Number(match[1]),minute=Number(match[2]);
+ if(match[3]){
+  if(hour<1||hour>12)return null;
+  hour=hour%12+(match[3].toLowerCase()==='pm'?12:0);
+ }else if(hour>23)return null;
+ return hour*60+minute;
+}
+function rfDayMovementPeriod(item){
+ const minute=rfDayMovementMinutes(item.time);
+ return RF_MOVEMENT_DAY_PERIODS.find(period=>minute!==null&&minute>=period.start&&minute<=period.end)?.id||'other';
+}
+function rfDayMovementStudents(){
+ const query=rfDayStudentSearch.trim().toLocaleLowerCase();
+ return query&&!rfDayStudentId
+  ?people.filter(person=>person.name.toLocaleLowerCase().includes(query)||
+     person.id.toLocaleLowerCase().includes(query)).slice(0,8)
+  :[];
+}
+function rfDayStudentOptions(){
+ return rfDayMovementStudents().map((student,index)=>
+  `<button type="button" role="option" id="rf-day-option-${index}"
+   aria-selected="${index===rfDayStudentHighlight}" class="rf-day-student-option ${index===rfDayStudentHighlight?'selected':''}"
+   data-rf-day-student="${esc(student.id)}"><strong>${esc(student.name)}</strong><span>Year ${student.year} · ${esc(student.id)}</span></button>`
+ ).join('');
+}
+function rfDayStudentMovements(){
+ if(!rfDayStudentId)return [];
+ // Strictly the selected date, unlike the main activity log which additionally
+ // shows outstanding passes from earlier days when viewing today.
+ const entries=[
+  ...state.movements.filter(item=>item.studentId===rfDayStudentId&&item.date===state.date),
+  ...(Array.isArray(workspace.sampleMovementHistory)?workspace.sampleMovementHistory:[])
+    .filter(item=>item.sample&&item.studentId===rfDayStudentId&&item.date===state.date)
+ ];
+ return entries.sort((a,b)=>(rfDayMovementMinutes(a.time)??9999)-
+                           (rfDayMovementMinutes(b.time)??9999));
+}
+function rfDayMovementChip(item){
+ const duration=item.sample?item.minutes:movementDuration(item);
+ return `<div class="rf-day-movement-entry">
+  <strong>${esc(item.destination||'Destination not recorded')}</strong>
+  <span>${esc(item.time||'Time not recorded')} · ${item.returnedAt?'Returned '+esc(item.returnedAt):'Currently out'}${duration===null||duration===undefined?'':' · '+duration+' min'}</span>
+  ${item.sample?'<small>Fictional sample</small>':''}
+ </div>`;
+}
+function rfDayStudentPeriodTable(){
+ const person=getPerson(rfDayStudentId);
+ const records=rfDayStudentMovements();
+ const rows=RF_MOVEMENT_DAY_PERIODS.map(period=>{
+  const movements=records.filter(item=>rfDayMovementPeriod(item)===period.id);
+  return `<tr data-rf-day-period="${period.id}">
+   <th scope="row"><strong>${period.label}</strong><small>${period.time}</small></th>
+   <td class="rf-day-period-cell">${movements.map(rfDayMovementChip).join('')}</td>
+  </tr>`;
+ }).join('');
+ const outside=records.filter(item=>rfDayMovementPeriod(item)==='other');
+ return `${person?`<p class="rf-day-selected-student"><strong>${esc(person.name)}</strong> · Year ${person.year} · ${esc(person.id)} · ${esc(niceDate())}</p>`:''}
+ <div class="rf-day-period-table-wrap">
+  <table class="rf-day-period-table" aria-label="Student movement by Care class and periods 1 to 4">
+   <thead><tr><th scope="col">Session</th><th scope="col">Movements</th></tr></thead>
+   <tbody>${rows}</tbody>
+  </table>
+ </div>
+ ${outside.length?`<div class="rf-day-outside-periods">
+  <strong>Movement outside Care class–Period 4</strong>
+  ${outside.map(rfDayMovementChip).join('')}
+ </div>`:''}`;
+}
+function rfDayStudentReview(){
+ return `<section class="sheet rf-day-review" aria-labelledby="rf-day-review-title">
+  <div class="rf-day-review-header">
+   <h2 id="rf-day-review-title">Student movements by period</h2>
+   <p>Find a student to view their movements on ${esc(niceDate())}, grouped by departure time. Sessions without a movement are blank.</p>
+  </div>
+  <div class="rf-day-student-search">
+   <label for="rf-day-student-search">Search student by name or ID</label>
+   <div class="rf-day-student-input-row">
+    <div class="rf-day-student-combo">
+     <input id="rf-day-student-search" type="search" role="combobox"
+      aria-autocomplete="list" aria-controls="rf-day-student-options"
+      aria-expanded="${rfDayStudentStudentsVisible()}" autocomplete="off"
+      placeholder="Search a student…" value="${esc(rfDayStudentSearch)}">
+     <div id="rf-day-student-options" class="rf-day-student-options" role="listbox">${rfDayStudentOptions()}</div>
+    </div>
+    <button type="button" class="btn rf-day-student-clear" data-rf-day-clear
+      ${rfDayStudentId||rfDayStudentSearch?'':'disabled'}>Clear</button>
+   </div>
+  </div>
+  <div id="rf-day-period-result">${rfDayStudentPeriodTable()}</div>
+ </section>`;
+}
+function rfDayStudentStudentsVisible(){return rfDayMovementStudents().length>0}
+function rfDayStudentRefresh(){
+ const options=document.getElementById('rf-day-student-options');
+ const query=document.getElementById('rf-day-student-search');
+ const result=document.getElementById('rf-day-period-result');
+ if(options)options.innerHTML=rfDayStudentOptions();
+ if(query)query.setAttribute('aria-expanded',String(rfDayStudentStudentsVisible()));
+ if(result)result.innerHTML=rfDayStudentPeriodTable();
+ const clear=document.querySelector('[data-rf-day-clear]');
+ if(clear)clear.disabled=!rfDayStudentId&&!rfDayStudentSearch;
+}
+function rfDayStudentSelect(id){
+ const student=getPerson(id);if(!student)return;
+ rfDayStudentId=student.id;rfDayStudentSearch=student.name;
+ rfDayStudentHighlight=0;
+ render();
+}
+document.addEventListener('input',event=>{
+ if(event.target?.id!=='rf-day-student-search')return;
+ rfDayStudentSearch=event.target.value;rfDayStudentId='';
+ rfDayStudentHighlight=0;rfDayStudentRefresh();
+});
+document.addEventListener('keydown',event=>{
+ if(event.target?.id!=='rf-day-student-search')return;
+ const matches=rfDayMovementStudents();
+ if(event.key==='Escape'){rfDayStudentHighlight=0;rfDayStudentRefresh();return}
+ if(!matches.length)return;
+ if(event.key==='ArrowDown'||event.key==='ArrowUp'){
+  event.preventDefault();
+  rfDayStudentHighlight=(rfDayStudentHighlight+(event.key==='ArrowDown'?1:matches.length-1))%matches.length;
+  rfDayStudentRefresh();
+ }else if(event.key==='Enter'){
+  event.preventDefault();rfDayStudentSelect(matches[rfDayStudentHighlight]?.id);
+ }
+});
+document.addEventListener('click',event=>{
+ const choice=event.target.closest('[data-rf-day-student]');
+ if(choice){event.preventDefault();rfDayStudentSelect(choice.dataset.rfDayStudent);return}
+ const clear=event.target.closest('[data-rf-day-clear]');
+ if(clear){event.preventDefault();rfDayStudentId='';rfDayStudentSearch='';rfDayStudentHighlight=0;render()}
+});
+
 function movementRows() {
   const visible = rfMovementEntriesForDate().filter(m =>
     rfMovementListFilter === 'all' ||
@@ -735,6 +881,8 @@ function movementsPage() {
       </div>
       ${movementRows()}
     </section>
+
+    ${rfDayStudentReview()}
 
     <p class="rf-movement-demo-note">Demo · Fictional student records are saved in this browser only.</p>
   </div>`;
@@ -985,6 +1133,7 @@ body[data-theme="Dark"] .rf-movement-stat span { color: #f2f7fa; }
 }
 `;
 document.head.appendChild(rfMovementExample1Style);
+const rfDayReviewStyle=document.createElement('style');rfDayReviewStyle.textContent="\n.rf-day-review{background:#fff;border:1px solid #d5e2e4;border-radius:11px;padding:20px;overflow:visible}\n.rf-day-review-header h2{margin:0 0 5px;color:#203844;font-size:20px;font-weight:800}\n.rf-day-review-header p{color:#607482;margin:0;font-size:12px;line-height:1.55}\n.rf-day-student-search{margin:17px 0 15px;max-width:620px}\n.rf-day-student-search>label{display:block;color:#40596a;font-size:12px;font-weight:750;margin-bottom:6px}\n.rf-day-student-input-row{display:flex;align-items:flex-start;gap:10px}\n.rf-day-student-combo{position:relative;flex:1;min-width:0}\n.rf-day-student-combo input{height:41px;width:100%;border:1px solid #b7cbd0;border-radius:7px;background:#fff;color:#253b48;padding:9px 12px;font-size:13px}\n.rf-day-student-clear{height:41px;min-width:74px;border-radius:7px}\n.rf-day-student-options{position:absolute;z-index:31;left:0;right:0;top:calc(100% + 4px);max-height:250px;overflow:auto;box-shadow:0 5px 20px #1b35432c;background:#fff;border-radius:7px}\n.rf-day-student-options:empty{display:none}\n.rf-day-student-option{display:flex;flex-direction:column;align-items:flex-start;width:100%;background:#fff;border:0;border-bottom:1px solid #e1e9ec;cursor:pointer;text-align:left;padding:10px 12px;color:#203844;gap:3px}\n.rf-day-student-option.selected,.rf-day-student-option:hover{background:#eaf4ee}\n.rf-day-student-option span{font-size:11px;color:#607781}\n.rf-day-selected-student{padding:11px 13px;background:#eaf5ee;color:#284b38;border-radius:7px;margin:0 0 12px;font-size:13px}\n.rf-day-period-table-wrap{width:100%;overflow-x:auto}\n.rf-day-period-table{width:100%;border-collapse:collapse;table-layout:fixed;text-align:left;font-size:13px}\n.rf-day-period-table thead{background:#e9f0f3;color:#314a58}\n.rf-day-period-table th,.rf-day-period-table td{padding:12px 14px;border:1px solid #dce6e9;vertical-align:top}\n.rf-day-period-table thead th:first-child,.rf-day-period-table tbody th{width:175px}\n.rf-day-period-table tbody th{font-weight:750;color:#273e4a;background:#f7fafb}\n.rf-day-period-table tbody th strong,.rf-day-period-table tbody th small{display:block}\n.rf-day-period-table tbody th small{font-size:11px;color:#6a808c;font-weight:500;margin-top:4px}\n.rf-day-period-cell{min-height:48px;background:#fff}\n.rf-day-movement-entry{display:flex;flex-wrap:wrap;align-items:center;gap:4px 13px;padding:8px 11px;background:#f1f8f4;border-left:3px solid #17824b;border-radius:5px;margin-bottom:6px;overflow-wrap:anywhere}\n.rf-day-movement-entry:last-child{margin-bottom:0}\n.rf-day-movement-entry>strong{color:#183e2b;font-size:13px}\n.rf-day-movement-entry>span{color:#3c5866;font-size:12px}\n.rf-day-movement-entry>small{color:#55776a;font-size:10px}\n.rf-day-outside-periods{border-top:1px solid #dce6e9;margin-top:13px;padding-top:12px;color:#455b68}\n.rf-day-outside-periods>strong{display:block;margin-bottom:7px}\nbody[data-theme=\"Dark\"] .rf-day-review{background:#203744;border-color:#49616e;color:#f0f7f9}\nbody[data-theme=\"Dark\"] .rf-day-review-header h2{color:#fff}\nbody[data-theme=\"Dark\"] .rf-day-period-table tbody th{background:#263e4b;color:#e9f4f9}\nbody[data-theme=\"Dark\"] .rf-day-period-cell{background:#203744}\nbody[data-theme=\"Dark\"] .rf-day-period-table th,body[data-theme=\"Dark\"] .rf-day-period-table td{border-color:#4a6370}\n@media(max-width:600px){.rf-day-review{padding:13px}.rf-day-period-table thead th:first-child,.rf-day-period-table tbody th{width:119px}.rf-day-period-table th,.rf-day-period-table td{padding:9px}.rf-day-period-table tbody th small{font-size:10px}.rf-day-student-input-row{gap:6px}}\n";document.head.appendChild(rfDayReviewStyle);
 
 const noticeData=[{id:'notice-1',title:'School timetable changes',type:'Timetable',body:'Check your assigned rooms and class changes before taking each roll.'},{id:'notice-2',title:'Friday excursion attendance',type:'Activities',body:'Check school instructions for students attending an approved excursion.'},{id:'notice-3',title:'Roll certification reminder',type:'Attendance',body:'Check each student’s attendance before saving the class roll.'}];
 function alertsPage(){const pending=scheduledClassesFor(state.date).filter(c=>!isSubmitted(c.id));const notices=noticeData.map(n=>`<div class="notice-row ${state.readNotices.includes(n.id)?'read':''}"><span class="notice-dot"></span><div><div class="notice-category">${esc(n.type)}</div><strong>${esc(n.title)}</strong><p>${esc(n.body)}</p></div><button class="btn small" data-action="toggleNotice" data-notice="${n.id}">${state.readNotices.includes(n.id)?'Mark unread':'Mark read'}</button></div>`).join('');const body=`<div class="section-intro"><h2>Messages relevant to your classes</h2><p>Timetable, activity and attendance reminders.</p></div><section class="sheet"><div class="sheet-head"><span>ROLL REMINDERS</span><span class="quiet">${pending.length} awaiting submission</span></div>${pending.length?pending.map(c=>`<div class="simple-row"><div><strong>${esc(c.period)} · ${esc(c.id)} — ${esc(c.name)}</strong><span>${classCounts(c)['?']} students unmarked · Room ${esc(c.room)}</span></div><button class="btn small" data-open="${c.id}">Open roll ›</button></div>`).join(''):'<div class="empty-state">All scheduled rolls have been submitted.</div>'}</section><section class="sheet notices"><div class="sheet-head">NOTICES</div>${notices}</section>`;return shell(body,'Alerts & Notices','Teacher alerts and reminders','')}
