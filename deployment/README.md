@@ -39,6 +39,8 @@ movements feature and a separately approved Windows update mechanism would be
 required for automatic multi-device parity. Never commit school data or private
 archives to the public GitHub repository.
 
+**Student Movements cleanup (fictional demo):** The V3.6.7 offline fallback demo now matches GitHub Pages: it no longer inserts **Daily Service Usage**, **Students Using Each Service**, or **Visits to Each Service** above the dashboard. The earlier 6–10 visits-for-every-student generated history is replaced by a smaller set of 18 selected fictional students with varying levels of completed visits, including frequent users (10–15), occasional users (3–6) and infrequent users (1–2). These show as clearly labeled **Fictional sample** in the dashboard log and in student histories. Existing browser-issued passes and unrecognised user-modified history are not overwritten. The connected-school Django installation remains separate, and updating source does **not** update an installed Windows instance automatically.
+
 # V3.6.7 — Unified Teacher & Administration Interface (draft staging)
 
 This is a UI-only update on top of V3.6.6: shared offline design tokens,
