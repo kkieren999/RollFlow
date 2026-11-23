@@ -2,7 +2,7 @@ name: Public Pages demo login smoke
 
 on:
   push:
-    branches: [feature/pages-demo-swilliams-login, main]
+    branches: [main, 'feature/**']
     paths:
       - 'index.html'
       - 'tests/pages-demo-login-smoke.cjs'

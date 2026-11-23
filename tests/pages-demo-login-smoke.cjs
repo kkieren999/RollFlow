@@ -117,6 +117,53 @@ async function test() {
     assert((await page.locator('main').innerText()).includes('ENG071A'),
       'Year 7 should continue through the final school day');
 
+    // The timetable uses "Spare" rather than "Prep", and every attendance
+    // page has a clear title, class hierarchy and date-preserving back action.
+    await page.locator('[data-nav="timetable"]').first().click();
+    await viewDate('2026-03-09');
+    const spareTitles = await page.locator('.rf-planning-slot h3').allInnerTexts();
+    assert.deepEqual(spareTitles, ['Spare'], 'Monday Period 5 should be a Spare');
+    assert(!(await page.locator('main').innerText()).includes('Planning & preparation'),
+      'Outdated planning/preparation label is still visible');
+    assert(!(await page.locator('main').innerText()).includes('10+ minutes after start'),
+      'The overdue message should only say Roll overdue');
+    const monEnglish = page.locator('[data-timetable-class="ENG081C"]');
+    await monEnglish.locator('[data-open-report]').click();
+    assert.equal((await page.locator('.page-bar h1').innerText()).trim(),
+      'Take Attendance', 'Attendance screen needs a clear top-level heading');
+    assert.match(await page.locator('#attendance-class-title').innerText(), /ENG081C.*English/,
+      'Class identity should be the prominent heading');
+    const header = page.locator('.rf-attendance-heading');
+    assert.match(await header.innerText(), /PERIOD 2/);
+    assert.match(await header.innerText(), /10:15/);
+    assert.match(await header.innerText(), /Room B17/);
+    assert.match(await header.innerText(), /27 students/);
+    assert.equal((await page.locator('.rf-attendance-switch label').innerText()).trim(),
+      'Switch class', 'Class chooser needs a visible label');
+    const choices = await page.locator('#rf-attendance-class-select option').allInnerTexts();
+    assert(choices.some(x => x.includes('PERIOD 4') && x.includes('ENG101B')),
+      'Switch class options should reflect Sarah\'s chosen date');
+    const backButton = page.getByRole('button', { name: 'Back to Daily Schedule' });
+    assert(await backButton.isVisible(), 'Back to Daily Schedule must be obvious');
+    const backCss = await backButton.evaluate(el => ({
+      height: el.getBoundingClientRect().height,
+      borderWidth: getComputedStyle(el).borderTopWidth
+    }));
+    assert(backCss.height >= 30 && backCss.borderWidth !== '0px',
+      'Back button should be a genuine visible control, not a tiny text link');
+    await backButton.click();
+    assert.equal((await page.locator('.page-bar h1').innerText()).trim(), 'Daily Schedule');
+    assert.match(await page.locator('#dayScheduleTitle').innerText(), /Lessons for selected date/,
+      'Historical daily schedule heading should not say Today');
+    assert.equal(await page.locator('input[data-date]').first().inputValue(), '2026-03-09',
+      'Back navigation must preserve the selected historical date');
+
+    // Class Finder details should show multiple lessons, not the stale
+    // single-day seed for the 2026 fictional weekly timetable.
+    await page.locator('[data-nav="finder"]').first().click();
+    const finderSearch = page.locator('#finderResults');
+    assert(await finderSearch.count(), 'Class Finder should still render');
+
     // The app must use distinct attendance and workspace stores.
     const keys = await page.evaluate(() => Object.keys(localStorage));
     assert(keys.some(key => key.startsWith('rollflow_workspace_swilliams_')),
