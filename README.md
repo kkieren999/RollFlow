@@ -6,6 +6,22 @@ The **public browser-only demonstration** now accepts `swilliams / swilliams` in
 
 The two teacher demos have separate **browser-local** attendance and workspace storage keys. Signing out of Sarah Williams returns to the public login, and changing teacher reloads the demo identity to avoid sharing in-memory teacher state. This is **not real authentication**; credentials are public and any browser user can enter either identity. School planning preview and other shared fictional fixture data remain browser-local. No real school or Windows user credentials and no private PostgreSQL records are involved. GitHub Pages cannot log into or synchronise with a Windows school database.
 
+### Sarah Williams's fictional 2026 timetable
+
+The browser demo generates Sarah Williams's schedule **for any selected 2026 school date**, including past school dates. It is a *fictional weekly template*, not a copy of OneSchool or a timetable synced from Windows. It repeats throughout the Queensland term dates below; there is no data upload or migration. The existing Sarah-specific local attendance and preferences are retained.
+
+| Day | Home group 8:35–8:50 | P1 9:00–10:10 | P2 10:15–11:25 | P3 11:30–12:40 | P4 1:20–2:30 | P5 2:35–3:10 |
+|---|---|---|---|---|---|---|
+| Mon | 10BH · G05 | ENG071A · B14 | ENG081C · B17 | ENG091B · B14 | ENG101B · B13 | Preparation |
+| Tue | 10BH · G05 | ENG101C · B18 | ENG071A · B14 | ENG081C · B17 | Preparation | ENG091B · B14 |
+| Wed | 10BH · G05 | ENG091B · B14 | ENG101B · B13 | ENG101C · B18 | ENG081C · B17 | Preparation |
+| Thu | 10BH · G05 | ENG101B · B13 | ENG091B · B14 | Preparation | ENG071A · B14 | ENG101C · B18 |
+| Fri | 10BH · G05 | ENG081C · B17 | ENG101C · B18 | ENG071A · B14 | ENG101B · B13 | Preparation |
+
+Classes are Year 7 (\`ENG071A\`), Year 8 (\`ENG081C\`), Year 9 (\`ENG091B\`), Year 10 (\`ENG101B\` and \`ENG101C\`), and Year 10B home group (\`10BH\`). Each English class meets on four separate weekdays; no periods overlap. Preps appear in **My Timetable**, but have no roll to submit.
+
+**Queensland 2026 state school terms (student dates):** 27 Jan–2 Apr, 20 Apr–26 Jun, 13 Jul–18 Sep and 6 Oct–11 Dec (see [Department of Education](https://education.qld.gov.au/about-us/calendar/term-dates)). Saturdays, Sundays, term holidays, the statewide Labour Day holiday (4 May), Brisbane's Ekka show holiday (12 Aug) and the student-free development day (4 Sep) have no scheduled lessons. Year 10 student lessons and the Year 10B home group end after **27 November 2026**; Years 7–9 lessons continue until **11 December**. The timetable is deliberately scoped to 2026, not a real school's roster.
+
 ## V3.4.4 — Import reliability and timetable bug fixes
 
 Browser import fingerprints are based on the original decoded CSV content, not masked timetable structure. Only the fingerprint and masked schedule are stored. Exact repeated source text reuses a version; changed source text (including row order or duplicate rows) creates a new version. Existing V3.4.2/3 versions remain intact; the first reimport under V3.4.4 may create a new version. The original file is not stored or uploaded. Use approved data only; masking is not a guarantee of anonymity.
