@@ -1,3 +1,44 @@
+# Student Movements Example 1 — Windows bundle and GitHub Pages parity
+
+The **fictional browser-local Student Movements demo** in this branch's `index.html`
+now has the same Example 1 compact dashboard as GitHub Pages, including the
+three movement counters, student search, destinations, Issue pass, duration,
+Returned actions and the All / Currently out / Returned filter. Source parity
+does **not** imply installed-app parity or shared data.
+
+**What Windows actually runs:** `deployment/build_windows.py` includes
+`index.html` in the offline bundle. The protected Django `/teacher/` route
+renders that demo only for eligible teachers with **no connected publication**.
+When a connected timetable is active, teachers are redirected to the
+independent Django timetable and roster views; those do not yet have a
+production student-movements backend or this demo page. Do not use a browser
+demo to record real student movements.
+
+**A GitHub push does not update a user's existing Windows installation.**
+To apply this source change to the offline staging bundle, obtain a **new
+tested V3.6.7 Windows-x64 STAGING artifact** built from the updated
+`feature/v3.6.7-unified-ui` branch. Confirm the artifact's workflow completed
+successfully. On the machine, with appropriate IT authorisation:
+
+1. Stop RollFlow first; back up the local staging instance and any data.
+2. Extract the *new* bundle to a **separate directory**, keeping the previous
+   directory because the PostgreSQL configuration may refer to its runtime.
+3. Run `Upgrade Existing.cmd` from the new bundle. It creates a private
+   backup and checks migrations. **Never use First Setup.cmd on an existing
+   instance.**
+4. Start with `Start RollFlow.cmd`; test the protected login and existing
+   timetable in the new bundle on the isolated staging port `18085`.
+5. If needed, roll back only according to your authorised restore procedure;
+   do not overwrite or delete the prior PostgreSQL runtime directory.
+
+The staging database under
+`%LOCALAPPDATA%\\RollFlow-V3641-Staging` is **not** the website's localStorage.
+No school records, credentials, timetable allocations or data synchronisation
+are transferred by this visual update. A secure shared backend, authenticated
+movements feature and a separately approved Windows update mechanism would be
+required for automatic multi-device parity. Never commit school data or private
+archives to the public GitHub repository.
+
 # V3.6.7 — Unified Teacher & Administration Interface (draft staging)
 
 This is a UI-only update on top of V3.6.6: shared offline design tokens,
