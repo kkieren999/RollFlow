@@ -1,3 +1,20 @@
+# Recording services in the student day template (offline demo)
+
+The V3.6.7 Windows staging **fictional browser fallback** now uses the same
+movement log as its searchable student day template. When an example student
+uses a service, the template displays the destination, departure/return
+status and duration under Care class or the correct Period 1–4 based on
+the recorded Brisbane time. New passes also store a session identifier for
+consistent grouping. The Movement log provides a **View in template** control
+that opens the matching student and date; names of students with recorded
+visits on that date are also offered as shortcuts. No-visit period cells
+remain blank, and records outside the five periods remain visible.
+
+The feature changes only offline demo UI and browser-local fictional passes.
+The authenticated Django/Windows connected-school system does not share this
+data or receive this new template automatically. Installing an approved
+Windows staging build requires backup-first manual upgrade instructions below.
+
 # Student movements by period — Windows offline demo
 
 The fictional browser-based fallback teacher UI packaged in the Windows
