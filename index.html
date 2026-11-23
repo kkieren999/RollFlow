@@ -404,8 +404,453 @@ function clearFinder(){state.finder={query:'',year:'all',subject:'all',day:'all'
 
 function studentRows(){const q=state.studentQuery.trim().toLowerCase();const myIds=new Set(classes.flatMap(c=>c.ids));const matches=people.filter(p=>myIds.has(p.id)&&(!q||p.name.toLowerCase().includes(q)||p.id.toLowerCase().includes(q)));return `<div class="directory-count">${matches.length} student${matches.length===1?'':'s'} found</div>${matches.map(p=>`<div class="student-result"><img src="${photo(p)}" alt=""><div><strong>${esc(p.name)}</strong><span>Year ${p.year} · ${esc(p.id)} · ${classes.filter(c=>c.ids.includes(p.id)).map(c=>c.id).join(', ')}</span></div><button class="btn small" data-open-student="${p.id}">Student details ›</button></div>`).join('')||'<div class="empty-state">No students match your search.</div>'}`}
 function studentSearchPage(){const body=`<div class="section-intro"><h2>Find a student</h2><p>Search students in your assigned classes.</p></div><section class="sheet"><div class="sheet-head">STUDENT DIRECTORY</div><div class="directory-input"><label for="studentQuery">Student name or ID</label><input type="search" id="studentQuery" placeholder="Search by name or student ID" value="${esc(state.studentQuery)}" autocomplete="off"></div><div id="studentResults">${studentRows()}</div></section>`;return shell(body,'Student Search','Assigned student directory','')}
-function movementRows(){const current=state.movements.filter(m=>!state.date||m.date===state.date||(!m.returnedAt&&state.date===brisbaneToday())).slice().reverse();if(!current.length)return '<div class="empty-state">No student movements have been recorded for this date.</div>';return `<div class="movements-table-wrap"><table class="schedule-table"><thead><tr><th>STUDENT</th><th>DESTINATION</th><th>TIME OUT</th><th>STATUS</th><th></th></tr></thead><tbody>${current.map(m=>{const p=getPerson(m.studentId);return `<tr><td><strong>${esc(p?.name||'Student')}</strong></td><td>${esc(m.destination)}</td><td>${esc(m.time)}<div class="sub-cell">${esc(m.date)}</div><div class="sub-cell" data-movement-duration="${esc(m.id)}">${movementDuration(m)===null?'Duration not recorded':movementDuration(m)+' min'}</div></td><td>${m.returnedAt?'<span class="tag done">Returned</span>':'<span class="tag todo">Out</span>'}</td><td style="text-align:right">${m.returnedAt?`<span class="muted-small">${esc(m.returnedAt)}</span>`:`<button class="btn small" data-action="returnMovement" data-movement="${esc(m.id)}">Mark returned</button>`}</td></tr>`}).join('')}</tbody></table></div>`}
-function movementsPage(){const body=`<div class="section-intro"><h2>Student passes and movements</h2><p>Record a student leaving your class and confirm their return.</p></div><section class="sheet"><div class="sheet-head">RECORD A MOVEMENT</div><div class="movement-form"><label class="movement-student-field" for="movementStudentSearch">Search student by name or ID<div class="movement-search-wrap"><input id="movementStudentSearch" type="search" role="combobox" aria-controls="movementSuggestions" aria-autocomplete="list" aria-expanded="false" autocomplete="off" placeholder="Type a student's name..." value="${esc(state.movementQuery)}"><input id="movementStudent" type="hidden" value="${esc(state.movementStudentId)}"><div id="movementSuggestions" class="movement-suggestions" role="listbox"></div></div><div id="movementFeedback" class="movement-feedback ${state.movementStudentId?'confirmed':''}">${state.movementStudentId?'✓ '+esc(getPerson(state.movementStudentId)?.name||'')+' selected':'Search and select a student to issue a pass'}</div></label><label>Destination<select id="movementDestination" class="field-select"><option>Toilet</option><option>Student services</option><option>School office</option><option>Library</option></select></label><button id="movementIssueButton" class="btn green" data-action="issueMovement" ${state.movementStudentId?'':'disabled'}>Issue pass</button></div></section><section class="sheet movements-list"><div class="sheet-head"><span>MOVEMENTS · ${niceDate().toUpperCase()}</span><span class="quiet">${state.movements.filter(m=>m.date===state.date).length} recorded</span></div>${movementRows()}</section>`;return shell(body,'Student Movements','Passes and movement tracking',`<label class="date-filter">Date <input type="date" class="field-date" data-date value="${state.date}"></label>`)}
+/*
+ * RollFlow — Student Movements, Example 1 (Compact Dashboard)
+ * Drop-in replacement for movementRows() and movementsPage() in index.html.
+ * Paste this whole block IN PLACE OF those two existing functions, inside
+ * RollFlow's existing <script> closure.
+ *
+ * This uses existing helpers, state and action handling:
+ * state.movements, state.date, state.movementQuery, state.movementStudentId,
+ * getPerson(), photo(), movementDuration(), niceDate(), brisbaneToday(),
+ * esc(), shell(), render(), refreshMovementSuggestions(), and data-action
+ * issueMovement/returnMovement. It adds only a local status-filter handler.
+ *
+ * Demo records remain local to the user's browser; no backend is added.
+ */
+
+let rfMovementListFilter = 'all';
+
+function rfMovementEntriesForDate() {
+  // Preserve RollFlow's existing behaviour: when reviewing today, active
+  // passes from earlier dates remain visible until they are returned.
+  return state.movements
+    .filter(m => m.date === state.date ||
+      (state.date === brisbaneToday() && !m.returnedAt))
+    .slice()
+    .reverse();
+}
+
+function movementRows() {
+  const visible = rfMovementEntriesForDate().filter(m =>
+    rfMovementListFilter === 'all' ||
+    (rfMovementListFilter === 'out' && !m.returnedAt) ||
+    (rfMovementListFilter === 'returned' && !!m.returnedAt)
+  );
+
+  if (!visible.length) {
+    return `<div class="rf-movement-empty">
+      No ${rfMovementListFilter === 'out' ? 'active passes' :
+        rfMovementListFilter === 'returned' ? 'returned passes' : 'student movements'}
+      to show for this date.
+    </div>`;
+  }
+
+  return `<div class="rf-movement-table-wrap">
+    <table class="rf-movement-table" aria-label="Student movement log">
+      <thead>
+        <tr>
+          <th scope="col">Student</th>
+          <th scope="col">Destination</th>
+          <th scope="col">Time out</th>
+          <th scope="col">Duration</th>
+          <th scope="col">Status</th>
+          <th scope="col">Action</th>
+        </tr>
+      </thead>
+      <tbody>${visible.map(m => {
+        const student = getPerson(m.studentId);
+        const name = student?.name || 'Student';
+        const duration = movementDuration(m);
+        const avatar = student
+          ? `<img src="${photo(student)}" alt="" class="rf-movement-avatar">`
+          : `<span class="rf-movement-avatar rf-movement-avatar-empty" aria-hidden="true">?</span>`;
+
+        return `<tr>
+          <td>
+            <div class="rf-movement-student">
+              ${avatar}
+              <div>
+                <strong>${esc(name)}</strong>
+                <small>${esc(student?.id || m.studentId || '')}</small>
+              </div>
+            </div>
+          </td>
+          <td>${esc(m.destination)}</td>
+          <td>
+            <strong>${esc(m.time)}</strong>
+            <small class="rf-movement-subtext">${esc(m.date)}</small>
+          </td>
+          <td>
+            <span data-movement-duration="${esc(m.id)}">
+              ${duration === null ? 'Duration not recorded' : duration + ' min'}
+            </span>
+          </td>
+          <td>
+            <span class="rf-movement-status ${m.returnedAt ? 'is-returned' : 'is-out'}">
+              ${m.returnedAt ? '✓ Returned' : '● Out'}
+            </span>
+          </td>
+          <td>
+            ${m.returnedAt
+              ? `<span class="rf-movement-return-time">Returned ${esc(m.returnedAt)}</span>`
+              : `<button type="button" class="rf-movement-return-button"
+                   data-action="returnMovement" data-movement="${esc(m.id)}">
+                   ✓ Mark returned
+                 </button>`}
+          </td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>
+  </div>`;
+}
+
+function movementsPage() {
+  const entries = rfMovementEntriesForDate();
+  const outCount = entries.filter(m => !m.returnedAt).length;
+  const returnedCount = entries.filter(m => !!m.returnedAt).length;
+  const totalCount = entries.length;
+  const onToday = state.date === brisbaneToday();
+
+  const body = `<div class="rf-movements-page">
+    <header class="rf-movements-hero">
+      <div class="rf-movements-hero-copy">
+        <h1>↔ Student Movements</h1>
+        <p>Manage student passes and track student movements during class time.</p>
+      </div>
+      <label class="rf-movements-date-label" for="rf-movements-date">
+        <span>Date</span>
+        <input id="rf-movements-date" type="date" data-date
+          value="${esc(state.date)}" aria-label="Movement date">
+      </label>
+    </header>
+
+    <div class="rf-movement-stats" aria-label="Movement summary for the selected date">
+      <section class="rf-movement-stat rf-movement-stat-out">
+        <div class="rf-movement-stat-icon" aria-hidden="true">↗</div>
+        <div><span>Currently out</span><strong>${outCount}</strong></div>
+      </section>
+      <section class="rf-movement-stat rf-movement-stat-returned">
+        <div class="rf-movement-stat-icon" aria-hidden="true">✓</div>
+        <div><span>${onToday ? 'Returned today' : 'Returned'}</span><strong>${returnedCount}</strong></div>
+      </section>
+      <section class="rf-movement-stat rf-movement-stat-total">
+        <div class="rf-movement-stat-icon" aria-hidden="true">▤</div>
+        <div><span>Total passes</span><strong>${totalCount}</strong></div>
+      </section>
+    </div>
+
+    <section class="rf-movement-issue sheet" aria-labelledby="rf-issue-heading">
+      <h2 id="rf-issue-heading">Issue a pass</h2>
+      <div class="rf-movement-issue-fields">
+        <div class="rf-movement-student-field">
+          <label for="movementStudentSearch">Search student by name or ID</label>
+          <div class="movement-search-wrap">
+            <input id="movementStudentSearch" type="search"
+              role="combobox" aria-controls="movementSuggestions"
+              aria-autocomplete="list" aria-expanded="false"
+              autocomplete="off" placeholder="Type a student's name..."
+              value="${esc(state.movementQuery)}">
+            <input id="movementStudent" type="hidden"
+              value="${esc(state.movementStudentId)}">
+            <div id="movementSuggestions" class="movement-suggestions"
+              role="listbox"></div>
+          </div>
+          <div id="movementFeedback"
+            class="movement-feedback ${state.movementStudentId ? 'confirmed' : ''}">
+            ${!onToday
+              ? 'Select today’s date to issue a live pass'
+              : state.movementStudentId
+                ? '✓ ' + esc(getPerson(state.movementStudentId)?.name || '') + ' selected'
+                : 'Search and select a student to issue a pass'}
+          </div>
+        </div>
+        <div class="rf-movement-destination-field">
+          <label for="movementDestination">Destination</label>
+          <select id="movementDestination" class="field-select">
+            <option>Toilet</option>
+            <option>Student services</option>
+            <option>School office</option>
+            <option>Library</option>
+          </select>
+        </div>
+        <button id="movementIssueButton" type="button"
+          class="btn green rf-movement-issue-button"
+          data-action="issueMovement"
+          ${onToday && state.movementStudentId ? '' : 'disabled'}>
+          + Issue pass
+        </button>
+      </div>
+    </section>
+
+    <section class="rf-movement-log sheet" aria-labelledby="rf-movement-log-heading">
+      <div class="rf-movement-log-head">
+        <div>
+          <h2 id="rf-movement-log-heading">Movement log</h2>
+          <p>${esc(niceDate())} · ${totalCount} pass${totalCount === 1 ? '' : 'es'} displayed</p>
+        </div>
+        <label class="rf-movement-filter-label" for="rfMovementView">
+          Show
+          <select id="rfMovementView" class="field-select">
+            <option value="all" ${rfMovementListFilter === 'all' ? 'selected' : ''}>All movements</option>
+            <option value="out" ${rfMovementListFilter === 'out' ? 'selected' : ''}>Currently out</option>
+            <option value="returned" ${rfMovementListFilter === 'returned' ? 'selected' : ''}>Returned</option>
+          </select>
+        </label>
+      </div>
+      ${movementRows()}
+    </section>
+
+    <p class="rf-movement-demo-note">Demo · Fictional student records are saved in this browser only.</p>
+  </div>`;
+
+  // Existing shell() supplies the sidebar and user bar. The stylesheet below
+  // hides its duplicate white page heading only on this specific page.
+  return shell(body, 'Student Movements', 'Passes and movement tracking', '');
+}
+
+// One small new handler, for the optional log filter. Existing event handlers
+// continue to handle date selection, student search, issuing and returning.
+document.addEventListener('change', event => {
+  if (event.target?.id !== 'rfMovementView') return;
+  rfMovementListFilter = event.target.value;
+  render();
+});
+
+const rfMovementExample1Style = document.createElement('style');
+rfMovementExample1Style.textContent = `
+/* RollFlow · Student Movements Example 1 — compact dashboard */
+.content-shell:has(.rf-movements-page) > .page-bar { display: none; }
+.content-shell:has(.rf-movements-page) .main-home {
+  padding: clamp(12px, 2vw, 22px);
+}
+.rf-movements-page {
+  display: grid;
+  gap: 16px;
+  max-width: 1480px;
+  margin: 0 auto;
+  color: #243746;
+}
+.rf-movements-hero {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  background: linear-gradient(105deg, #00692c, #008638);
+  color: #fff;
+  border-radius: 12px;
+  padding: 19px 24px;
+}
+.rf-movements-hero h1 {
+  margin: 0 0 5px;
+  font-size: clamp(23px, 2.7vw, 31px);
+  font-weight: 800;
+  line-height: 1.18;
+  color: inherit;
+}
+.rf-movements-hero p { color: #e4f7e9; font-size: 13px; margin: 0; }
+.rf-movements-date-label { display: grid; gap: 5px; font-size: 11px; font-weight: 700; }
+.rf-movements-date-label input {
+  height: 40px;
+  border: 1px solid #bcd8c7;
+  border-radius: 7px;
+  background: #fff;
+  padding: 7px 11px;
+  color: #223747;
+  font-size: 13px;
+  min-width: 160px;
+}
+.rf-movement-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.rf-movement-stat {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  border-radius: 11px;
+  padding: 17px 22px;
+  min-height: 98px;
+}
+.rf-movement-stat-out { background: #e4f2e8; }
+.rf-movement-stat-returned { background: #e3f0fc; }
+.rf-movement-stat-total { background: #f1e9fa; }
+.rf-movement-stat-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 49px;
+  height: 49px;
+  font-size: 30px;
+  font-weight: 800;
+  color: #16703e;
+}
+.rf-movement-stat-returned .rf-movement-stat-icon { color: #1871ae; }
+.rf-movement-stat-total .rf-movement-stat-icon { color: #7b4ab3; }
+.rf-movement-stat span { display: block; color: #3d5261; font-size: 13px; font-weight: 700; }
+.rf-movement-stat strong { display: block; font-size: 30px; line-height: 1.2; margin-top: 4px; }
+.rf-movement-issue, .rf-movement-log {
+  margin: 0;
+  border: 1px solid #d5e2e4;
+  border-radius: 11px;
+  overflow: visible;
+  background: #fff;
+  box-shadow: 0 1px 4px #18334412;
+}
+.rf-movement-issue { padding: 17px 20px; background: #f6fbf8; border-color: #bedfc9; }
+.rf-movement-issue h2, .rf-movement-log h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.2;
+  color: #203844;
+}
+.rf-movement-issue-fields {
+  display: grid;
+  grid-template-columns: minmax(200px, 1fr) minmax(145px, 235px) auto;
+  gap: 14px;
+  align-items: start;
+  margin-top: 14px;
+}
+.rf-movement-student-field { min-width: 0; position: relative; }
+.rf-movement-student-field > label,
+.rf-movement-destination-field > label {
+  display: block;
+  color: #4c6170;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.rf-movement-issue #movementStudentSearch,
+.rf-movement-issue #movementDestination {
+  width: 100%;
+  height: 41px;
+  border: 1px solid #bacbd2;
+  border-radius: 7px;
+  background: #fff;
+  color: #253b48;
+  padding: 8px 11px;
+  font-size: 13px;
+  margin: 0;
+}
+.rf-movement-issue .movement-search-wrap { margin: 0; }
+.rf-movement-issue .movement-feedback { padding: 6px 0 0; }
+.rf-movement-issue-button {
+  align-self: start;
+  margin-top: 21px;
+  min-height: 41px;
+  white-space: nowrap;
+  border-radius: 7px;
+  padding-inline: 17px;
+  font-weight: 800;
+}
+.rf-movement-log { overflow: hidden; }
+.rf-movement-log-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  padding: 20px 20px 15px;
+}
+.rf-movement-log-head p { color: #697d89; font-size: 12px; margin: 5px 0 0; }
+.rf-movement-filter-label { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; }
+.rf-movement-filter-label select {
+  min-width: 170px;
+  border-radius: 7px;
+  font-size: 12px;
+  min-height: 36px;
+}
+.rf-movement-table-wrap { width: 100%; overflow-x: auto; padding: 0 12px 14px; }
+.rf-movement-table { width: 100%; border-collapse: collapse; min-width: 690px; font-size: 12px; }
+.rf-movement-table thead { background: #e9f0f3; }
+.rf-movement-table th {
+  text-align: left;
+  color: #3c5361;
+  text-transform: uppercase;
+  letter-spacing: .035em;
+  font-size: 10px;
+  padding: 13px 11px;
+  font-weight: 800;
+}
+.rf-movement-table td { padding: 11px; border-bottom: 1px solid #e3eaed; vertical-align: middle; }
+.rf-movement-table tr:last-child td { border-bottom: 0; }
+.rf-movement-table tbody tr:hover { background: #f7faf9; }
+.rf-movement-student { display: flex; align-items: center; gap: 10px; min-width: 170px; }
+.rf-movement-student strong { display: block; font-size: 12px; }
+.rf-movement-student small, .rf-movement-subtext { display: block; color: #6e8090; font-size: 10px; margin-top: 3px; }
+.rf-movement-avatar {
+  display: block;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #e7eff0;
+  border: 1px solid #d1dcdf;
+}
+.rf-movement-avatar-empty { display: grid; place-items: center; color: #6c7a82; }
+.rf-movement-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 7px 10px;
+  border-radius: 7px;
+  white-space: nowrap;
+}
+.rf-movement-status.is-out { background: #fde3e3; color: #a6222f; }
+.rf-movement-status.is-returned { background: #e0f3e4; color: #207443; }
+.rf-movement-return-button {
+  min-height: 35px;
+  border-radius: 7px;
+  padding: 7px 10px;
+  border: 1px solid #249a4c;
+  color: #187239;
+  background: #fff;
+  white-space: nowrap;
+  font-weight: 800;
+  font-size: 11px;
+  cursor: pointer;
+}
+.rf-movement-return-button:hover { background: #e4f4e7; }
+.rf-movement-return-time { color: #607783; font-size: 11px; white-space: nowrap; }
+.rf-movement-empty { padding: 35px 20px; text-align: center; color: #6d8290; }
+.rf-movement-demo-note { font-size: 11px; color: #778b95; margin: 2px 0; }
+body[data-theme="Dark"] .rf-movement-issue,
+body[data-theme="Dark"] .rf-movement-log { background: #203744; color: #e5f1f4; border-color: #465f6c; }
+body[data-theme="Dark"] .rf-movement-issue h2,
+body[data-theme="Dark"] .rf-movement-log h2 { color: #e9f5f7; }
+body[data-theme="Dark"] .rf-movement-table th { color: #e0eff5; }
+body[data-theme="Dark"] .rf-movement-table thead { background: #2a4755; }
+body[data-theme="Dark"] .rf-movement-table td { border-bottom-color: #47616f; }
+body[data-theme="Dark"] .rf-movement-table tbody tr:hover { background: #294755; }
+body[data-theme="Dark"] .rf-movement-stat-out { background: #254b3c; }
+body[data-theme="Dark"] .rf-movement-stat-returned { background: #254459; }
+body[data-theme="Dark"] .rf-movement-stat-total { background: #3c3154; }
+body[data-theme="Dark"] .rf-movement-stat strong,
+body[data-theme="Dark"] .rf-movement-stat span { color: #f2f7fa; }
+@media (max-width: 1020px) {
+  .rf-movement-issue-fields { grid-template-columns: minmax(0, 1fr) minmax(145px, 200px); }
+  .rf-movement-issue-button { grid-column: 1 / -1; justify-self: end; margin-top: 0; }
+}
+@media (max-width: 720px) {
+  .rf-movement-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .rf-movement-stat { padding: 12px; gap: 7px; min-height: 84px; }
+  .rf-movement-stat-icon { flex: 0 0 28px; height: 28px; font-size: 23px; }
+  .rf-movement-stat strong { font-size: 24px; }
+  .rf-movement-stat span { font-size: 11px; }
+  .rf-movement-log-head { flex-wrap: wrap; padding: 15px; }
+}
+@media (max-width: 520px) {
+  .rf-movements-hero { padding: 17px; }
+  .rf-movement-stats { grid-template-columns: 1fr; }
+  .rf-movement-stat { min-height: 70px; }
+  .rf-movement-issue-fields { grid-template-columns: 1fr; }
+  .rf-movement-issue-button { grid-column: 1; width: 100%; }
+  .rf-movement-filter-label { width: 100%; }
+  .rf-movement-filter-label select { flex: 1; min-width: 0; }
+}
+`;
+document.head.appendChild(rfMovementExample1Style);
+
 const noticeData=[{id:'notice-1',title:'School timetable changes',type:'Timetable',body:'Check your assigned rooms and class changes before taking each roll.'},{id:'notice-2',title:'Friday excursion attendance',type:'Activities',body:'Check school instructions for students attending an approved excursion.'},{id:'notice-3',title:'Roll certification reminder',type:'Attendance',body:'Check each student’s attendance before saving the class roll.'}];
 function alertsPage(){const pending=scheduledClassesFor(state.date).filter(c=>!isSubmitted(c.id));const notices=noticeData.map(n=>`<div class="notice-row ${state.readNotices.includes(n.id)?'read':''}"><span class="notice-dot"></span><div><div class="notice-category">${esc(n.type)}</div><strong>${esc(n.title)}</strong><p>${esc(n.body)}</p></div><button class="btn small" data-action="toggleNotice" data-notice="${n.id}">${state.readNotices.includes(n.id)?'Mark unread':'Mark read'}</button></div>`).join('');const body=`<div class="section-intro"><h2>Messages relevant to your classes</h2><p>Timetable, activity and attendance reminders.</p></div><section class="sheet"><div class="sheet-head"><span>ROLL REMINDERS</span><span class="quiet">${pending.length} awaiting submission</span></div>${pending.length?pending.map(c=>`<div class="simple-row"><div><strong>${esc(c.period)} · ${esc(c.id)} — ${esc(c.name)}</strong><span>${classCounts(c)['?']} students unmarked · Room ${esc(c.room)}</span></div><button class="btn small" data-open="${c.id}">Open roll ›</button></div>`).join(''):'<div class="empty-state">All scheduled rolls have been submitted.</div>'}</section><section class="sheet notices"><div class="sheet-head">NOTICES</div>${notices}</section>`;return shell(body,'Alerts & Notices','Teacher alerts and reminders','')}
 function preferencesPage(){const body=`<div class="section-intro"><h2>Your display preferences</h2><p>Choose how student information appears in your teacher workspace.</p></div><section class="sheet settings-sheet"><div class="sheet-head">DISPLAY</div><label class="setting-row"><div><strong>Show student portraits</strong><p>Display photo-shaped images on class rolls and student lists.</p></div><input type="checkbox" data-pref="showPortraits" ${state.prefs.showPortraits?'checked':''}></label><label class="setting-row"><div><strong>Show marking hints</strong><p>Display the photo marking guide above the class roll.</p></div><input type="checkbox" data-pref="showHints" ${state.prefs.showHints?'checked':''}></label><div class="settings-note">Your choices are saved in this browser. The menu automatically collapses when a class roll opens.</div></section>`;return shell(body,'My Preferences','Teacher display settings','')}
@@ -450,7 +895,7 @@ function searchResults(){const q=state.search.toLowerCase().trim();const myIds=n
 function closeModal(){document.getElementById('modal')?.remove();state.modal=null}
 function showModal(which){closeModal();state.modal=which;drawModal()}
 function movementMatches(){const q=state.movementQuery.trim().toLocaleLowerCase();return q?people.filter(p=>p.name.toLocaleLowerCase().includes(q)||p.id.toLocaleLowerCase().includes(q)).slice(0,8):[]}
-function refreshMovementSuggestions(){const target=document.getElementById('movementSuggestions'),query=document.getElementById('movementStudentSearch'),feedback=document.getElementById('movementFeedback'),hidden=document.getElementById('movementStudent'),submit=document.getElementById('movementIssueButton');if(!target||!query)return;const matches=state.movementStudentId?[]:movementMatches();target.innerHTML=state.movementQuery.trim()&&!state.movementStudentId?(matches.length?matches.map((p,i)=>`<button type="button" class="movement-suggestion ${state.movementHighlight===i?'selected':''}" role="option" aria-selected="${state.movementHighlight===i}" data-movement-choice="${esc(p.id)}"><strong>${esc(p.name)}</strong><span>Year ${p.year} · ${esc(p.id)}</span></button>`).join(''):'<div class="movement-not-found">No students found. Try another name.</div>'):'';query.setAttribute('aria-expanded',String(!!target.innerHTML));if(hidden)hidden.value=state.movementStudentId;if(submit)submit.disabled=!state.movementStudentId;if(feedback){const p=getPerson(state.movementStudentId);feedback.textContent=p?'✓ '+p.name+' selected':state.movementQuery.trim()?'Select the correct student from the results':'Search and select a student to issue a pass';feedback.classList.toggle('confirmed',!!p)}}
+function refreshMovementSuggestions(){const target=document.getElementById('movementSuggestions'),query=document.getElementById('movementStudentSearch'),feedback=document.getElementById('movementFeedback'),hidden=document.getElementById('movementStudent'),submit=document.getElementById('movementIssueButton');if(!target||!query)return;const matches=state.movementStudentId?[]:movementMatches();target.innerHTML=state.movementQuery.trim()&&!state.movementStudentId?(matches.length?matches.map((p,i)=>`<button type="button" class="movement-suggestion ${state.movementHighlight===i?'selected':''}" role="option" aria-selected="${state.movementHighlight===i}" data-movement-choice="${esc(p.id)}"><strong>${esc(p.name)}</strong><span>Year ${p.year} · ${esc(p.id)}</span></button>`).join(''):'<div class="movement-not-found">No students found. Try another name.</div>'):'';query.setAttribute('aria-expanded',String(!!target.innerHTML));if(hidden)hidden.value=state.movementStudentId;if(submit)submit.disabled=!state.movementStudentId||state.date!==brisbaneToday();if(feedback){const p=getPerson(state.movementStudentId);feedback.textContent=p?'✓ '+p.name+' selected':state.movementQuery.trim()?'Select the correct student from the results':'Search and select a student to issue a pass';feedback.classList.toggle('confirmed',!!p)}}
 function selectMovementStudent(id){const p=getPerson(id);if(!p)return;state.movementStudentId=id;state.movementQuery=p.name;state.movementHighlight=0;const input=document.getElementById('movementStudentSearch');if(input)input.value=p.name;refreshMovementSuggestions()}
 function recordMovement(studentId,destination){state.movements.push({id:'M'+Date.now()+'-'+Math.random().toString(36).slice(2,6),studentId,destination,time:new Date().toLocaleTimeString('en-AU',{hour:'numeric',minute:'2-digit'}),date:state.date,returnedAt:null});persist()}
 function nav(page){if(page==='master')osSetView(false);if(page==='master'&&serverIdentity){window.location.href='/teacher/master/';return}if(page==='cover')page='finder';if(page==='reports')page='timetable';if(page==='finder'&&state.page!=='class-detail')workspace.settings.assignedOnly=false;profileEditing=false;if(page==='home')state.date=brisbaneToday();if(page==='roll'){state.date=brisbaneToday();const cls=preferredAttendanceClass();if(!cls){showToast('No lessons scheduled today');nav('timetable');return}openClass(cls.id);return}state.page=page;state.sidebarCollapsed=false;state.mobileNav=false;state.profileOpen=false;closeDrawer();closeModal();state.history=[];render()}
