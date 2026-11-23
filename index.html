@@ -507,13 +507,17 @@ function studentSearchPage(){const body=`<div class="section-intro"><h2>Find a s
 let rfMovementListFilter = 'all';
 
 function rfMovementEntriesForDate() {
-  // Preserve RollFlow's existing behaviour: when reviewing today, active
-  // passes from earlier dates remain visible until they are returned.
-  return state.movements
+  // Browser-issued passes remain separate from completed fictional examples.
+  // Include active earlier passes when viewing today, as before.
+  const issued = state.movements
     .filter(m => m.date === state.date ||
       (state.date === brisbaneToday() && !m.returnedAt))
-    .slice()
-    .reverse();
+    .slice().reverse();
+  const examples = Array.isArray(workspace.sampleMovementHistory)
+    ? workspace.sampleMovementHistory.filter(m => m.sample && m.date === state.date)
+      .slice().sort((a,b)=>b.time.localeCompare(a.time))
+    : [];
+  return [...issued, ...examples];
 }
 
 function movementRows() {
@@ -546,7 +550,7 @@ function movementRows() {
       <tbody>${visible.map(m => {
         const student = getPerson(m.studentId);
         const name = student?.name || 'Student';
-        const duration = movementDuration(m);
+        const duration = m.sample ? m.minutes : movementDuration(m);
         const avatar = student
           ? `<img src="${photo(student)}" alt="" class="rf-movement-avatar">`
           : `<span class="rf-movement-avatar rf-movement-avatar-empty" aria-hidden="true">?</span>`;
@@ -557,7 +561,7 @@ function movementRows() {
               ${avatar}
               <div>
                 <strong>${esc(name)}</strong>
-                <small>${esc(student?.id || m.studentId || '')}</small>
+                <small>${esc(student?.id || m.studentId || '')}${m.sample?' · Fictional sample':''}</small>
               </div>
             </div>
           </td>
@@ -578,7 +582,7 @@ function movementRows() {
           </td>
           <td>
             ${m.returnedAt
-              ? `<span class="rf-movement-return-time">Returned ${esc(m.returnedAt)}</span>`
+              ? `<span class="rf-movement-return-time">${m.sample?'Fictional sample · ':''}Returned ${esc(m.returnedAt)}</span>`
               : `<button type="button" class="rf-movement-return-button"
                    data-action="returnMovement" data-movement="${esc(m.id)}">
                    ✓ Mark returned
@@ -1136,14 +1140,74 @@ document.addEventListener('keydown',event=>{if(demoRole!=='teacher'||!event.altK
 const polish=document.createElement('style');polish.textContent=`.nav-group-label{padding:16px 15px 6px;font-size:10px;letter-spacing:1px;color:#aec5cb}.collapsed .nav-group-label{display:none}.v2-list{display:flex!important;flex-direction:column;overflow:auto}.v2-list .student-card{min-height:64px;display:flex;align-items:center;gap:16px}.v2-list .portrait-area{width:40px;height:48px}.v2-list .tile-name{font-size:14px}body[data-theme="Dark"] .main,body[data-theme="Dark"] .page-bar,body[data-theme="Dark"] .home-welcome,body[data-theme="Dark"] .sheet-head,body[data-theme="Dark"] .setting-row{background:#182c39;color:#f2f7fa}body[data-theme="Dark"] p,body[data-theme="Dark"] .settings-note,body[data-theme="Dark"] .page-sub,body[data-theme="Dark"] .simple-row span{color:#c8dce5}body[data-theme="Dark"] input,body[data-theme="Dark"] select,body[data-theme="Dark"] textarea{background:#243f4e;color:#fff}body[data-theme="Dark"] a{color:#81e2bd}.v2-contrast .main{color:#000}.v2-contrast .sheet{border:3px solid currentColor}.v2-large .main *{font-size:inherit}.v2-large .main h2{font-size:24px}[hidden]{display:none!important}@media(max-width:640px){.v2-panel .setting-row{flex-wrap:wrap;gap:10px}.v2-panel input,.v2-panel select{min-width:0;width:100%}.v2-panel input[type=checkbox]{width:auto}.v2-panel .simple-row{gap:10px}.top-left .btn{font-size:11px}}`;document.head.appendChild(polish);
 const coverStyle=document.createElement('style');coverStyle.textContent=`.simple-row.schedule-cover{border:2px solid #7655bd;border-left:6px solid #7655bd;border-radius:8px;margin:10px;background:#f7f3ff}.simple-row .cover-badge{display:inline-block;margin:5px 0;padding:3px 8px;border-radius:4px;background:#ede5ff;color:#51328c;font-size:10px;font-weight:700;letter-spacing:.6px}body[data-theme="Dark"] .simple-row.schedule-cover{border-color:#b99aff;background:#302445}body[data-theme="Dark"] .simple-row .cover-badge{background:#50376e;color:#f3eaff}.v2-contrast .simple-row.schedule-cover{border-style:double;border-width:4px}`;document.head.appendChild(coverStyle);
 const studentFilters={classId:'',year:'',destination:'',from:'',to:''};
-if(!workspace.sampleMovementHistory){
- workspace.sampleMovementHistory=people.flatMap((person,index)=>Array.from({length:6+index%5},(_,offset)=>{
-  const date=new Date(brisbaneToday()+'T12:00:00');date.setDate(date.getDate()-(offset*2+index%3));
-  const memberships=schoolClasses.filter(cls=>cls.ids.includes(person.id));
-  const cls=memberships[(index+offset)%memberships.length];
-  return {id:`sample-${person.id}-${offset}`,studentId:person.id,classId:cls?.id||'',destination:['Toilet','Student services','School office','Library'][(index+offset)%4],date:date.toISOString().slice(0,10),time:`${String(9+offset%5).padStart(2,'0')}:${String(index%50).padStart(2,'0')}`,minutes:3+(index*3+offset*5)%18,sample:true};
- }));saveWorkspace();
+// Completed fictional movement visits for the design demo only. Never merge
+// these examples into state.movements, which holds actual browser-issued passes.
+// Frequent users have 10–15 visits, occasional users 3–6, rare users 1–2;
+// most fictional students have no sample history at all.
+function rfMakeVariedMovementSamples(){
+ const usage=[
+  ['S18001',15,'Toilet'],['S7001',13,'Library'],
+  ['S9003',12,'Student services'],['S11005',10,'School office'],
+  ['S8002',6,'Library'],['S12007',5,'Student services'],
+  ['S18007',5,'Toilet'],['S7008',4,'Library'],
+  ['S9009',4,'School office'],['S11011',3,'Student services'],
+  ['S8009',2,'Toilet'],['S18015',2,'Library'],
+  ['S7006',1,'Student services'],['S90014',1,'Library'],
+  ['S11017',1,'Toilet'],['S12019',1,'School office'],
+  ['S80016',1,'Library'],['S18023',1,'Toilet']
+ ];
+ const terms=[['2026-01-27','2026-04-02'],['2026-04-20','2026-06-26'],
+  ['2026-07-13','2026-09-18'],['2026-10-06','2026-12-11']];
+ const closed=new Set(['2026-05-04','2026-08-12','2026-09-04']);
+ const anchor=brisbaneToday()<'2026-01-27'?'2026-01-27'
+  :brisbaneToday()>'2026-12-11'?'2026-12-11':brisbaneToday();
+ const cursor=new Date(anchor+'T12:00:00Z');
+ const dates=[];
+ for(let i=0;i<340&&dates.length<42;i++){
+  const date=cursor.toISOString().slice(0,10);
+  if(cursor.getUTCDay()!==0&&cursor.getUTCDay()!==6&&
+   terms.some(([start,end])=>date>=start&&date<=end)&&!closed.has(date))
+   dates.push(date);
+  cursor.setUTCDate(cursor.getUTCDate()-1);
+ }
+ const timeLabel=minutes=>{
+  const h=Math.floor(minutes/60),m=minutes%60;
+  return (h%12||12)+':'+String(m).padStart(2,'0')+(h<12?' am':' pm');
+ };
+ return usage.flatMap(([studentId,count,preferred],i)=>{
+  const student=getPerson(studentId);
+  if(!student)return [];
+  const memberships=schoolClasses.filter(cls=>cls.ids.includes(studentId));
+  return Array.from({length:count},(_,visit)=>{
+   // Keep each student's visits on different school days.
+   const date=dates[(visit*2+i%4)%dates.length];
+   const departure=9*60+((i+visit)%5)*58+(i*7+visit*3)%16;
+   const minutes=3+(i*3+visit*5)%18;
+   const alternatives=['Toilet','Student services','School office','Library'];
+   const destination=visit%4===3
+    ?alternatives[(alternatives.indexOf(preferred)+1+i%2)%alternatives.length]
+    :preferred;
+   return {
+    id:'rf-fictional-2026-'+studentId+'-'+visit,
+    studentId, classId:memberships[(i+visit)%memberships.length]?.id||'',
+    date, destination, time:timeLabel(departure),
+    returnedAt:timeLabel(departure+minutes), minutes, sample:true
+   };
+  });
+ });
 }
+// Older versions auto-created 6–10 identical visits for EVERY student.
+// Replace only that recognisable generated set; never touch genuine local
+// issued passes or unrecognised / customised workspace history.
+const rfExistingSamples=workspace.sampleMovementHistory;
+const rfIsOldAutoSample=Array.isArray(rfExistingSamples)&&rfExistingSamples.length>0&&
+ rfExistingSamples.every(item=>item?.sample===true&&
+  /^sample-S\d+-\d+$/.test(String(item.id||'')));
+if(!Array.isArray(rfExistingSamples)||!rfExistingSamples.length||rfIsOldAutoSample){
+ workspace.sampleMovementHistory=rfMakeVariedMovementSamples();
+ saveWorkspace();
+}
+
 function studentMatches(){const query=state.studentQuery.trim().toLowerCase(),members=studentFilters.classId?schoolClasses.find(cls=>cls.id===studentFilters.classId)?.ids:people.map(person=>person.id);return people.filter(person=>members?.includes(person.id)&&(!studentFilters.year||String(person.year)===studentFilters.year)&&(!query||`${person.name} ${person.id}`.toLowerCase().includes(query)))}
 function movementAnalysis(){const matched=new Set(studentMatches().map(person=>person.id));return [...workspace.sampleMovementHistory,...state.movements.map(item=>({...item,classId:item.classId||'',minutes:movementDuration(item),sample:false}))].filter(item=>matched.has(item.studentId)&&(!studentFilters.classId||item.classId===studentFilters.classId)&&(!studentFilters.destination||item.destination===studentFilters.destination)&&(!studentFilters.from||item.date>=studentFilters.from)&&(!studentFilters.to||item.date<=studentFilters.to))}
 function movementBars(title,entries){const max=Math.max(1,...entries.map(([,count])=>count));return `<section class="sheet movement-chart"><div class="sheet-head">${title}</div><div class="movement-bars">${entries.map(([label,count])=>`<div class="movement-bar-row"><span>${esc(label)}</span><div class="movement-bar-track"><div style="width:${count/max*100}%"></div></div><strong>${count}</strong></div>`).join('')||'<p>No movement records match these filters.</p>'}</div></section>`}
@@ -1225,8 +1289,7 @@ const serviceFilters={classId:'',destination:''};
 function allMovementHistory(){return [...workspace.sampleMovementHistory,...state.movements.map(item=>({...item,sample:false,minutes:movementDuration(item)}))]}
 function serviceChoices(attribute,value){return `<select ${attribute}><option value="">All services</option>${['Toilet','Student services','School office','Library'].map(service=>`<option ${service===value?'selected':''}>${service}</option>`).join('')}</select>`}
 function individualMovementPage(){const student=getPerson(individualMovement.studentId);const records=allMovementHistory().filter(item=>item.studentId===individualMovement.studentId&&(!individualMovement.from||item.date>=individualMovement.from)&&(!individualMovement.to||item.date<=individualMovement.to)&&(!individualMovement.destination||item.destination===individualMovement.destination));const dates=[...new Set(records.map(item=>item.date))].sort();return shell(`<button class="btn" data-nav="search">← Student Finder</button><div class="student-filter-grid"><label>From date<input type="date" data-individual="from" value="${individualMovement.from}"></label><label>To date<input type="date" data-individual="to" value="${individualMovement.to}"></label><label>Service${serviceChoices('data-individual="destination"',individualMovement.destination)}</label></div><div class="settings-note">${records.length} visits · Fictional sample history and records from this browser. Each visit counts once.</div><div class="movement-chart-grid">${movementBars('VISITS PER DAY',dates.map(date=>[date,records.filter(item=>item.date===date).length]))}${movementBars('SERVICES USED',['Toilet','Student services','School office','Library'].map(service=>[service,records.filter(item=>item.destination===service).length]))}</div><section class="sheet"><div class="sheet-head">INDIVIDUAL MOVEMENT HISTORY</div>${records.slice().sort((first,second)=>second.date.localeCompare(first.date)).map(item=>`<div class="simple-row"><div><strong>${esc(item.destination)}</strong><span>${esc(item.date)} · ${esc(item.time)} · ${esc(item.classId||'Class not recorded')}</span></div><span>${item.minutes===null?'Duration not recorded':item.minutes+' minutes'} · ${item.sample?'Sample':'Browser record'}</span></div>`).join('')||'<div class="empty-state">No visits match these filters.</div>'}</section>`,'Student Movement Data',`${esc(student?.name||'Student')} · ${esc(student?.id||'')}`,'')}
-const passMovementsPage=movementsPage;
-movementsPage=function(){const records=allMovementHistory().filter(item=>item.date===state.date&&(!serviceFilters.classId||item.classId===serviceFilters.classId)&&(!serviceFilters.destination||item.destination===serviceFilters.destination));const services=['Toilet','Student services','School office','Library'];const content=`<section class="sheet"><div class="sheet-head">DAILY SERVICE USAGE · ${esc(state.date)}</div><div class="student-filter-grid"><label>Class<select data-service-filter="classId"><option value="">All classes</option>${schoolClasses.map(cls=>`<option value="${cls.id}" ${serviceFilters.classId===cls.id?'selected':''}>${esc(cls.id)}</option>`).join('')}</select></label><label>Service${serviceChoices('data-service-filter="destination"',serviceFilters.destination)}</label></div><div class="settings-note">${new Set(records.map(item=>item.studentId)).size} distinct students · ${records.length} visits on the selected date. A student may use more than one service; service counts are not additive.</div><div class="movement-chart-grid">${movementBars('STUDENTS USING EACH SERVICE',services.map(service=>[service,new Set(records.filter(item=>item.destination===service).map(item=>item.studentId)).size]))}${movementBars('VISITS TO EACH SERVICE',services.map(service=>[service,records.filter(item=>item.destination===service).length]))}</div><div class="settings-note">Fictional completed sample history is included. Sample visits do not create active passes.</div></section>`;return passMovementsPage().replace('<main class="main main-home">','<main class="main main-home">'+content)};
+// The compact Student Movements dashboard is the only movements overview.
 const movementDrawer=drawDrawer;
 drawDrawer=function(){movementDrawer();document.querySelector('#overlay .action-list')?.insertAdjacentHTML('beforeend',`<button data-view-movement="${esc(state.drawer)}">View movement data <span>›</span></button>`)};
 const movementRender=render;
