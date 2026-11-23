@@ -12,15 +12,17 @@ The browser demo generates Sarah Williams's schedule **for any selected 2026 sch
 
 | Day | Home group 8:35–8:50 | P1 9:00–10:10 | P2 10:15–11:25 | P3 11:30–12:40 | P4 1:20–2:30 | P5 2:35–3:10 |
 |---|---|---|---|---|---|---|
-| Mon | 10BH · G05 | ENG071A · B14 | ENG081C · B17 | ENG091B · B14 | ENG101B · B13 | Preparation |
-| Tue | 10BH · G05 | ENG101C · B18 | ENG071A · B14 | ENG081C · B17 | Preparation | ENG091B · B14 |
-| Wed | 10BH · G05 | ENG091B · B14 | ENG101B · B13 | ENG101C · B18 | ENG081C · B17 | Preparation |
-| Thu | 10BH · G05 | ENG101B · B13 | ENG091B · B14 | Preparation | ENG071A · B14 | ENG101C · B18 |
-| Fri | 10BH · G05 | ENG081C · B17 | ENG101C · B18 | ENG071A · B14 | ENG101B · B13 | Preparation |
+| Mon | 10BH · G05 | ENG071A · B14 | ENG081C · B17 | ENG091B · B14 | ENG101B · B13 | Spare |
+| Tue | 10BH · G05 | ENG101C · B18 | ENG071A · B14 | ENG081C · B17 | Spare | ENG091B · B14 |
+| Wed | 10BH · G05 | ENG091B · B14 | ENG101B · B13 | ENG101C · B18 | ENG081C · B17 | Spare |
+| Thu | 10BH · G05 | ENG101B · B13 | ENG091B · B14 | Spare | ENG071A · B14 | ENG101C · B18 |
+| Fri | 10BH · G05 | ENG081C · B17 | ENG101C · B18 | ENG071A · B14 | ENG101B · B13 | Spare |
 
-Classes are Year 7 (\`ENG071A\`), Year 8 (\`ENG081C\`), Year 9 (\`ENG091B\`), Year 10 (\`ENG101B\` and \`ENG101C\`), and Year 10B home group (\`10BH\`). Each English class meets on four separate weekdays; no periods overlap. Preps appear in **My Timetable**, but have no roll to submit.
+Classes are Year 7 (\`ENG071A\`), Year 8 (\`ENG081C\`), Year 9 (\`ENG091B\`), Year 10 (\`ENG101B\` and \`ENG101C\`), and Year 10B home group (\`10BH\`). Each English class meets on four separate weekdays; no periods overlap. Spare periods appear in **My Timetable**, but have no roll to submit.
 
 **Queensland 2026 state school terms (student dates):** 27 Jan–2 Apr, 20 Apr–26 Jun, 13 Jul–18 Sep and 6 Oct–11 Dec (see [Department of Education](https://education.qld.gov.au/about-us/calendar/term-dates)). Saturdays, Sundays, term holidays, the statewide Labour Day holiday (4 May), Brisbane's Ekka show holiday (12 Aug) and the student-free development day (4 Sep) have no scheduled lessons. Year 10 student lessons and the Year 10B home group end after **27 November 2026**; Years 7–9 lessons continue until **11 December**. The timetable is deliberately scoped to 2026, not a real school's roster.
+
+**Teacher page navigation:** The Take Attendance page now has a clearly labeled **Back to Daily Schedule** button (which preserves the selected date), a prominent class-code/subject heading, and clearly grouped period/time/room details. The classroom picker displays the selected date's timetable, and Class Finder's detail page shows Sarah's repeating weekly periods. Past-due attendance displays the shorter label **Roll overdue**.
 
 ## V3.4.4 — Import reliability and timetable bug fixes
 
