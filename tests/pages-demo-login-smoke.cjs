@@ -186,6 +186,62 @@ async function test() {
     const finderSearch = page.locator('#finderResults');
     assert(await finderSearch.count(), 'Class Finder should still render');
 
+    // Student Movements Example 1 uses real browser-local pass records,
+    // including live return actions and filters; no server or school records.
+    await page.locator('[data-nav="movements"]').first().click();
+    assert.equal(await page.locator('.rf-movements-hero h1').innerText(),
+      '↔ Student Movements', 'New dashboard header should render');
+    assert.equal(await page.locator('.rf-movement-stat').count(), 3,
+      'Currently out, Returned and Total passes summaries are required');
+    assert.equal(await page.locator('#movementStudentSearch').count(), 1,
+      'Existing student autocomplete must remain on the new page');
+    assert.equal(await page.locator('#movementDestination').count(), 1);
+    assert.equal(await page.locator('#movementIssueButton').count(), 1);
+    assert.equal(await page.locator('#rfMovementView').count(), 1,
+      'Movement status filter must remain usable');
+
+    const dateParts = Object.fromEntries(new Intl.DateTimeFormat('en-AU', {
+      timeZone: 'Australia/Brisbane', year: 'numeric', month: '2-digit',
+      day: '2-digit'
+    }).formatToParts(new Date()).map(part => [part.type, part.value]));
+    const today = dateParts.year + '-' + dateParts.month + '-' + dateParts.day;
+    const movementDate = page.locator('#rf-movements-date');
+    await movementDate.fill(today);
+    await movementDate.dispatchEvent('change');
+    assert.equal(await page.locator('.rf-movement-stat-out strong').innerText(), '0');
+    assert.equal(await page.locator('.rf-movement-stat-returned strong').innerText(), '0');
+    assert.equal(await page.locator('.rf-movement-stat-total strong').innerText(), '0');
+
+    await page.locator('#movementStudentSearch').fill('S7001');
+    await page.locator('[data-movement-choice="S7001"]').click();
+    assert(await page.locator('#movementIssueButton').isEnabled());
+    await page.locator('#movementDestination').selectOption('Library');
+    await page.locator('#movementIssueButton').click();
+    assert.equal(await page.locator('.rf-movement-stat-out strong').innerText(), '1');
+    assert.equal(await page.locator('.rf-movement-stat-total strong').innerText(), '1');
+    assert.match(await page.locator('.rf-movement-table tbody').innerText(), /Library/);
+    assert.equal(await page.locator('.rf-movement-return-button').count(), 1);
+
+    await page.locator('#rfMovementView').selectOption('returned');
+    assert.equal(await page.locator('.rf-movement-return-button').count(), 0,
+      'Returned filter must hide active student passes');
+    await page.locator('#rfMovementView').selectOption('out');
+    assert.equal(await page.locator('.rf-movement-return-button').count(), 1);
+    await page.locator('#rfMovementView').selectOption('all');
+    await page.locator('.rf-movement-return-button').click();
+    assert.equal(await page.locator('.rf-movement-stat-out strong').innerText(), '0');
+    assert.equal(await page.locator('.rf-movement-stat-returned strong').innerText(), '1');
+    assert.equal(await page.locator('.rf-movement-stat-total strong').innerText(), '1');
+    assert.match(await page.locator('.rf-movement-table tbody').innerText(), /Returned/);
+
+    await page.locator('#rf-movements-date').fill('2026-03-09');
+    await page.locator('#rf-movements-date').dispatchEvent('change');
+    await page.locator('#movementStudentSearch').fill('S7001');
+    await page.locator('[data-movement-choice="S7001"]').click();
+    assert(await page.locator('#movementIssueButton').isDisabled(),
+      'Historical dates must not allow new live movement passes');
+    assert.match(await page.locator('#movementFeedback').innerText(), /selected/);
+
     // The app must use distinct attendance and workspace stores.
     const keys = await page.evaluate(() => Object.keys(localStorage));
     assert(keys.some(key => key.startsWith('rollflow_workspace_swilliams_')),
