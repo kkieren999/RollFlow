@@ -172,6 +172,16 @@ class SharedInterfaceTests(TestCase):
             'data-rf-day-period="',
             "rfDayStudentReview()",
             "rfDayReviewStyle",
+            "function rfDayStudentsWithVisits()",
+            "function rfDayQuickStudentPicks()",
+            'data-rf-day-quick-student="',
+            'data-rf-view-day="',
+            'data-rf-view-date="',
+            'class="rf-movement-view-day"',
+            "function rfDayStudentMovements()",
+            "rfMovementEntriesForDate()",
+            "session:slot==='other'?'':slot",
+            "rfDayServiceLinkStyle",
 
         ):
             with self.subTest(marker=marker):
@@ -187,6 +197,9 @@ class SharedInterfaceTests(TestCase):
         self.assertEqual(html.count("function rfAdminMovementDestinationsPage()"), 1)
         self.assertEqual(html.count("const RF_MOVEMENT_DESTINATIONS_KEY="), 1)
         self.assertIn("if(adminPage==='movements')return rfAdminMovementDestinationsPage();", html)
+        self.assertEqual(html.count("function rfDayQuickStudentPicks()"), 1)
+        self.assertEqual(html.count("function rfDayStudentsWithVisits()"), 1)
+        self.assertIn("rfDayStudentSelect(person.id);", html)
         self.assertEqual(html.count("function rfDayStudentReview()"), 1)
         self.assertEqual(html.count("function rfDayStudentMovements()"), 1)
         self.assertIn("item.date===state.date", html)
