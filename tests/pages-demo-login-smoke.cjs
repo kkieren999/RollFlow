@@ -45,15 +45,17 @@ async function test() {
     page.on('pageerror', error => { console.error('Browser error:', error); });
     await page.goto(url, { waitUntil: 'load' });
     await page.locator('#demo-login-form').waitFor();
+    assert.match(await page.locator('.demo-auth-footer').innerText(), /Training workspace.*Do not enter real school credentials or records/);
 
-    // Public demo rejects invented credentials.
+    // Public training access rejects invented credentials.
     await page.locator('#demo-username').fill('swilliams');
     await page.locator('#demo-password').fill('wrong');
     await page.locator('#demo-login-form button[type="submit"]').click();
-    assert.match(await page.locator('#demo-login-error').innerText(), /Incorrect demo credentials/);
+    assert.match(await page.locator('#demo-login-error').innerText(), /Incorrect training access details/);
 
     await logIn(page, 'swilliams', 'swilliams');
     assert.equal((await page.locator('.top-user > span').innerText()).trim(), 'Sarah Williams');
+    assert(await page.locator('.rf-training-notice').isVisible(), 'Teacher workspace must disclose its public training status');
     await page.locator('[data-nav="classes"]').first().click();
     const englishClasses = await page.locator('main').innerText();
     for (const code of ['ENG071A', 'ENG091B', 'ENG101B', '10BH']) {
@@ -132,12 +134,12 @@ async function test() {
     const hero = page.locator('.rf-example1-hero');
     assert(await hero.isVisible(), 'Example 1 green title bar should be visible');
     assert.equal((await hero.locator('h1').innerText()).trim(),
-      'Take Attendance', 'Green hero must carry the primary page heading');
+      'Take Attendance', 'Shared hero must carry the primary page heading');
     const heroGradient = await hero.evaluate(el => getComputedStyle(el).backgroundImage);
     assert(heroGradient.includes('linear-gradient'),
       'Example 1 requires a prominent green title background');
     assert(await page.locator('.page-bar').isHidden(),
-      'The old white page heading must not duplicate the green hero title');
+      'The shared page heading must not duplicate the attendance title');
     assert.match(await page.locator('#attendance-class-title').innerText(), /ENG081C.*English/,
       'Class identity should be on its own clear strip below the hero');
     assert(await page.locator('.rf-example1-class-row').isVisible(),
@@ -150,7 +152,7 @@ async function test() {
     assert.equal(await page.locator('input[type="date"]').count(), 0,
       'Take Attendance must not offer date changes; use Daily Schedule instead');
     assert.equal(await page.locator('.rf-example1-date-picker').count(), 0,
-      'The green hero must not show Change date');
+      'The attendance hero must not show Change date');
     assert.match(heroText, /Monday 9 March 2026/,
       'The chosen attendance date must remain visible');
     assert.equal(await page.locator('[data-class-select]').count(), 0,
@@ -241,7 +243,7 @@ async function test() {
     await page.locator('#rf-movements-date').dispatchEvent('change');
     assert(Number(await page.locator('.rf-movement-stat-returned strong').innerText()) > 0,
       'Fictional completed movements should appear in the dated movement log');
-    assert.match(await page.locator('.rf-movement-table tbody').innerText(), /Fictional sample/,
+    assert.match(await page.locator('.rf-movement-table tbody').innerText(), /Training record/,
       'Sample history must be clearly labelled rather than mistaken for real passes');
     await page.locator('#rf-movements-date').fill(today);
     await page.locator('#rf-movements-date').dispatchEvent('change');
@@ -341,7 +343,7 @@ async function test() {
     assert.match(await page.locator('.rf-day-visit-count').innerText(), /1 recorded service visit/);
     const p1 = page.locator('[data-rf-day-period="p1"] .rf-day-period-cell');
     assert.match(await p1.innerText(), new RegExp(sampleInPeriodOne.destination));
-    assert.match(await p1.innerText(), /Fictional sample/);
+    assert.match(await p1.innerText(), /Training record/);
     for (const periodId of ['care','p2','p3','p4']) {
       assert.equal((await page.locator('[data-rf-day-period="' + periodId + '"] .rf-day-period-cell')
         .innerText()).trim(), '', periodId + ' should remain blank without a visit');
@@ -417,6 +419,13 @@ async function test() {
 
     // Admin-managed destinations must persist in this browser, be shared
     // between demo roles, and never mutate historical movement records.
+    assert.match(await page.locator('.v31-disclaimer').innerText(), /Training workspace.*Do not enter real student or staff records/);
+    for (const id of ['relief', 'attendance', 'notices', 'reports', 'settings']) {
+      assert.equal(await page.locator('.v31-nav [data-admin-page="' + id + '"]').count(), 0, 'Unimplemented menu item must not be offered: ' + id);
+    }
+    await page.locator('[data-admin-page="staff"]').first().click();
+    assert.equal(await page.locator('[data-admin-reset]').count(), 0, 'No simulated password reset control');
+    assert.equal(await page.getByText('Built-in training access', { exact: true }).count(), 3, 'All three public access identities must be protected');
     await page.locator('[data-admin-page="movements"]').first().click();
     assert.equal((await page.locator('#rf-admin-destinations-title').innerText()).trim(),
       'Manage movement destinations');
