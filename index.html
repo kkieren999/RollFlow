@@ -590,6 +590,9 @@ function rfDayMovementMinutes(text){
  return hour*60+minute;
 }
 function rfDayMovementPeriod(item){
+ // New live passes retain their assigned school session; older passes and
+ // fictional completed samples are grouped from their departure clock.
+ if(RF_MOVEMENT_DAY_PERIODS.some(period=>period.id===item.session))return item.session;
  const minute=rfDayMovementMinutes(item.time);
  return RF_MOVEMENT_DAY_PERIODS.find(period=>minute!==null&&minute>=period.start&&minute<=period.end)?.id||'other';
 }
@@ -604,20 +607,17 @@ function rfDayStudentOptions(){
  return rfDayMovementStudents().map((student,index)=>
   `<button type="button" role="option" id="rf-day-option-${index}"
    aria-selected="${index===rfDayStudentHighlight}" class="rf-day-student-option ${index===rfDayStudentHighlight?'selected':''}"
-   data-rf-day-student="${esc(student.id)}"><strong>${esc(student.name)}</strong><span>Year ${student.year} · ${esc(student.id)}</span></button>`
+   data-rf-day-student="${esc(student.id)}"><strong>${esc(student.name)}</strong><span>Year ${student.year} · ${esc(student.id)} · ${rfMovementEntriesForDate().filter(m=>m.studentId===student.id&&m.date===state.date).length} service visits this date</span></button>`
  ).join('');
 }
 function rfDayStudentMovements(){
  if(!rfDayStudentId)return [];
- // Strictly the selected date, unlike the main activity log which additionally
- // shows outstanding passes from earlier days when viewing today.
- const entries=[
-  ...state.movements.filter(item=>item.studentId===rfDayStudentId&&item.date===state.date),
-  ...(Array.isArray(workspace.sampleMovementHistory)?workspace.sampleMovementHistory:[])
-    .filter(item=>item.sample&&item.studentId===rfDayStudentId&&item.date===state.date)
- ];
- return entries.sort((a,b)=>(rfDayMovementMinutes(a.time)??9999)-
-                           (rfDayMovementMinutes(b.time)??9999));
+ // Use the exact same records as Movement log, including issued passes and
+ // completed fictional examples, while excluding outstanding prior-day passes.
+ return rfMovementEntriesForDate()
+  .filter(item=>item.studentId===rfDayStudentId&&item.date===state.date)
+  .sort((a,b)=>(rfDayMovementMinutes(a.time)??9999)-
+                (rfDayMovementMinutes(b.time)??9999));
 }
 function rfDayMovementChip(item){
  const duration=item.sample?item.minutes:movementDuration(item);
@@ -638,7 +638,7 @@ function rfDayStudentPeriodTable(){
   </tr>`;
  }).join('');
  const outside=records.filter(item=>rfDayMovementPeriod(item)==='other');
- return `${person?`<p class="rf-day-selected-student"><strong>${esc(person.name)}</strong> · Year ${person.year} · ${esc(person.id)} · ${esc(niceDate())}</p>`:''}
+ return `${person?`<p class="rf-day-selected-student"><strong>${esc(person.name)}</strong> · Year ${person.year} · ${esc(person.id)} · ${esc(niceDate())} · <span class="rf-day-visit-count">${records.length} recorded service visit${records.length===1?'':'s'}</span></p>`:''}
  <div class="rf-day-period-table-wrap">
   <table class="rf-day-period-table" aria-label="Student movement by Care class and periods 1 to 4">
    <thead><tr><th scope="col">Session</th><th scope="col">Movements</th></tr></thead>
@@ -649,6 +649,23 @@ function rfDayStudentPeriodTable(){
   <strong>Movement outside Care class–Period 4</strong>
   ${outside.map(rfDayMovementChip).join('')}
  </div>`:''}`;
+}
+function rfDayStudentsWithVisits(){
+ const students=new Map();
+ rfMovementEntriesForDate().filter(item=>item.date===state.date&&getPerson(item.studentId))
+  .forEach(item=>students.set(item.studentId,(students.get(item.studentId)||0)+1));
+ return [...students.entries()]
+  .sort((a,b)=>b[1]-a[1]||getPerson(a[0]).name.localeCompare(getPerson(b[0]).name));
+}
+function rfDayQuickStudentPicks(){
+ const matches=rfDayStudentsWithVisits();
+ if(!matches.length)return '';
+ return `<div class="rf-day-quick-picks" aria-label="Students with recorded service visits for this date">
+  <span>Students with visits on this date</span>
+  <div>${matches.slice(0,12).map(([id,count])=>`<button type="button"
+   data-rf-day-student="${esc(id)}" class="rf-day-quick-pick"
+   aria-pressed="${rfDayStudentId===id}">${esc(getPerson(id).name)} <strong>${count}</strong></button>`).join('')}</div>
+ </div>`;
 }
 function rfDayStudentReview(){
  return `<section class="sheet rf-day-review" aria-labelledby="rf-day-review-title">
@@ -670,6 +687,7 @@ function rfDayStudentReview(){
       ${rfDayStudentId||rfDayStudentSearch?'':'disabled'}>Clear</button>
    </div>
   </div>
+  ${rfDayQuickStudentPicks()}
   <div id="rf-day-period-result">${rfDayStudentPeriodTable()}</div>
  </section>`;
 }
@@ -709,6 +727,18 @@ document.addEventListener('keydown',event=>{
  }
 });
 document.addEventListener('click',event=>{
+ const view=event.target.closest('[data-rf-view-day]');
+ if(view){
+  event.preventDefault();
+  const person=getPerson(view.dataset.rfViewDay);
+  if(!person)return;
+  // An outstanding earlier pass may be shown in today's Movement log.
+  // Select that pass's actual date before displaying the day's timeline.
+  if(view.dataset.rfViewDate)state.date=view.dataset.rfViewDate;
+  rfDayStudentSelect(person.id);
+  document.querySelector('#rf-day-review-title')?.scrollIntoView({block:'start'});
+  return;
+ }
  const choice=event.target.closest('[data-rf-day-student]');
  if(choice){event.preventDefault();rfDayStudentSelect(choice.dataset.rfDayStudent);return}
  const clear=event.target.closest('[data-rf-day-clear]');
@@ -776,12 +806,15 @@ function movementRows() {
             </span>
           </td>
           <td>
-            ${m.returnedAt
-              ? `<span class="rf-movement-return-time">${m.sample?'Fictional sample · ':''}Returned ${esc(m.returnedAt)}</span>`
-              : `<button type="button" class="rf-movement-return-button"
-                   data-action="returnMovement" data-movement="${esc(m.id)}">
-                   ✓ Mark returned
-                 </button>`}
+            <div class="rf-movement-row-actions">
+              ${m.returnedAt
+                ? `<span class="rf-movement-return-time">${m.sample?'Fictional sample · ':''}Returned ${esc(m.returnedAt)}</span>`
+                : `<button type="button" class="rf-movement-return-button"
+                     data-action="returnMovement" data-movement="${esc(m.id)}">✓ Mark returned</button>`}
+              <button type="button" class="rf-movement-view-day"
+                data-rf-view-day="${esc(m.studentId)}" data-rf-view-date="${esc(m.date)}"
+                aria-label="Show ${esc(name)} service visits in day template">View in template</button>
+            </div>
           </td>
         </tr>`;
       }).join('')}</tbody>
@@ -1133,6 +1166,7 @@ body[data-theme="Dark"] .rf-movement-stat span { color: #f2f7fa; }
 }
 `;
 document.head.appendChild(rfMovementExample1Style);
+const rfDayServiceLinkStyle=document.createElement('style');rfDayServiceLinkStyle.textContent="\n/* Connect the main log to the same day template, with clear service labels. */\n.rf-movement-row-actions{display:flex;flex-wrap:wrap;align-items:center;gap:7px 9px}\n.rf-movement-view-day{border:1px solid #9fcdb4;border-radius:6px;padding:6px 9px;color:#116b3d;background:#eaf6ee;cursor:pointer;font-size:11px;font-weight:750;white-space:nowrap}\n.rf-movement-view-day:hover{background:#d7ede0}\n.rf-movement-view-day:focus-visible,.rf-day-quick-pick:focus-visible{outline:3px solid #e2b44d;outline-offset:2px}\n.rf-day-visit-count{font-weight:800;color:#166d40}\n.rf-day-quick-picks{display:grid;gap:7px;margin:0 0 15px;padding:12px 14px;background:#f5faf6;border:1px solid #d8e9dc;border-radius:8px}\n.rf-day-quick-picks>span{color:#486254;font-size:11px;font-weight:750}\n.rf-day-quick-picks>div{display:flex;gap:7px;flex-wrap:wrap}\n.rf-day-quick-pick{border:1px solid #bed9c7;border-radius:999px;padding:6px 10px;cursor:pointer;color:#23563a;background:#fff;font-size:11px}\n.rf-day-quick-pick strong{display:inline-grid;place-items:center;border-radius:50%;min-width:20px;height:20px;background:#e2f2e7;color:#176038;font-size:10px;margin-left:3px}\n.rf-day-quick-pick[aria-pressed=\"true\"]{background:#147a41;border-color:#147a41;color:#fff}\nbody[data-theme=\"Dark\"] .rf-day-quick-picks{background:#213c2e;border-color:#35674b}\nbody[data-theme=\"Dark\"] .rf-day-quick-picks>span{color:#c8e1d1}\n@media(max-width:700px){.rf-movement-row-actions{min-width:130px}.rf-day-quick-picks{padding:9px}}\n";document.head.appendChild(rfDayServiceLinkStyle);
 const rfDayReviewStyle=document.createElement('style');rfDayReviewStyle.textContent="\n.rf-day-review{background:#fff;border:1px solid #d5e2e4;border-radius:11px;padding:20px;overflow:visible}\n.rf-day-review-header h2{margin:0 0 5px;color:#203844;font-size:20px;font-weight:800}\n.rf-day-review-header p{color:#607482;margin:0;font-size:12px;line-height:1.55}\n.rf-day-student-search{margin:17px 0 15px;max-width:620px}\n.rf-day-student-search>label{display:block;color:#40596a;font-size:12px;font-weight:750;margin-bottom:6px}\n.rf-day-student-input-row{display:flex;align-items:flex-start;gap:10px}\n.rf-day-student-combo{position:relative;flex:1;min-width:0}\n.rf-day-student-combo input{height:41px;width:100%;border:1px solid #b7cbd0;border-radius:7px;background:#fff;color:#253b48;padding:9px 12px;font-size:13px}\n.rf-day-student-clear{height:41px;min-width:74px;border-radius:7px}\n.rf-day-student-options{position:absolute;z-index:31;left:0;right:0;top:calc(100% + 4px);max-height:250px;overflow:auto;box-shadow:0 5px 20px #1b35432c;background:#fff;border-radius:7px}\n.rf-day-student-options:empty{display:none}\n.rf-day-student-option{display:flex;flex-direction:column;align-items:flex-start;width:100%;background:#fff;border:0;border-bottom:1px solid #e1e9ec;cursor:pointer;text-align:left;padding:10px 12px;color:#203844;gap:3px}\n.rf-day-student-option.selected,.rf-day-student-option:hover{background:#eaf4ee}\n.rf-day-student-option span{font-size:11px;color:#607781}\n.rf-day-selected-student{padding:11px 13px;background:#eaf5ee;color:#284b38;border-radius:7px;margin:0 0 12px;font-size:13px}\n.rf-day-period-table-wrap{width:100%;overflow-x:auto}\n.rf-day-period-table{width:100%;border-collapse:collapse;table-layout:fixed;text-align:left;font-size:13px}\n.rf-day-period-table thead{background:#e9f0f3;color:#314a58}\n.rf-day-period-table th,.rf-day-period-table td{padding:12px 14px;border:1px solid #dce6e9;vertical-align:top}\n.rf-day-period-table thead th:first-child,.rf-day-period-table tbody th{width:175px}\n.rf-day-period-table tbody th{font-weight:750;color:#273e4a;background:#f7fafb}\n.rf-day-period-table tbody th strong,.rf-day-period-table tbody th small{display:block}\n.rf-day-period-table tbody th small{font-size:11px;color:#6a808c;font-weight:500;margin-top:4px}\n.rf-day-period-cell{min-height:48px;background:#fff}\n.rf-day-movement-entry{display:flex;flex-wrap:wrap;align-items:center;gap:4px 13px;padding:8px 11px;background:#f1f8f4;border-left:3px solid #17824b;border-radius:5px;margin-bottom:6px;overflow-wrap:anywhere}\n.rf-day-movement-entry:last-child{margin-bottom:0}\n.rf-day-movement-entry>strong{color:#183e2b;font-size:13px}\n.rf-day-movement-entry>span{color:#3c5866;font-size:12px}\n.rf-day-movement-entry>small{color:#55776a;font-size:10px}\n.rf-day-outside-periods{border-top:1px solid #dce6e9;margin-top:13px;padding-top:12px;color:#455b68}\n.rf-day-outside-periods>strong{display:block;margin-bottom:7px}\nbody[data-theme=\"Dark\"] .rf-day-review{background:#203744;border-color:#49616e;color:#f0f7f9}\nbody[data-theme=\"Dark\"] .rf-day-review-header h2{color:#fff}\nbody[data-theme=\"Dark\"] .rf-day-period-table tbody th{background:#263e4b;color:#e9f4f9}\nbody[data-theme=\"Dark\"] .rf-day-period-cell{background:#203744}\nbody[data-theme=\"Dark\"] .rf-day-period-table th,body[data-theme=\"Dark\"] .rf-day-period-table td{border-color:#4a6370}\n@media(max-width:600px){.rf-day-review{padding:13px}.rf-day-period-table thead th:first-child,.rf-day-period-table tbody th{width:119px}.rf-day-period-table th,.rf-day-period-table td{padding:9px}.rf-day-period-table tbody th small{font-size:10px}.rf-day-student-input-row{gap:6px}}\n";document.head.appendChild(rfDayReviewStyle);
 
 const noticeData=[{id:'notice-1',title:'School timetable changes',type:'Timetable',body:'Check your assigned rooms and class changes before taking each roll.'},{id:'notice-2',title:'Friday excursion attendance',type:'Activities',body:'Check school instructions for students attending an approved excursion.'},{id:'notice-3',title:'Roll certification reminder',type:'Attendance',body:'Check each student’s attendance before saving the class roll.'}];
@@ -1181,7 +1215,7 @@ function showModal(which){closeModal();state.modal=which;drawModal()}
 function movementMatches(){const q=state.movementQuery.trim().toLocaleLowerCase();return q?people.filter(p=>p.name.toLocaleLowerCase().includes(q)||p.id.toLocaleLowerCase().includes(q)).slice(0,8):[]}
 function refreshMovementSuggestions(){const target=document.getElementById('movementSuggestions'),query=document.getElementById('movementStudentSearch'),feedback=document.getElementById('movementFeedback'),hidden=document.getElementById('movementStudent'),submit=document.getElementById('movementIssueButton');if(!target||!query)return;const matches=state.movementStudentId?[]:movementMatches();target.innerHTML=state.movementQuery.trim()&&!state.movementStudentId?(matches.length?matches.map((p,i)=>`<button type="button" class="movement-suggestion ${state.movementHighlight===i?'selected':''}" role="option" aria-selected="${state.movementHighlight===i}" data-movement-choice="${esc(p.id)}"><strong>${esc(p.name)}</strong><span>Year ${p.year} · ${esc(p.id)}</span></button>`).join(''):'<div class="movement-not-found">No students found. Try another name.</div>'):'';query.setAttribute('aria-expanded',String(!!target.innerHTML));if(hidden)hidden.value=state.movementStudentId;if(submit)submit.disabled=!state.movementStudentId||state.date!==brisbaneToday();if(feedback){const p=getPerson(state.movementStudentId);feedback.textContent=p?'✓ '+p.name+' selected':state.movementQuery.trim()?'Select the correct student from the results':'Search and select a student to issue a pass';feedback.classList.toggle('confirmed',!!p)}}
 function selectMovementStudent(id){const p=getPerson(id);if(!p)return;state.movementStudentId=id;state.movementQuery=p.name;state.movementHighlight=0;const input=document.getElementById('movementStudentSearch');if(input)input.value=p.name;refreshMovementSuggestions()}
-function recordMovement(studentId,destination){state.movements.push({id:'M'+Date.now()+'-'+Math.random().toString(36).slice(2,6),studentId,destination,time:new Date().toLocaleTimeString('en-AU',{hour:'numeric',minute:'2-digit'}),date:state.date,returnedAt:null});persist()}
+function recordMovement(studentId,destination){const now=new Date(),time=brisbaneClock(now),session=rfDayMovementPeriod({time});state.movements.push({id:'M'+Date.now()+'-'+Math.random().toString(36).slice(2,6),studentId,destination,time,date:state.date,departedISO:now.toISOString(),session:session==='other'?'':session,returnedAt:null});persist()}
 function nav(page){if(page==='master')osSetView(false);if(page==='cover')page='finder';if(page==='reports')page='timetable';if(page==='finder'&&state.page!=='class-detail')workspace.settings.assignedOnly=false;profileEditing=false;if(page==='home')state.date=brisbaneToday();if(page==='roll'){state.date=brisbaneToday();const cls=preferredAttendanceClass();if(!cls){showToast('No lessons scheduled today');nav('timetable');return}openClass(cls.id);return}state.page=page;state.sidebarCollapsed=false;state.mobileNav=false;state.profileOpen=false;closeDrawer();closeModal();state.history=[];render()}
 document.addEventListener('change',e=>{if(e.target.matches('[data-pref]')){state.prefs[e.target.dataset.pref]=e.target.checked;persist();render()}if(e.target.matches('[data-date]')){state.date=e.target.value||state.date;state.history=[];render()}if(e.target.matches('[data-class-select]'))openClass(e.target.value);if(e.target.matches('select[data-finder-field]')){state.finder[e.target.dataset.finderField]=e.target.value;refreshFinderResults();}if(e.target.matches('[data-image]')){const file=e.target.files?.[0];if(!file)return;if(!/^image\/(png|jpeg|webp)$/.test(file.type)||file.size>2_000_000){showToast('Choose a PNG, JPEG or WebP under 2 MB');return}const reader=new FileReader();reader.onload=()=>{state.pictures[e.target.dataset.image]=reader.result;closeDrawer();render();state.drawer=e.target.dataset.image;drawDrawer();showToast('Photo updated in this browser session')};reader.readAsDataURL(file)}});
 document.addEventListener('change',e=>{if(e.target?.id==='certifyCheck'){const b=document.getElementById('confirmSubmit');if(b)b.disabled=!e.target.checked}});
