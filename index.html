@@ -1994,7 +1994,67 @@ function osPlanningPage(){
  const index={lessons:0,rooms:1,periods:2}[osTab];return tabs+original.slice(indexes[index],indexes[index+1]);
 }
 
+function rfAdminMovementDestinationsPage(){
+ const options=rfMovementDestinations;
+ return `<section class="v31-panel rf-admin-destinations" aria-labelledby="rf-admin-destinations-title">
+  <h2 id="rf-admin-destinations-title">Manage movement destinations</h2>
+  <p>Choose which destinations teachers can select when issuing new student passes. Removing an option does not delete or rename past movement records.</p>
+  <form id="rf-add-movement-destination" class="rf-admin-destination-form">
+   <label for="rf-new-movement-destination">New destination</label>
+   <div class="rf-admin-destination-add">
+    <input id="rf-new-movement-destination" name="destination" maxlength="50" required
+     autocomplete="off" placeholder="e.g. Wellbeing Centre" aria-describedby="rf-destination-help">
+    <button type="submit" class="v31-btn primary">Add destination</button>
+   </div>
+   <small id="rf-destination-help">2–50 characters. Destination names must be unique; maximum 30.</small>
+  </form>
+  <div class="rf-admin-destination-list" aria-label="Available movement destinations">
+   <h3>Available for new passes (${options.length})</h3>
+   ${options.map(name=>`<div class="rf-admin-destination-item">
+    <strong>${esc(name)}</strong>
+    <button type="button" class="v31-btn" data-rf-remove-movement-destination="${esc(name)}"
+     aria-label="Remove ${esc(name)}"${options.length===1?' disabled title="At least one destination is required"':''}>Remove</button>
+   </div>`).join('')}
+  </div>
+  <p class="rf-admin-destination-note">Public demonstration only: these settings are stored in this browser and shared by its demo teacher and admin logins. Other browsers and the installed Windows app will not synchronise automatically. Do not use with real student records.</p>
+ </section>`;
+}
+document.addEventListener('submit',event=>{
+ if(event.target?.id!=='rf-add-movement-destination')return;
+ event.preventDefault();
+ event.stopImmediatePropagation();
+ if(demoRole!=='admin')return;
+ try{
+  const name=rfNormaliseMovementDestination(new FormData(event.target).get('destination'));
+  if(rfMovementDestinations.some(item=>item.toLocaleLowerCase()===name.toLocaleLowerCase()))
+   throw Error('That destination already exists.');
+  rfSaveMovementDestinations([...rfMovementDestinations,name]);
+  adminMessage='Destination added: '+name+' (this browser only)';
+ }catch(error){adminMessage=error.message||'The destination could not be added.'}
+ render();
+},true);
+document.addEventListener('click',event=>{
+ const button=event.target.closest('[data-rf-remove-movement-destination]');
+ if(!button)return;
+ event.preventDefault();
+ event.stopImmediatePropagation();
+ if(demoRole!=='admin')return;
+ const name=button.getAttribute('data-rf-remove-movement-destination');
+ if(!rfMovementDestinations.includes(name))return;
+ if(rfMovementDestinations.length===1){
+  adminMessage='Keep at least one destination for new passes.';
+  render();return;
+ }
+ if(!confirm('Remove "'+name+'" from future student passes? Historical records will keep their original destination.'))return;
+ try{
+  rfSaveMovementDestinations(rfMovementDestinations.filter(item=>item!==name));
+  adminMessage='Destination removed: '+name+' (historical visits retained)';
+ }catch(error){adminMessage=error.message||'The destination could not be removed.'}
+ render();
+},true);
+
 function demoAdminContent(){
+ if(adminPage==='movements')return rfAdminMovementDestinationsPage();
  if(adminPage==='oneschool')return osImportPage();
  if(adminPage==='master')return osPublished()?osDatedContent(false):masterContent();
  if(adminPage==='classes')return demoPlanning();
@@ -2139,6 +2199,7 @@ const teacherHeadingPolishStyle=document.createElement('style');teacherHeadingPo
 
 const attendanceExample1Style=document.createElement('style');attendanceExample1Style.textContent="\n/* Example 1: the green Take Attendance header with a separate class strip. */\n.roll-view .page-bar{display:none}\n.roll-view .roll-main{padding:10px 15px 12px;gap:8px}\n.roll-view .rf-example1-panel{flex:none;min-width:0;border:1px solid #dbe4e6;border-radius:10px;overflow:hidden;background:#fff;box-shadow:0 1px 4px #152b3a0e}\n.roll-view .rf-example1-hero{background:linear-gradient(110deg,#007c31 0%,#008f38 100%);color:#fff;padding:16px 21px}\n.roll-view .rf-example1-hero.roll-overdue{outline:none;border:0;border-left:5px solid #f5ba57;padding-left:16px;border-radius:0}\n.roll-view .rf-example1-hero-main{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}\n.roll-view .rf-example1-hero-copy{min-width:0;flex:1}\n.roll-view .rf-example1-hero h1{color:#fff;font-size:26px;font-weight:800;line-height:1.15;margin:0 0 8px;letter-spacing:-.5px}\n.roll-view .rf-example1-meta{display:flex;align-items:center;flex-wrap:wrap;gap:5px 0;color:#f3fff6;font-size:12px;font-weight:500;line-height:1.6}\n.roll-view .rf-example1-meta span{display:inline-flex;align-items:center;white-space:nowrap}\n.roll-view .rf-example1-meta span+span:before{content:\"\";width:1px;height:13px;margin:0 11px;background:#fff9}\n.roll-view .rf-example1-lesson-date:before{content:\"▦\";font-size:15px;line-height:1;margin-right:7px}\n.roll-view .rf-example1-actions{display:flex;flex-direction:column;align-items:flex-end;gap:7px;flex:none}\n.roll-view .rf-example1-back{background:#f1faf3;color:#116333;border:1px solid #d5f1dc;border-radius:6px;min-height:37px;padding:8px 13px;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap}\n.roll-view .rf-example1-back:hover{background:#fff;border-color:#fff}\n.roll-view .rf-example1-back:focus-visible{outline:3px solid #ffd35d;outline-offset:2px}\n.roll-view .rf-example1-date-picker{display:flex;align-items:center;justify-content:flex-end;gap:7px;font-size:11px;font-weight:650;color:#fff}\n.roll-view .rf-example1-date-picker input{width:142px;min-height:31px;height:31px;font-size:12px;border-radius:5px;border:1px solid #f1fff1ad;background:#fff;color:#1f3540;padding:4px 7px}\n.roll-view .rf-example1-class-row{display:flex;align-items:center;padding:13px 21px;background:#f9fbfb;min-height:62px}\n.roll-view .rf-example1-class-heading{min-width:0;flex:1 1 auto}\n.roll-view .rf-example1-class-heading h2{font-size:18px;line-height:1.28;font-weight:800;color:#243a48;letter-spacing:-.2px;margin:0}\n.roll-view .rf-example1-class-status{margin-top:5px;display:flex;align-items:center;gap:7px}\n.roll-view .rf-example1-class-status .tag{font-size:10px;padding:4px 7px}\n.roll-view .rf-example1-class-select{display:flex;align-items:center;gap:8px;flex:0 1 265px;min-width:0}\n.roll-view .rf-example1-class-select label{font-size:11px;font-weight:700;white-space:nowrap;color:#465d69}\n.roll-view .rf-example1-class-select select{flex:1;min-width:0;min-height:34px;height:34px;border-radius:5px;background:#fff;color:#273d49}\nbody[data-theme=\"Dark\"] .roll-view .rf-example1-panel{background:#203744;border-color:#48616d}\nbody[data-theme=\"Dark\"] .roll-view .rf-example1-class-row{background:#203744}\nbody[data-theme=\"Dark\"] .roll-view .rf-example1-class-heading h2{color:#f0f7f9}\nbody[data-theme=\"Dark\"] .roll-view .rf-example1-class-select label{color:#d5e2e9}\nbody[data-theme=\"Dark\"] .roll-view .rf-example1-meta{color:#f0fff4}\n@media(max-width:900px){\n .roll-view .rf-example1-hero{padding:12px 14px}\n .roll-view .rf-example1-class-row{padding:11px 14px}\n .roll-view .rf-example1-hero h1{font-size:22px}\n .roll-view .rf-example1-hero.roll-overdue{padding-left:9px}\n}\n@media(max-width:660px){\n .roll-view .rf-example1-hero-main{flex-wrap:wrap;gap:8px}\n .roll-view .rf-example1-actions{width:100%;flex-direction:row;align-items:center;justify-content:space-between;gap:9px}\n .roll-view .rf-example1-class-row{flex-wrap:wrap;gap:8px}\n .roll-view .rf-example1-class-select{flex:1 1 100%;max-width:390px}\n .roll-view .rf-example1-back{min-height:32px;padding:6px 9px}\n .roll-view .rf-example1-date-picker{font-size:10px}\n .roll-view .rf-example1-date-picker input{min-height:29px;height:29px;width:129px}\n}\n@media(max-width:400px){\n .roll-view .roll-main{padding:5px;gap:5px}\n .roll-view .rf-example1-hero{padding:9px}\n .roll-view .rf-example1-hero h1{font-size:19px}\n .roll-view .rf-example1-hero.roll-overdue{padding-left:5px}\n .roll-view .rf-example1-meta{font-size:10px}\n .roll-view .rf-example1-meta span+span:before{margin:0 5px}\n .roll-view .rf-example1-class-row{padding:9px}\n .roll-view .rf-example1-class-heading h2{font-size:15px}\n .roll-view .rf-example1-date-picker{gap:4px}\n .roll-view .rf-example1-date-picker input{width:121px}\n .roll-view .rf-example1-back{font-size:11px}\n .roll-view .rf-example1-class-select{flex-wrap:wrap;gap:3px}\n .roll-view .rf-example1-class-select select{flex:1 1 100%}\n}\n@media(max-height:650px){\n .roll-view .rf-example1-hero{padding-top:8px;padding-bottom:8px}\n .roll-view .rf-example1-class-row{padding-top:7px;padding-bottom:7px;min-height:0}\n .roll-view .rf-example1-hero h1{font-size:20px;margin-bottom:4px}\n}\n";document.head.appendChild(attendanceExample1Style);
 
+const rfAdminDestinationStyle=document.createElement('style');rfAdminDestinationStyle.textContent="\n.rf-admin-destinations{max-width:880px}\n.rf-admin-destinations>p{color:#536977;margin:7px 0 17px}\n.rf-admin-destination-form{display:grid;gap:7px;margin:10px 0 20px}\n.rf-admin-destination-form>label{font-weight:750;color:#2f4754}\n.rf-admin-destination-add{display:flex;gap:10px;align-items:stretch;flex-wrap:wrap}\n.rf-admin-destination-add input{min-width:225px;max-width:430px;flex:1 1 240px;border:1px solid #aabbc5;border-radius:6px;padding:9px 11px;background:#fff;min-height:41px;color:#263d48}\n.rf-admin-destination-add button{min-height:41px}\n.rf-admin-destination-form small{font-size:11px;color:#687b85}\n.rf-admin-destination-list{border:1px solid #d7e1e6;border-radius:9px;background:#fff;overflow:hidden}\n.rf-admin-destination-list h3{font-size:14px;font-weight:800;padding:13px 15px;margin:0;background:#edf5f0;border-bottom:1px solid #d7e1e6}\n.rf-admin-destination-item{display:flex;align-items:center;justify-content:space-between;padding:10px 15px;border-top:1px solid #e9eeee;gap:12px}\n.rf-admin-destination-item:first-of-type{border-top:0}\n.rf-admin-destination-item strong{overflow-wrap:anywhere}\n.rf-admin-destination-item button{font-weight:700;min-width:88px}\n.rf-admin-destination-item button:disabled{opacity:.45}\n.rf-admin-destination-note{padding-top:8px;font-size:12px;line-height:1.5}\n@media(max-width:520px){.rf-admin-destination-add{flex-direction:column}.rf-admin-destination-add input{width:100%;max-width:none;flex:auto}.rf-admin-destination-add button{width:100%}}\n";document.head.appendChild(rfAdminDestinationStyle);
 render();
 })();
 </script></body></html>
