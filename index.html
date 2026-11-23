@@ -663,7 +663,7 @@ function rfDayQuickStudentPicks(){
  return `<div class="rf-day-quick-picks" aria-label="Students with recorded service visits for this date">
   <span>Students with visits on this date</span>
   <div>${matches.slice(0,12).map(([id,count])=>`<button type="button"
-   data-rf-day-student="${esc(id)}" class="rf-day-quick-pick"
+   data-rf-day-quick-student="${esc(id)}" class="rf-day-quick-pick"
    aria-pressed="${rfDayStudentId===id}">${esc(getPerson(id).name)} <strong>${count}</strong></button>`).join('')}</div>
  </div>`;
 }
@@ -739,8 +739,8 @@ document.addEventListener('click',event=>{
   document.querySelector('#rf-day-review-title')?.scrollIntoView({block:'start'});
   return;
  }
- const choice=event.target.closest('[data-rf-day-student]');
- if(choice){event.preventDefault();rfDayStudentSelect(choice.dataset.rfDayStudent);return}
+ const choice=event.target.closest('[data-rf-day-student],[data-rf-day-quick-student]');
+ if(choice){event.preventDefault();rfDayStudentSelect(choice.dataset.rfDayStudent||choice.dataset.rfDayQuickStudent);return}
  const clear=event.target.closest('[data-rf-day-clear]');
  if(clear){event.preventDefault();rfDayStudentId='';rfDayStudentSearch='';rfDayStudentHighlight=0;render()}
 });
@@ -1215,7 +1215,7 @@ function showModal(which){closeModal();state.modal=which;drawModal()}
 function movementMatches(){const q=state.movementQuery.trim().toLocaleLowerCase();return q?people.filter(p=>p.name.toLocaleLowerCase().includes(q)||p.id.toLocaleLowerCase().includes(q)).slice(0,8):[]}
 function refreshMovementSuggestions(){const target=document.getElementById('movementSuggestions'),query=document.getElementById('movementStudentSearch'),feedback=document.getElementById('movementFeedback'),hidden=document.getElementById('movementStudent'),submit=document.getElementById('movementIssueButton');if(!target||!query)return;const matches=state.movementStudentId?[]:movementMatches();target.innerHTML=state.movementQuery.trim()&&!state.movementStudentId?(matches.length?matches.map((p,i)=>`<button type="button" class="movement-suggestion ${state.movementHighlight===i?'selected':''}" role="option" aria-selected="${state.movementHighlight===i}" data-movement-choice="${esc(p.id)}"><strong>${esc(p.name)}</strong><span>Year ${p.year} · ${esc(p.id)}</span></button>`).join(''):'<div class="movement-not-found">No students found. Try another name.</div>'):'';query.setAttribute('aria-expanded',String(!!target.innerHTML));if(hidden)hidden.value=state.movementStudentId;if(submit)submit.disabled=!state.movementStudentId||state.date!==brisbaneToday();if(feedback){const p=getPerson(state.movementStudentId);feedback.textContent=p?'✓ '+p.name+' selected':state.movementQuery.trim()?'Select the correct student from the results':'Search and select a student to issue a pass';feedback.classList.toggle('confirmed',!!p)}}
 function selectMovementStudent(id){const p=getPerson(id);if(!p)return;state.movementStudentId=id;state.movementQuery=p.name;state.movementHighlight=0;const input=document.getElementById('movementStudentSearch');if(input)input.value=p.name;refreshMovementSuggestions()}
-function recordMovement(studentId,destination){const now=new Date(),time=brisbaneClock(now),session=rfDayMovementPeriod({time});state.movements.push({id:'M'+Date.now()+'-'+Math.random().toString(36).slice(2,6),studentId,destination,time,date:state.date,departedISO:now.toISOString(),session:session==='other'?'':session,returnedAt:null});persist()}
+function recordMovement(studentId,destination){state.movements.push({id:'M'+Date.now()+'-'+Math.random().toString(36).slice(2,6),studentId,destination,time:new Date().toLocaleTimeString('en-AU',{hour:'numeric',minute:'2-digit'}),date:state.date,returnedAt:null});persist()}
 function nav(page){if(page==='master')osSetView(false);if(page==='cover')page='finder';if(page==='reports')page='timetable';if(page==='finder'&&state.page!=='class-detail')workspace.settings.assignedOnly=false;profileEditing=false;if(page==='home')state.date=brisbaneToday();if(page==='roll'){state.date=brisbaneToday();const cls=preferredAttendanceClass();if(!cls){showToast('No lessons scheduled today');nav('timetable');return}openClass(cls.id);return}state.page=page;state.sidebarCollapsed=false;state.mobileNav=false;state.profileOpen=false;closeDrawer();closeModal();state.history=[];render()}
 document.addEventListener('change',e=>{if(e.target.matches('[data-pref]')){state.prefs[e.target.dataset.pref]=e.target.checked;persist();render()}if(e.target.matches('[data-date]')){state.date=e.target.value||state.date;state.history=[];render()}if(e.target.matches('[data-class-select]'))openClass(e.target.value);if(e.target.matches('select[data-finder-field]')){state.finder[e.target.dataset.finderField]=e.target.value;refreshFinderResults();}if(e.target.matches('[data-image]')){const file=e.target.files?.[0];if(!file)return;if(!/^image\/(png|jpeg|webp)$/.test(file.type)||file.size>2_000_000){showToast('Choose a PNG, JPEG or WebP under 2 MB');return}const reader=new FileReader();reader.onload=()=>{state.pictures[e.target.dataset.image]=reader.result;closeDrawer();render();state.drawer=e.target.dataset.image;drawDrawer();showToast('Photo updated in this browser session')};reader.readAsDataURL(file)}});
 document.addEventListener('change',e=>{if(e.target?.id==='certifyCheck'){const b=document.getElementById('confirmSubmit');if(b)b.disabled=!e.target.checked}});
@@ -1449,7 +1449,7 @@ recordMovement=function(studentId,destination){
  if(!getPerson(studentId)||!destination)return false;
  if(state.movements.some(m=>m.studentId===studentId&&!m.returnedAt)){showToast('This student already has an active pass. Mark them returned first.');return false}
  if(state.date!==brisbaneToday()){showToast('Select today’s date to issue a live movement pass.');return false}
- const now=new Date(),entry={id:'M'+Date.now()+'-'+Math.random().toString(36).slice(2,6),studentId,destination,time:brisbaneClock(now),date:brisbaneToday(),departedISO:now.toISOString(),returnedAt:null,classId:state.page==='roll'&&getClass().ids.includes(studentId)?state.classId:''};
+ const now=new Date(),time=brisbaneClock(now),slot=rfDayMovementPeriod({time}),entry={id:'M'+Date.now()+'-'+Math.random().toString(36).slice(2,6),studentId,destination,time,date:brisbaneToday(),departedISO:now.toISOString(),session:slot==='other'?'':slot,returnedAt:null,classId:state.page==='roll'&&getClass().ids.includes(studentId)?state.classId:''};
  state.movements.push(entry);if(!persist()){state.movements.pop();return false}return true;
 };
 const teacherLabels={name:'Display name',role:'Teaching role',faculty:'Faculty or department',years:'Teaching year levels',campus:'School or campus',avatar:'Avatar initials'};
