@@ -152,7 +152,9 @@ async function test() {
     assert(backCss.height >= 30 && backCss.borderWidth !== '0px',
       'Back button should be a genuine visible control, not a tiny text link');
     await backButton.click();
-    assert.equal((await page.locator('.page-bar h1').innerText()).trim(), 'Today');
+    assert.equal((await page.locator('.page-bar h1').innerText()).trim(), 'Daily Schedule');
+    assert.match(await page.locator('#dayScheduleTitle').innerText(), /Lessons for selected date/,
+      'Historical daily schedule heading should not say Today');
     assert.equal(await page.locator('input[data-date]').first().inputValue(), '2026-03-09',
       'Back navigation must preserve the selected historical date');
 
