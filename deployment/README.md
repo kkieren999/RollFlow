@@ -1,3 +1,18 @@
+# Student movements by period — Windows offline demo
+
+The fictional browser-based fallback teacher UI packaged in the Windows
+V3.6.7 staging bundle has a student lookup **below Movement log**, with a
+read-only five-row **Care class through Period 4** template. Existing sample
+and browser-issued passes are grouped by departure time on the selected date,
+with empty period cells where no movement was recorded. Multiple passes per
+period remain visible and out-of-period visits are listed separately.
+
+This is matching demo source, **not** a new connected-school Django route,
+not a PostgreSQL movement register, and not an automatic Windows update.
+An approved Windows bundle must pass staging tests and be installed through
+the backup-first manual upgrade process below; real school records must never
+be entered into the public fictional demo.
+
 # Administrator-managed movement destinations — V3.6.7 offline demo
 
 The offline fictional browser UI shipped as `index.html` now provides

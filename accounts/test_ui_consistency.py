@@ -162,6 +162,17 @@ class SharedInterfaceTests(TestCase):
             'rfMovementDestinations.map(name=>',
             'rfMovementHistoryDestinations()',
             "Fictional sample · ",
+            "const RF_MOVEMENT_DAY_PERIODS=[",
+            "function rfDayStudentPeriodTable()",
+            "function rfDayStudentMovements()",
+            "function rfDayMovementPeriod(item)",
+            'id="rf-day-review-title"',
+            'id="rf-day-student-search"',
+            'id="rf-day-period-result"',
+            'data-rf-day-period="',
+            "rfDayStudentReview()",
+            "rfDayReviewStyle",
+
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, html)
@@ -176,6 +187,9 @@ class SharedInterfaceTests(TestCase):
         self.assertEqual(html.count("function rfAdminMovementDestinationsPage()"), 1)
         self.assertEqual(html.count("const RF_MOVEMENT_DESTINATIONS_KEY="), 1)
         self.assertIn("if(adminPage==='movements')return rfAdminMovementDestinationsPage();", html)
+        self.assertEqual(html.count("function rfDayStudentReview()"), 1)
+        self.assertEqual(html.count("function rfDayStudentMovements()"), 1)
+        self.assertIn("item.date===state.date", html)
         self.assertEqual(html.count("function movementRows()"), 1)
         self.assertEqual(html.count("function movementsPage()"), 1)
 
