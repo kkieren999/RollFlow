@@ -255,6 +255,17 @@ async function test() {
     assert.equal(Number(await page.locator('.rf-movement-stat-total strong').innerText()), initialTotal + 1);
     assert.match(await page.locator('.rf-movement-table tbody').innerText(), /Library/);
     assert.equal(await page.locator('.rf-movement-return-button').count(), 1);
+    const livePass = await page.evaluate(() => {
+      const stored = JSON.parse(localStorage.getItem('rollflow_teacher_swilliams_2026_v1') || '{}');
+      return stored.movements?.at(-1);
+    });
+    assert(livePass?.departedISO && !Number.isNaN(Date.parse(livePass.departedISO)),
+      'New service passes need a real departure timestamp for duration');
+    assert.equal(typeof livePass.session, 'string',
+      'Store the actual Care/Period session on newly issued services');
+    assert(livePass?.time, 'The service visit must record a readable departure time');
+    assert(await page.locator('.rf-movement-view-day').count() > 0,
+      'Each service log entry needs a way to display its day template');
 
     await page.locator('#rfMovementView').selectOption('returned');
     assert.equal(await page.locator('.rf-movement-return-button').count(), 0,
@@ -305,8 +316,15 @@ async function test() {
       'Selecting another date should preserve the selected student');
     assert((await page.locator('.rf-day-period-cell').allInnerTexts()).every(text => text.trim() === ''),
       'The period view must filter on the selected date');
-    await page.locator('#rf-day-student-search').fill('S7001');
-    await page.locator('[data-rf-day-student="S7001"]').click();
+    assert(await page.locator('.rf-day-quick-picks').isVisible(),
+      'Students with service movements on this date must be directly selectable');
+    assert(await page.locator('.rf-day-quick-pick[data-rf-day-student="S7001"]').isVisible());
+    const logVisitRow = page.locator('.rf-movement-table tbody tr').filter({hasText:'S7001'}).first();
+    assert(await logVisitRow.locator('[data-rf-view-day="S7001"]').isVisible(),
+      'A recorded service visit should offer View in template from the Movement log');
+    await logVisitRow.locator('[data-rf-view-day="S7001"]').click();
+    assert.match(await page.locator('.rf-day-selected-student').innerText(), /S7001/);
+    assert.match(await page.locator('.rf-day-visit-count').innerText(), /1 recorded service visit/);
     const p1 = page.locator('[data-rf-day-period="p1"] .rf-day-period-cell');
     assert.match(await p1.innerText(), new RegExp(sampleInPeriodOne.destination));
     assert.match(await p1.innerText(), /Fictional sample/);
@@ -343,8 +361,9 @@ async function test() {
     await page.locator('[data-nav="movements"]').first().click();
     await page.locator('#rf-movements-date').fill('2026-03-09');
     await page.locator('#rf-movements-date').dispatchEvent('change');
-    await page.locator('#rf-day-student-search').fill('S18030');
-    await page.locator('[data-rf-day-student="S18030"]').click();
+    const loggedRow = page.locator('.rf-movement-table tbody tr').filter({hasText:'S18030'}).first();
+    await loggedRow.locator('[data-rf-view-day="S18030"]').click();
+    assert.match(await page.locator('.rf-day-visit-count').innerText(), /5 recorded service visits/);
     assert.equal(await page.locator('[data-rf-day-period="care"] .rf-day-movement-entry').count(),1);
     assert.equal(await page.locator('[data-rf-day-period="p1"] .rf-day-movement-entry').count(),2,
       'Show multiple movements within the same period, not just the first');
