@@ -266,6 +266,16 @@ async function test() {
     assert(livePass?.time, 'The service visit must record a readable departure time');
     assert(await page.locator('.rf-movement-view-day').count() > 0,
       'Each service log entry needs a way to display its day template');
+    const issuedRow = page.locator('.rf-movement-table tbody tr').filter({hasText:'S7001'}).first();
+    await issuedRow.locator('[data-rf-view-day="S7001"]').click();
+    assert.match(await page.locator('.rf-day-selected-student').innerText(), /S7001/);
+    assert.match(await page.locator('#rf-day-period-result').innerText(), /Library/,
+      'The just-issued service pass must automatically appear in the student day template');
+    assert.match(await page.locator('#rf-day-period-result').innerText(), /Currently out/,
+      'The template should update while the student is out');
+    assert.equal(await page.locator('#rf-movements-date').inputValue(), today,
+      'Opening a current pass must keep the current date');
+
 
     await page.locator('#rfMovementView').selectOption('returned');
     assert.equal(await page.locator('.rf-movement-return-button').count(), 0,
@@ -274,6 +284,10 @@ async function test() {
     assert.equal(await page.locator('.rf-movement-return-button').count(), 1);
     await page.locator('#rfMovementView').selectOption('all');
     await page.locator('.rf-movement-return-button').click();
+    assert.match(await page.locator('#rf-day-period-result').innerText(), /Library/,
+      'Completing a service must not remove its entry from the student day');
+    assert.match(await page.locator('#rf-day-period-result').innerText(), /Returned/,
+      'The selected student template must refresh to show a returned service');
     assert.equal(await page.locator('.rf-movement-stat-out strong').innerText(), '0');
     assert.equal(Number(await page.locator('.rf-movement-stat-returned strong').innerText()), initialReturned + 1);
     assert.equal(Number(await page.locator('.rf-movement-stat-total strong').innerText()), initialTotal + 1);
