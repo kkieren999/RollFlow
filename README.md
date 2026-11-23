@@ -6,6 +6,28 @@ The **public browser-only demonstration** now accepts `swilliams / swilliams` in
 
 The two teacher demos have separate **browser-local** attendance and workspace storage keys. Signing out of Sarah Williams returns to the public login, and changing teacher reloads the demo identity to avoid sharing in-memory teacher state. This is **not real authentication**; credentials are public and any browser user can enter either identity. School planning preview and other shared fictional fixture data remain browser-local. No real school or Windows user credentials and no private PostgreSQL records are involved. GitHub Pages cannot log into or synchronise with a Windows school database.
 
+### Recorded service visits automatically appear in the student day template
+
+When a student is issued a pass to Toilet, Student services, School office,
+Library, or another administrator-configured service in the fictional demo,
+that pass is written to the existing movement log and the student's
+**Care class–Period 4** day template automatically. The effective pass-writing
+function now records the Brisbane departure time and the session it belongs
+to; older passes are grouped using their recorded time. The template shows
+the **service name, time out, return status and (when available) duration**.
+Marking a pass returned also updates its template entry. No periods are
+filled unless a matching service visit exists on the selected date.
+
+Teachers can click **View in template** on any row of Movement log to select
+that student and the actual date of the visit, or search by name/ID below
+the log. Shortcut chips show students with visits on the selected date,
+including the count. A student with no visits still has empty Care/Period
+cells; outside-period visits remain visible in a separate list.
+
+This applies to browser-local fictional demonstration records; it neither
+creates student attendance marks nor imports school data. It is not a
+secure cross-browser movement register or a live Windows school database.
+
 ### Searchable movement timeline — Care class through Period 4
 
 Below **Movement log**, teachers can search the fictional student directory by
