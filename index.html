@@ -2406,7 +2406,7 @@ function rfSpringMove(el,from,to,duration=640){
   const x=q<0?clamp(dx*q,-18,18):dx*q,y=q<0?clamp(dy*q,-15,15):dy*q;
   const w=q<0?clamp(1+(sx-1)*q,.93,1.07):Math.max(.05,1+(sx-1)*q);
   const h=q<0?clamp(1+(sy-1)*q,.93,1.07):Math.max(.05,1+(sy-1)*q);
-  return {offset:t,transformOrigin:'center',transform:'translate('+x+'px,'+y+'px) scale('+w+','+h+')',zIndex:5};
+  return {offset:t,transformOrigin:'center',transform:'translate('+x+'px,'+y+'px) scale('+w+','+h+')',zIndex:el.classList?.contains('rf-toggle-thumb')?-1:5};
  });
  return el.animate(frames,{duration,easing:'linear'});
 }
