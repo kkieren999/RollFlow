@@ -70,6 +70,7 @@ def week(request):
         "version": version,
         "week_days": week_days,
         "week_start": monday,
+        "anchor_date": anchor.isoformat(),
         "prev_week": shift_date(monday, -7).isoformat(),
         "next_week": shift_date(monday, 7).isoformat(),
         "today_url": today.isoformat(),

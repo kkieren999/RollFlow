@@ -1,0 +1,64 @@
+{# Progressive enhancement of teacher-authorised weekly rows only. No extra data or network calls. #}
+<style>
+.rf-native-toolbar{display:flex;align-items:center;gap:8px;justify-content:flex-end;margin:12px 0;flex-wrap:wrap}
+.rf-page .rf-native-toolbar button[aria-pressed="true"]{background:#193a80;color:white;border-color:#193a80}
+.rf-native-scroll{overflow-x:auto;max-width:100%;overscroll-behavior-x:contain}
+.rf-native-grid{display:grid!important;grid-template-columns:80px repeat(5,minmax(145px,1fr));grid-template-rows:auto repeat(var(--native-rows),minmax(82px,auto));gap:6px;min-width:850px;background:#fff;padding:8px;border:1px solid #dbe4e6;border-radius:10px}
+.rf-native-grid>.day,.rf-native-grid>.rf-native-labels{display:grid!important;grid-row:1/span calc(var(--native-rows) + 1);grid-template-rows:subgrid;gap:6px;min-width:0;background:none;border:0;box-shadow:none;overflow:visible;margin:0;padding:0}
+.rf-native-grid .day-body{display:contents}
+.rf-native-grid .day-head,.rf-native-head{background:#193a80;color:white;border-radius:7px;padding:10px 6px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:3px;min-height:64px}
+.rf-native-grid .day-head h2,.rf-native-grid .day-head small{color:white;font-size:13px;margin:0}
+.rf-native-grid .day-head .btn{display:none}
+.rf-native-grid .day-head[data-selected="true"]{background:#0076a8;box-shadow:inset 0 -3px #ffc928}
+.rf-page .rf-native-grid .day-head button{background:transparent;color:white;border:none;font:inherit;padding:2px;min-height:30px}
+.rf-native-label{background:#eef3f6;border-radius:6px;text-align:center;display:grid;place-items:center;font-weight:700;color:#243a48}
+.rf-native-slot{background:#f4f6f8;border:1px solid #e2e7ec;border-radius:7px;padding:4px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.rf-page [data-rf-native-card]{padding:9px 10px;border:1px solid var(--card-edge,#557fae);border-left:4px solid var(--card-edge,#557fae);border-radius:8px;background:var(--card-bg,#e4edf9);color:#243a48;min-width:0;margin:0;overflow-wrap:anywhere}
+.rf-page [data-rf-native-card] small,.rf-page [data-rf-native-card] .time{color:#455d6b;display:block;font-size:11px}
+.rf-page [data-rf-native-card] strong{display:block;font-size:14px;margin:3px 0}
+.rf-page [data-rf-native-card] a{display:inline-block;font-size:11px;margin-top:5px;color:#193a80}
+.rf-native-grid [data-rf-native-card]{flex:1;padding:7px}
+.rf-native-grid [data-rf-native-card] strong:before{content:"▤ ";color:var(--card-edge)}
+.rf-native-day-mode{display:block!important;min-width:0}
+.rf-native-day-mode>.day[hidden]{display:none!important}
+.rf-native-day-mode>.day{display:block;overflow:hidden;padding:12px;background:#fff;border:1px solid #dbe4e6;border-radius:10px}
+.rf-native-day-mode .day-head{background:#f9fbfb;color:#243a48;padding:12px;margin-bottom:8px}
+.rf-native-day-mode .day-head button{display:none}
+.rf-native-day-mode .day-body{display:grid;gap:7px;padding:4px}
+.rf-native-day-mode [data-rf-native-card]{min-height:72px;display:grid;grid-template-columns:minmax(105px,150px) minmax(120px,1fr);align-content:center;gap:4px 12px}
+.rf-native-day-mode [data-rf-native-card] strong{margin:0}
+.rf-native-day-mode [data-rf-native-card] a{grid-column:2}
+.rf-native-day-mode .rf-native-slot{display:contents}
+@media(max-width:600px){.rf-native-day-mode [data-rf-native-card]{grid-template-columns:1fr}.rf-native-day-mode [data-rf-native-card] a{grid-column:auto}}
+</style>
+<script>
+(function(){
+ const root=document.querySelector('[data-rf-native-timetable]');if(!root)return;
+ const days=[...root.querySelectorAll('[data-rf-native-day]')];if(!days.length)return;
+ const palette=[['#fbe1ef','#b34d82'],['#dceefe','#3879b9'],['#ffe5d4','#b76835'],['#fff3c4','#a68220'],['#dcf5e8','#37835d'],['#e9e2fa','#7860ad']];
+ const cards=days.map(day=>[...day.querySelectorAll('[data-rf-native-card]')]);
+ const periods=[...new Set(cards.flat().map(el=>el.dataset.rfPeriod))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
+ if(!periods.length)periods.push('—');
+ const labels=document.createElement('div');labels.className='rf-native-labels';
+ for(const name of ['Period',...periods]){const el=document.createElement('div');el.className=name==='Period'?'rf-native-head':'rf-native-label';el.textContent=name;labels.append(el);}
+ const toolbar=document.createElement('div');toolbar.className='rf-native-toolbar';toolbar.setAttribute('aria-label','Timetable view');
+ const dayButton=document.createElement('button'),weekButton=document.createElement('button'),picker=document.createElement('select');dayButton.type=weekButton.type='button';dayButton.textContent='Day';weekButton.textContent='Week';picker.setAttribute('aria-label','Selected day');
+ let selected=days.some(d=>d.dataset.rfNativeDay===root.dataset.rfSelected)?root.dataset.rfSelected:days[0].dataset.rfNativeDay;
+ for(const day of days){const opt=document.createElement('option');opt.value=day.dataset.rfNativeDay;opt.textContent=day.getAttribute('aria-label')||opt.value;picker.append(opt);}
+ picker.value=selected;toolbar.append(picker,dayButton,weekButton);root.before(toolbar);
+ const scroll=document.createElement('div');scroll.className='rf-native-scroll';root.before(scroll);scroll.append(root);
+ for(const card of cards.flat()){let h=0;for(const ch of card.dataset.rfCode)h=(h*31+ch.charCodeAt(0))>>>0;const p=palette[h%palette.length];card.style.setProperty('--card-bg',p[0]);card.style.setProperty('--card-edge',p[1]);}
+ days.forEach((day,i)=>{const head=day.querySelector('.day-head'),body=day.querySelector('.day-body'),btn=document.createElement('button');btn.type='button';btn.textContent='Expand day';btn.setAttribute('aria-label','Expand '+day.getAttribute('aria-label'));btn.addEventListener('click',()=>{selected=day.dataset.rfNativeDay;picker.value=selected;setMode('day')});head.append(btn);
+  const empty=body.querySelector('.muted');if(empty){empty.remove();head.append(empty);empty.style.fontSize='11px';}
+  body.replaceChildren(...periods.map(p=>{const slot=document.createElement('div');slot.className='rf-native-slot';slot.append(...cards[i].filter(card=>card.dataset.rfPeriod===p));return slot;}));});
+ root.prepend(labels);root.style.setProperty('--native-rows',periods.length);
+ let mode='week';
+ function setMode(next,animate=true){const old=new Map();for(const card of cards.flat()){const r=card.getBoundingClientRect();if(r.width&&r.height)old.set(card.dataset.rfKey,r);}
+ mode=next;const week=mode==='week';root.classList.toggle('rf-native-grid',week);root.classList.toggle('rf-native-day-mode',!week);labels.hidden=!week;days.forEach(d=>{d.hidden=!week&&d.dataset.rfNativeDay!==selected;d.querySelector('.day-head').dataset.selected=String(d.dataset.rfNativeDay===selected)});
+ dayButton.setAttribute('aria-pressed',String(!week));weekButton.setAttribute('aria-pressed',String(week));
+ if(!week)scroll.scrollLeft=0;if(!animate||matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+ for(const card of cards.flat()){const a=old.get(card.dataset.rfKey),b=card.getBoundingClientRect();if(!b.width||!b.height||!card.animate)continue;if(a)card.animate([{transformOrigin:'top left',transform:'translate('+(a.left-b.left)+'px,'+(a.top-b.top)+'px) scale('+(a.width/b.width)+','+(a.height/b.height)+')'},{transformOrigin:'top left',transform:'none'}],{duration:430,easing:'cubic-bezier(.2,.75,.2,1)'});else card.animate([{opacity:0},{opacity:1}],{duration:250});}
+ }
+ picker.addEventListener('change',()=>{selected=picker.value;setMode(mode)});dayButton.addEventListener('click',()=>setMode('day'));weekButton.addEventListener('click',()=>setMode('week'));setMode(root.dataset.rfInitial==='day'?'day':'week',false);
+})();
+</script>

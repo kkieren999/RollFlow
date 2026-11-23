@@ -18,10 +18,8 @@ from .models import ConnectedSchoolPublication, ConnectedStaffMapping, StaffProf
 class SharedInterfaceTests(TestCase):
     ADMIN_TABS = (
         "/manage/", "/manage/staff/", "/manage/students/", "/manage/classes/",
-        "/manage/timetable/", "/manage/master/", "/manage/relief/",
-        "/manage/attendance/", "/manage/movements/", "/manage/notices/",
-        "/manage/reports/", "/manage/roles/", "/manage/data/",
-        "/manage/oneschool/", "/manage/audit/", "/manage/settings/",
+        "/manage/timetable/", "/manage/master/", "/manage/roles/", "/manage/data/",
+        "/manage/oneschool/", "/manage/audit/",
     )
     ADMIN_EXTERNAL = (
         "/manage/oneschool/documents/",
@@ -65,6 +63,13 @@ class SharedInterfaceTests(TestCase):
         self.assertIn('href="/manage/connected/"', html)
         html = self.assert_interface("/manage/oneschool/documents/", "OneSchool Import Centre")
         self.assertIn('href="/manage/"', html)
+
+    def test_unimplemented_admin_sections_are_not_offered(self):
+        html = self.assert_interface("/manage/")
+        for section in ("relief", "attendance", "movements", "notices", "reports", "settings"):
+            path = f"/manage/{section}/"
+            self.assertNotIn(f'href="{path}"', html)
+            self.assertEqual(self.client.get(path).status_code, 400)
 
     def publish_fictional(self):
         now = timezone.localdate()
@@ -142,7 +147,7 @@ class SharedInterfaceTests(TestCase):
         html = (settings.BASE_DIR / "index.html").read_text(encoding="utf-8")
         for marker in (
             "function rfMovementEntriesForDate()",
-            'class="rf-movements-hero"',
+            'class="rf-movements-hero rf-brand-hero"',
             'class="rf-movement-stats"',
             'id="movementStudentSearch"',
             'id="movementDestination"',
@@ -161,7 +166,7 @@ class SharedInterfaceTests(TestCase):
             'data-rf-remove-movement-destination',
             'rfMovementDestinations.map(name=>',
             'rfMovementHistoryDestinations()',
-            "Fictional sample · ",
+            "Training record · ",
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, html)
@@ -179,6 +184,19 @@ class SharedInterfaceTests(TestCase):
         self.assertEqual(html.count("function movementRows()"), 1)
         self.assertEqual(html.count("function movementsPage()"), 1)
 
+    def test_weekly_card_grid_keeps_teacher_permissions(self):
+        self.publish_fictional()
+        self.client.force_login(self.teacher)
+        html = self.assert_interface("/teacher/week/")
+        self.assertIn("data-rf-native-timetable", html)
+        self.assertIn("data-rf-native-card", html)
+        self.assertIn("data-rf-key", html)
+        self.assertNotIn("FAKE-ID-01", html)
+        offline = (settings.BASE_DIR / "index.html").read_text(encoding="utf-8")
+        self.assertIn("rf-week-grid", offline)
+        self.assertIn("function rfTimetableAnimate", offline)
+        self.assertIn("prefers-reduced-motion", offline)
+
     def test_login_and_templates_compile_with_shared_components(self):
         anon = Client()
         for path in ("/", "/admin-login/"):
@@ -194,7 +212,7 @@ class SharedInterfaceTests(TestCase):
             "teacher_timetable.html", "teacher_master.html", "imported_teacher.html",
             "live_timetable_pending.html", "oneschool_documents.html",
             "oneschool_class_rosters.html", "oneschool_schedule_review.html",
-            "login.html",
+            "login.html", "weekly_cards.html",
         ):
             with self.subTest(template=template):
                 get_template(template)

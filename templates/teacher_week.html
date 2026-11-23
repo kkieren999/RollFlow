@@ -56,13 +56,13 @@ p{margin:6px 0}
     <p role="status" class="notice warning">{{ link_message }} Until your account is verified, no imported lessons will be shown.</p>
   {% else %}
     <p class="summary">{{ lesson_count }} assigned lesson{{ lesson_count|pluralize }} this week. Only your own OneSchool staff-ID allocations are shown.</p>
-    <div class="days">
+    <div class="days" data-rf-native-timetable data-rf-selected="{{ anchor_date }}" data-rf-initial="week">
     {% for day in week_days %}
-      <section class="day" aria-label="{{ day.date|date:'l j F Y' }}">
+      <section class="day" data-rf-native-day="{{ day.iso }}" aria-label="{{ day.date|date:'l j F Y' }}">
         <div class="day-head"><div><h2>{{ day.date|date:"l" }}</h2><small>{{ day.date|date:"j F Y" }}</small></div><a class="btn" href="{% url 'teacher-timetable' %}?date={{ day.iso }}">Day view</a></div>
         <div class="day-body">
         {% for lesson in day.lessons %}
-          <div class="lesson">
+          <div class="lesson" data-rf-native-card data-rf-period="{{ lesson.period }}" data-rf-code="{{ lesson.code }}" data-rf-key="{{ day.iso }}|{{ lesson.period }}|{{ lesson.code }}|{{ lesson.start }}|{{ lesson.end }}">
             <span class="time">{{ lesson.period }} · {{ lesson.start }}–{{ lesson.end }}</span>
             <strong>{{ lesson.code }}</strong>
             <small>{{ lesson.subject }} · Year {{ lesson.year }}</small>
@@ -76,6 +76,7 @@ p{margin:6px 0}
     {% endfor %}
     </div>
   {% endif %}
+{% include "weekly_cards.html" %}
 </main>
 </body>
 </html>

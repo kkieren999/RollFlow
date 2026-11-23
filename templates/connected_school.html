@@ -79,10 +79,23 @@ input[type=checkbox]{margin-right:6px}table{width:100%;text-align:left;border-co
 <a class="btn" href="?date={{ previous_date|date:'Y-m-d' }}">Previous {% if week_view %}week{% else %}day{% endif %}</a>
 <a class="btn" href="?date={{ next_date|date:'Y-m-d' }}">Next {% if week_view %}week{% else %}day{% endif %}</a>
 </div></form>
+{% if mode == 'teacher' and week_view %}
+<div data-rf-native-timetable data-rf-selected="{{ day|date:'Y-m-d' }}" data-rf-initial="week" class="days">
+{% for d in days %}<section class="day" data-rf-native-day="{{ d.date|date:'Y-m-d' }}" aria-label="{{ d.date|date:'l j F Y' }}">
+<div class="day-head"><h2>{{ d.date|date:"l j F" }}</h2><a class="btn" href="{% url 'teacher-timetable' %}?date={{ d.date|date:'Y-m-d' }}">Day view</a></div>
+<div class="day-body">{% for row in d.rows %}
+<div class="lesson" data-rf-native-card data-rf-period="P{{ row.period }}" data-rf-code="{{ row.code }}" data-rf-key="{{ d.date|date:'Y-m-d' }}|{{ row.period }}|{{ row.code }}|{{ row.start }}|{{ row.end }}">
+<span class="time">P{{ row.period }} · {{ row.start }}–{{ row.end }}</span><strong>{{ row.name }}</strong><small>{{ row.code }} · Room {{ row.room|default:"Unassigned" }}</small>
+<a href="{% url 'connected-teacher-roster' row.code %}">My class roster</a></div>
+{% empty %}<p class="muted">No scheduled lessons for this date.</p>{% endfor %}</div></section>{% endfor %}
+</div>{% include "weekly_cards.html" %}
+{% else %}
+{% if mode == 'teacher' %}<div class="rf-page-actions"><a class="btn primary" href="{% url 'teacher-week' %}?date={{ day|date:'Y-m-d' }}">Week view</a></div>{% endif %}
 {% for d in days %}<section class="panel"><h2>{{ d.date|date:"l j F" }}</h2><div class="scroll"><table><thead><tr><th>Period</th><th>Time</th><th>Class</th><th>Subject / class name</th><th>Room</th>{% if mode == 'master' %}<th>Source staff code</th>{% endif %}<th></th></tr></thead><tbody>
 {% for row in d.rows %}<tr><td>P{{ row.period }}</td><td>{{ row.start }}–{{ row.end }}</td><td>{{ row.code }}</td><td>{{ row.name }}</td><td>{{ row.room|default:"Unassigned" }}</td>{% if mode == 'master' %}<td>{{ row.staff|default:"Unassigned" }}</td>{% endif %}<td>{% if mode == 'master' %}<a href="{% url 'connected-admin-roster' row.code %}">Class roster</a>{% else %}<a href="{% url 'connected-teacher-roster' row.code %}">My class roster</a>{% endif %}</td></tr>
 {% empty %}<tr><td colspan="7">No scheduled lessons for this date. It may be a weekend, closure, outside term or an unassigned day.</td></tr>{% endfor %}
 </tbody></table></div></section>{% endfor %}
+{% endif %}
 {% elif mode == 'roster' %}
 <h1>{{ record.code }} · {{ record.name }}</h1><p>Read-only roster of currently active students in the published class. Central attendance marking is not enabled.</p>
 <section class="panel"><h2>Students ({{ students.paginator.count }})</h2><table><thead><tr><th>Student</th><th>Year</th>{% if admin_roster %}<th>EQID</th>{% endif %}</tr></thead><tbody>
