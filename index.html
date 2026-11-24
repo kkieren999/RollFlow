@@ -2351,7 +2351,7 @@ render=function(){
  if(demoRole==='teacher'){
   app.classList.remove('demo-auth-active');document.title='RollFlow | Teacher Portal';
   signedInTeacherRender();
-  if(state.page==='timetable'){const main=document.querySelector('main'),bar=main?.querySelector('.timetable-view-bar');if(bar)bar.insertAdjacentHTML('afterbegin','<button type="button" class="btn small rf-timetable-plan" data-v33-teacher-plan>View planned timetable</button>')}
+
   const utilities=document.querySelector('.nav-utility');
   if(utilities&&!utilities.querySelector('[data-demo-signout]'))utilities.insertAdjacentHTML('beforeend','<button type="button" class="nav-item demo-teacher-signout" data-demo-signout><span class="nav-icon" aria-hidden="true">↪</span><span class="nav-text">Sign out</span></button>');
   polishAfterRender();
