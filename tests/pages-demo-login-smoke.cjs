@@ -59,8 +59,9 @@ async function test() {
     assert.equal(await page.locator('.permanent-sidebar [data-nav="classes"]').count(), 0, 'My Classes must not appear in the menu');
     assert.equal(await page.locator('.permanent-sidebar [data-nav="roll"]').count(), 0, 'Mark Attendance must not appear in the menu');
     await page.locator('[data-nav="finder"]').first().click();
-    await page.locator('[data-teacher-scope]').selectOption('mine');
-    const englishClasses = await page.locator('main').innerText();
+    assert.equal(await page.locator('[data-teacher-scope]').count(), 0, 'Class Finder must not show the scope selector');
+    assert.equal(await page.locator('.page-right .tag').count(),0,'Class count badge removed');
+    const englishClasses = await page.locator('.finder-table tbody tr').filter({hasText:'My class'}).allInnerTexts().then(rows=>rows.join(' '));
     for (const code of ['ENG071A', 'ENG091B', 'ENG101B', '10BH']) {
       assert(englishClasses.includes(code), 'Missing assigned English class ' + code);
     }
@@ -68,6 +69,19 @@ async function test() {
     for (const code of ['ENG081C', 'ENG101C']) {
       assert(englishClasses.includes(code), 'New 2026 fictional English group missing: ' + code);
     }
+
+    // Student timetable uses the selected weekday, including recurring Sarah classes.
+    await page.locator('[data-nav="search"]').first().click();
+    await page.locator('[data-open-student]').first().click();
+    await page.locator('[data-action="showTimetable"]').click();
+    assert.equal(await page.locator('[data-rf-student-day]').count(),5);
+    for(const day of ['Monday','Tuesday','Wednesday','Thursday','Friday']){
+      await page.locator('[data-rf-student-day="'+day+'"]').click();
+      assert.equal(await page.locator('[data-rf-student-day][aria-pressed="true"]').getAttribute('data-rf-student-day'),day);
+      assert.equal(await page.locator('#rf-student-day-lessons').getAttribute('aria-label'),day+' lessons');
+    }
+    await page.locator('#modal [data-action="closeModal"]').first().click();
+    await page.locator('#overlay [data-action="closeDrawer"]').first().click();
 
     // A real browser renders the full Monday-Friday timetable for any 2026 term week.
     await page.locator('[data-nav="timetable"]').first().click();
@@ -486,8 +500,9 @@ async function test() {
     assert.equal(await page.locator('.permanent-sidebar [data-nav="classes"]').count(), 0, 'My Classes must not appear in the menu');
     assert.equal(await page.locator('.permanent-sidebar [data-nav="roll"]').count(), 0, 'Mark Attendance must not appear in the menu');
     await page.locator('[data-nav="finder"]').first().click();
-    await page.locator('[data-teacher-scope]').selectOption('mine');
-    const mathsClasses = await page.locator('main').innerText();
+    assert.equal(await page.locator('[data-teacher-scope]').count(), 0, 'Class Finder must not show the scope selector');
+    assert.equal(await page.locator('.page-right .tag').count(),0,'Class count badge removed');
+    const mathsClasses = await page.locator('.finder-table tbody tr').filter({hasText:'My class'}).allInnerTexts().then(rows=>rows.join(' '));
     assert(mathsClasses.includes('MAF102A'), 'Default teacher class missing');
     assert(!mathsClasses.includes('ENG071A'), 'Default teacher inherited Sarah class');
 
