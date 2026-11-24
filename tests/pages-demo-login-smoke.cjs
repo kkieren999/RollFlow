@@ -10,6 +10,19 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 const script = html.match(/<script>([\s\S]*?)<\/script>/);
 assert(script, 'Expected inline RollFlow script');
 new vm.Script(script[1], { filename: 'rollflow-pages-inline.js' });
+const studentCalcStart=script[1].indexOf('function rfActiveStudentMemberships');
+const studentCalcEnd=script[1].indexOf('function rfStudentAttendanceBody',studentCalcStart);
+const attendanceFixture={classes:['OLD','NEW','EMPTY'].map(code=>({code,name:code,active:true})),slots:['OLD','NEW','EMPTY'].map(classCode=>({classCode,active:true})),enrolments:[{studentId:'S',classCode:'OLD',start:'2026-01-27',end:'2026-06-26'},{studentId:'S',classCode:'NEW',start:'2026-08-01',end:''},{studentId:'S',classCode:'EMPTY',start:'2026-07-13',end:''}]};
+const fixtureMarks={'2026-03-09|OLD':{S:'P'},'2026-07-14|NEW':{S:'A'},'2026-08-03|NEW':{S:'P'},'2026-08-04|NEW':{S:'L'},'2026-08-05|NEW':{S:'A'},'2026-08-06|NEW':{S:'P'},'2026-08-07|NEW':{S:'?'}};
+const fixtureSubmitted=Object.fromEntries(Object.keys(fixtureMarks).filter(k=>k!=='2026-08-06|NEW').map(k=>[k,{}]));
+const calc=new Function('planning','previewStudents','SARAH_2026_YEAR10_FINISH','brisbaneToday','state','KEY','localStorage',script[1].slice(studentCalcStart,studentCalcEnd)+'return rfStudentAttendance;')(attendanceFixture,[{id:'S',status:'active'}],'2026-11-27',()=> '2026-11-24',{marks:{},submitted:{}},'',{});
+const semesterResult=calc('S','2026-11-24',[{marks:fixtureMarks,submitted:fixtureSubmitted}]);
+assert.deepEqual(semesterResult.rows.map(r=>r.code),['NEW','EMPTY']);
+assert.equal(semesterResult.rows[0].total,3);
+assert(Math.abs(semesterResult.rows[0].percent-200/3)<0.0001);
+assert.equal(semesterResult.rows[1].percent,null);
+console.log('PASS: semester and enrolment boundaries, late counted present, unsubmitted and unknown excluded.');
+
 
 function startServer() {
   return new Promise((resolve, reject) => {
@@ -82,6 +95,46 @@ async function test() {
     }
     await page.locator('#modal [data-action="closeModal"]').first().click();
     await page.locator('#overlay [data-action="closeDrawer"]').first().click();
+
+    // Student action controls and cross-role local referral flow.
+    await page.locator('[data-nav="search"]').first().click();
+    await page.locator('[data-open-student]').first().click();
+    await page.locator('[data-rf-student-action="details"]').click();
+    assert.equal(await page.locator('.rf-student-profile-grid dt').count(),28);
+    assert.match(await page.locator('.rf-student-profile-grid').innerText(),/PIN #\s+Restricted/);
+    await page.locator('#review-dialog [data-review-close]').first().click();
+    await page.locator('[data-rf-student-action="attendance"]').click();
+    assert.match(await page.locator('#review-dialog').innerText(),/Semester [12]/);
+    await page.locator('#review-dialog [data-review-close]').first().click();
+    await page.locator('[data-rf-student-action="late"]').click();
+    assert(await page.locator('#rf-student-incident-form [name="time"]').isVisible());
+    await page.locator('#rf-student-incident-form [name="type"]').selectOption('Late arrival');
+    await page.locator('#rf-student-incident-form [name="response"]').selectOption('Refer to admin support');
+    await page.locator('#rf-student-incident-form button[type="submit"]').click();
+    assert.equal(await page.locator('#review-dialog').count(),0);
+    await page.locator('#overlay [data-action="closeDrawer"]').click();
+    await page.locator('[data-demo-signout]').first().click();
+    await logIn(page,'admin','admin','.v31-admin');
+    await page.locator('[data-admin-page="student-actions"]').click();
+    assert.match(await page.locator('.v31-content main').innerText(),/Awaiting support/);
+    await page.locator('[data-rf-resolve-referral]').first().click();
+    assert.match(await page.locator('.v31-content main').innerText(),/Resolved/);
+    await page.locator('[data-rf-action-config="new"]').click();
+    await page.locator('#rf-action-config-form [name="name"]').fill('Classroom follow-up');
+    await page.locator('#rf-action-config-form [name="types"]').fill('Learning concern\nEquipment concern');
+    await page.locator('#rf-action-config-form [name="responses"]').fill('Discussed\nRecord only');
+    await page.locator('#rf-action-config-form button[type="submit"]').click();
+    await page.locator('[data-rf-action-config="toggle"][data-rf-config-id="uniform"]').click();
+    await page.locator('[data-demo-signout]').first().click();
+    await logIn(page,'swilliams','swilliams');
+    await page.locator('[data-nav="search"]').first().click();
+    await page.locator('[data-open-student]').first().click();
+    assert.equal(await page.locator('[data-rf-student-action="uniform"]').count(),0);
+    await page.getByRole('button',{name:'Classroom follow-up',exact:false}).click();
+    assert.deepEqual(await page.locator('#rf-student-incident-form [name="type"] option').allTextContents(),['Select type','Learning concern','Equipment concern']);
+    await page.locator('#review-dialog [data-review-close]').first().click();
+    await page.locator('#overlay [data-action="closeDrawer"]').first().click();
+    console.log('PASS: student profiles, semester attendance action, incidents, admin referrals and configurable choices.');
 
     // A real browser renders the full Monday-Friday timetable for any 2026 term week.
     await page.locator('[data-nav="timetable"]').first().click();
@@ -626,7 +679,7 @@ async function test() {
     await logIn(page, 'admin', 'admin', '.v31-admin');
     for (const size of deviceSizes) {
       await page.setViewportSize(size);
-      for (const route of ['dashboard','staff','students','classes','timetable','master','movements','roles','data','oneschool','audit']) {
+      for (const route of ['dashboard','staff','students','classes','timetable','master','movements','student-actions','roles','data','oneschool','audit']) {
         await page.locator('.v31-nav [data-admin-page="'+route+'"]').click();
         await assertWorkspaceFits('Admin '+route+' '+JSON.stringify(size), '.v31-content>main');
       }
