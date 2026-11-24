@@ -2423,7 +2423,7 @@ const rfMorphProperties=('display position top right bottom left box-sizing widt
 function rfMorphRect(el){const r=el.getBoundingClientRect();return {left:r.left,top:r.top,width:r.width,height:r.height}}
 function rfMorphCopy(el){
  const clone=el.cloneNode(true),src=[el,...el.querySelectorAll('*')],dst=[clone,...clone.querySelectorAll('*')];
- src.forEach((node,i)=>{const style=getComputedStyle(node),out=dst[i];for(const p of rfMorphProperties)out.style.setProperty(p,style.getPropertyValue(p));out.removeAttribute('id');out.removeAttribute('tabindex');out.removeAttribute('aria-label');out.removeAttribute('aria-describedby');out.removeAttribute('aria-labelledby');out.removeAttribute('data-open-report');out.style.pointerEvents='none';});
+ src.forEach((node,i)=>{const style=getComputedStyle(node),out=dst[i];for(const p of rfMorphProperties)out.style.setProperty(p,style.getPropertyValue(p));out.removeAttribute('id');out.removeAttribute('tabindex');out.removeAttribute('aria-label');out.removeAttribute('aria-describedby');out.removeAttribute('aria-labelledby');out.removeAttribute('data-open-report');out.removeAttribute('data-rf-motion');out.removeAttribute('data-timetable-class');out.removeAttribute('data-timetable-date');out.style.pointerEvents='none';});
  clone.style.position='absolute';clone.style.inset='0 auto auto 0';clone.style.margin='0';clone.style.transform='none';clone.style.visibility='visible';clone.style.opacity='1';clone.style.background='transparent';clone.style.borderColor='transparent';clone.style.boxShadow='none';clone.style.outline='none';
  clone.setAttribute('aria-hidden','true');clone.inert=true;
  return clone;
@@ -2436,7 +2436,7 @@ function rfClearTimetableMorph(){
 }
 function rfTimetableSnapshot(){
  const result=new Map();
- for(const el of document.querySelectorAll('.rf-timetable-card[data-rf-motion],.rf-toggle-thumb')){
+ for(const el of document.querySelectorAll('.rf-timetable-workspace .rf-timetable-card[data-rf-motion],.timetable-view-segment .rf-toggle-thumb')){
   const key=el.dataset.rfMotion||'toggle-thumb',flight=rfMorphFlights.get(key);
   const rect=rfMorphRect(flight?.box||el);
   if(!rect.width||!rect.height)continue;
@@ -2444,7 +2444,7 @@ function rfTimetableSnapshot(){
   const view=el.closest('main')?.getBoundingClientRect();
   if(view&&(rect.top+rect.height<view.top||rect.top>view.bottom||rect.left+rect.width<view.left||rect.left>view.right))continue;
   const visual=flight?(Number(getComputedStyle(flight.newCopy).opacity)>.5?flight.newCopy:flight.oldCopy):null;
-  const copy=visual?visual.cloneNode(true):rfMorphCopy(el);
+  const copy=visual?visual.cloneNode(true):rfMorphCopy(el);copy.style.visibility='visible';copy.style.opacity='1';
   result.set(key,{rect,copy,appearance:rfMorphAppearance(flight?.box||el)});
  }
  return result;

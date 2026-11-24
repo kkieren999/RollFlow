@@ -86,6 +86,51 @@ async function test() {
         'Each full timetable weekday needs one preparation period');
     }
 
+    // The actual lesson card travels from the day geometry to its matching week slot.
+    await page.setViewportSize({width:1920,height:1200});
+    await page.emulateMedia({reducedMotion:'reduce'});
+    await page.locator('[data-timetable-view="day"]').click();
+    await page.emulateMedia({reducedMotion:'no-preference'});
+    const morphResult = await page.evaluate(() => {
+      const card = document.querySelector('.rf-timetable-workspace .rf-timetable-card[data-timetable-class="ENG071A"]');
+      const key = card.dataset.rfMotion;
+      const rect = el => { const r=el.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height}; };
+      const source = rect(card);
+      document.querySelector('[data-timetable-view="week"]').click();
+      const flight = [...document.querySelectorAll('.rf-morph-card[data-rf-motion]')].find(el=>el.dataset.rfMotion===key);
+      const target = [...document.querySelectorAll('.rf-timetable-workspace .rf-timetable-card')].find(el=>el.dataset.rfMotion===key);
+      if(!flight||!target)return {missing:true};
+      const animation=flight.getAnimations()[0];animation.pause();
+      animation.currentTime=0;const first=rect(flight);
+      animation.currentTime=115;const middle=rect(flight);
+      animation.currentTime=760;const last=rect(flight);
+      return {source,first,middle,last,destination:rect(target),hidden:target.style.visibility,key};
+    });
+    assert(!morphResult.missing, 'Expected travelling card outside timetable grid');
+    const near = (a,b) => ['x','y','w','h'].every(k=>Math.abs(a[k]-b[k])<2);
+    assert(near(morphResult.source,morphResult.first), 'Morph starts at exact day card geometry');
+    assert(morphResult.middle.w < morphResult.first.w && morphResult.middle.w > morphResult.destination.w, 'Card physically shrinks in flight');
+    assert(near(morphResult.last,morphResult.destination), 'Morph ends in exact weekly slot');
+    assert.equal(morphResult.hidden,'hidden','Destination stays hidden until the card lands');
+    await page.evaluate(async()=>{const layer=document.querySelector('.rf-morph-layer');if(layer){const animations=layer.getAnimations({subtree:true});for(const a of animations)a.finish();await Promise.allSettled(animations.map(a=>a.finished));}});
+    await page.locator('.rf-morph-layer').waitFor({state:'detached'});
+    const reverse = await page.evaluate(key => {
+      const source = [...document.querySelectorAll('.rf-timetable-workspace .rf-timetable-card')].find(el=>el.dataset.rfMotion===key);
+      const width=source.getBoundingClientRect().width;
+      document.querySelector('[data-timetable-view="day"]').click();
+      const flight=[...document.querySelectorAll('.rf-morph-card[data-rf-motion]')].find(el=>el.dataset.rfMotion===key);
+      if(!flight)return {missing:true};
+      const a=flight.getAnimations()[0];a.pause();a.currentTime=115;const middle=flight.getBoundingClientRect().width;
+      a.currentTime=760;const end=flight.getBoundingClientRect().width;
+      return {width,middle,end};
+    },morphResult.key);
+    assert(!reverse.missing && reverse.middle>reverse.width && reverse.end>reverse.middle,'Week card expands into Day view');
+    await page.evaluate(async()=>{const layer=document.querySelector('.rf-morph-layer');if(layer){const animations=layer.getAnimations({subtree:true});for(const a of animations)a.finish();await Promise.allSettled(animations.map(a=>a.finished));}});
+    await page.locator('.rf-morph-layer').waitFor({state:'detached'});
+    await page.emulateMedia({reducedMotion:'reduce'});
+    await page.locator('[data-timetable-view="week"]').click();
+    assert.equal(await page.locator('.rf-morph-layer').count(),0,'Reduced motion bypasses travelling cards');
+
     // The full five-day grid and six-session day fit ordinary laptop and desktop viewports.
     // Turn motion off for geometry measurements so transient transforms do not affect overflow.
     await page.emulateMedia({ reducedMotion: 'reduce' });
