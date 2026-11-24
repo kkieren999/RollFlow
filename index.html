@@ -1218,7 +1218,7 @@ function rfStudentDayRows(person,day,asOf=brisbaneToday()){
   const c=classes.find(c=>c.code===s.classCode),p=planning.periods.find(p=>p.code===s.period&&p.active!==false);
   if(!p)return null;
   return {id:c.code,name:c.name,day,slot:s.period,period:p.label||s.period,time:p.start+'–'+p.end,room:s.room,teacher:planTeacherName(s.teacher),start:p.start};
- }).filter(Boolean).sort((a,b)=>a.start.localeCompare(b.start)||a.id.localeCompare(b.id));
+ }).filter(Boolean).sort((a,b)=>a.start.localeCompare(b.start)||Number(a.id.startsWith('DEMO'))-Number(b.id.startsWith('DEMO'))||a.id.localeCompare(b.id)).filter((row,i,rows)=>rows.findIndex(x=>x.slot===row.slot)===i);
 }
 function rfStudentDayContent(person,day){
  const rows=rfStudentDayRows(person,day);
@@ -1826,6 +1826,39 @@ const planPeriodSeed=[['ROLL','Home group','08:35','08:50'],['1','Period 1','09:
 function fixtureTeacher(c){return defaultDemoClassIds.has(c.id)?'teacher':c.teacher==='S. Williams'?'swilliams':'fixture:'+c.teacher}
 let planning={classes:schoolClasses.map(c=>({code:c.id,name:c.name,subject:c.faculty||c.subject,year:Number(c.year)||10,teacher:fixtureTeacher(c),active:true})),enrolments:schoolClasses.flatMap(c=>c.ids.map(id=>({classCode:c.id,studentId:id,start:'2026-01-27',end:''}))),rooms:[...new Set(schoolClasses.map(c=>c.room))].map(code=>({code,name:'',active:true})),periods:planPeriodSeed,slots:schoolClasses.flatMap((c,i)=>c.teacher==='S. Williams'?sarahWeekPlanningSlots(c,i,planDays):[{id:'fixture-'+i,classCode:c.id,teacher:fixtureTeacher(c),room:c.room,day:planDays.indexOf(c.day)+1,period:c.period==='ROLL'?'ROLL':String(c.period.match(/\d+/)?.[0]||'1'),active:true}])};
 try{const saved=JSON.parse(localStorage.getItem(PLAN_KEY)||'null');if(saved&&['classes','enrolments','rooms','periods','slots'].every(k=>Array.isArray(saved[k])))planning=saved}catch{}
+// Complete the fictional weekly school timetable without replacing existing classes.
+function rfCompleteDemoTimetables(plan){
+ if(plan.demoFullTimetableVersion===1)return;
+ const subjects=['English','Mathematics','Science','Humanities','Health & Physical Education','Digital Technologies','Visual Arts','Languages'];
+ const senior=['General English','Mathematical Methods','Biology','Modern History','Physical Education','Digital Solutions','Visual Arts','Japanese'];
+ const teachers=['C. Wallace','T. Fraser','L. Morris','J. Sullivan','R. Ellis','A. Brooks'];
+ const fixtureDate=brisbaneToday(),fixtureIds=new Set(people.map(p=>p.id)),activeCodes=new Set(plan.classes.filter(c=>c.active).map(c=>c.code)),members=new Map(),occupied=new Set();
+ for(const e of plan.enrolments){if(!fixtureIds.has(e.studentId)||!activeCodes.has(e.classCode)||e.start>fixtureDate||e.end&&e.end<fixtureDate)continue;if(!members.has(e.classCode))members.set(e.classCode,[]);members.get(e.classCode).push(e.studentId)}
+ for(const slot of plan.slots){if(!slot.active)continue;for(const id of members.get(slot.classCode)||[])occupied.add(id+'|'+slot.day+'|'+slot.period)}
+ const roomCodes=new Set(plan.rooms.map(r=>r.code)),classCodes=new Set(plan.classes.map(c=>c.code)),groups=new Map();
+ const roster=people.filter(p=>{const record=previewStudents.find(x=>x.id===p.id);return !record||record.status==='active'});
+ const periods=plan.periods.filter(p=>p.active!==false&&['ROLL','1','2','3','4','5'].includes(p.code));
+ for(let day=1;day<=5;day++)for(const period of periods)for(let year=7;year<=12;year++){
+  const missing=roster.filter(p=>Number(p.year)===year&&!occupied.has(p.id+'|'+day+'|'+period.code));if(!missing.length)continue;
+  // Keep fictional classes reasonably sized, with stable year-level groups.
+  for(let offset=0;offset<missing.length;offset+=28){
+   const pupils=missing.slice(offset,offset+28),group=offset/28,idx=(day-1)*5+Math.max(0,Number(period.code)-1||0),subject=period.code==='ROLL'?'Home Group':(year>=11?senior:subjects)[(idx+year)%subjects.length];
+   const name=period.code==='ROLL'?'Year '+year+' Home Group':subject,signature=year+'|'+subject+'|'+pupils.map(p=>p.id).join(',');
+   let cls=groups.get(signature);
+   if(!cls){
+    let code='DEMO'+year+'D'+day+'P'+period.code+'G'+(group+1),suffix=1;while(classCodes.has(code))code='DEMO'+year+'D'+day+'P'+period.code+'G'+(group+1)+'X'+suffix++;
+    const teacher='fixture:'+teachers[year-7]+' '+(group?'(B)':'(A)'),room='DF'+year+(group?'B':'A');
+    if(!roomCodes.has(room)){plan.rooms.push({code:room,name:'Fictional learning room '+year+(group?'B':'A'),active:true});roomCodes.add(room)}
+    cls={code,name,subject,year,teacher,room,active:true,fictionalTimetable:true};groups.set(signature,cls);classCodes.add(code);plan.classes.push(cls);
+    for(const p of pupils)plan.enrolments.push({classCode:code,studentId:p.id,start:'2026-01-27',end:''});
+   }
+   plan.slots.push({id:'full-demo-'+cls.code+'-'+day+'-'+period.code,classCode:cls.code,teacher:cls.teacher,room:cls.room,day,period:period.code,active:true});
+   for(const p of pupils)occupied.add(p.id+'|'+day+'|'+period.code);
+  }
+ }
+ plan.demoFullTimetableVersion=1;
+}
+rfCompleteDemoTimetables(planning);
 let planMode='list',planId='',planQuery='',planYear='',planTeacher='',planDay='',teacherPlanOpen=false;
 const planTeacherName=id=>{const p=previewStaff.find(x=>x.username===id);return p?p.first+' '+p.last:String(id||'Unassigned').replace(/^fixture:/,'')};
 const planTeacherOptions=(current='')=>[...previewStaff.filter(p=>p.role==='Teacher'&&p.active).map(p=>[p.username,planTeacherName(p.username)]),...current&&!previewStaff.some(p=>p.username===current&&p.role==='Teacher'&&p.active)?[[current,planTeacherName(current)+' (existing)']]:[]];
@@ -2594,7 +2627,8 @@ function rfAttendanceSources(){
  // Deterministic fictional historical lessons; real browser receipts take precedence.
  const demo={marks:{},submitted:{}},today=brisbaneToday(),sem=rfStudentSemester(today);
  const occupied=new Set(all.flatMap(src=>Object.keys(src.submitted||{}).filter(k=>src.submitted[k])));
- const fixtures=new Set(schoolClasses.map(c=>c.id));
+ const fixtures=new Set([...schoolClasses.map(c=>c.id),...planning.classes.filter(c=>c.fictionalTimetable).map(c=>c.code)]),enrolmentsByClass=new Map();
+ for(const e of planning.enrolments){if(!enrolmentsByClass.has(e.classCode))enrolmentsByClass.set(e.classCode,[]);enrolmentsByClass.get(e.classCode).push(e)}
  for(let n=1;n<=42;n++){
   const date=dateOffset(today,-n);if(date<sem.start)break;
   const day=planDays.indexOf(weekdayFor(date))+1;if(!day)continue;
@@ -2602,8 +2636,8 @@ function rfAttendanceSources(){
    if(!c.active||!fixtures.has(c.code)||!planning.slots.some(x=>x.active&&x.classCode===c.code&&x.day===day))continue;
    const key=date+'|'+c.code;if(occupied.has(key))continue;
    const marks={};
-   for(const e of planning.enrolments){
-    if(e.classCode!==c.code||e.start>date||e.end&&e.end<date||!getPerson(e.studentId))continue;
+   for(const e of enrolmentsByClass.get(c.code)||[]){
+    if(e.start>date||e.end&&e.end<date||!getPerson(e.studentId))continue;
     let h=2166136261;for(const ch of e.studentId+'|'+c.code+'|'+date)h=Math.imul(h^ch.charCodeAt(0),16777619);
     const v=(h>>>0)%100;marks[e.studentId]=v<8?'A':v<15?'L':'P';
    }
