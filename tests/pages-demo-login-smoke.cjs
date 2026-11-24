@@ -57,6 +57,7 @@ async function test() {
     assert.equal((await page.locator('.top-user > span').innerText()).trim(), 'Sarah Williams');
     assert(await page.locator('.rf-training-notice').isVisible(), 'Teacher workspace must disclose its public training status');
     assert.equal(await page.locator('.permanent-sidebar [data-nav="classes"]').count(), 0, 'My Classes must not appear in the menu');
+    assert.equal(await page.locator('.permanent-sidebar [data-nav="roll"]').count(), 0, 'Mark Attendance must not appear in the menu');
     await page.locator('[data-nav="finder"]').first().click();
     await page.locator('[data-teacher-scope]').selectOption('mine');
     const englishClasses = await page.locator('main').innerText();
@@ -483,6 +484,7 @@ async function test() {
     await logIn(page, 'teacher', 'teacher');
     assert.equal((await page.locator('.top-user > span').innerText()).trim(), 'Alex Morgan');
     assert.equal(await page.locator('.permanent-sidebar [data-nav="classes"]').count(), 0, 'My Classes must not appear in the menu');
+    assert.equal(await page.locator('.permanent-sidebar [data-nav="roll"]').count(), 0, 'Mark Attendance must not appear in the menu');
     await page.locator('[data-nav="finder"]').first().click();
     await page.locator('[data-teacher-scope]').selectOption('mine');
     const mathsClasses = await page.locator('main').innerText();
