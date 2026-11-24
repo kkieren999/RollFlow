@@ -1521,7 +1521,7 @@ render=function(){if(state.page==='individual-movement'){app.innerHTML=individua
 document.addEventListener('click',event=>{const button=event.target.closest('[data-view-movement]');if(!button)return;individualMovement.studentId=button.dataset.viewMovement;individualMovement.from='';individualMovement.to='';individualMovement.destination='';closeDrawer();state.page='individual-movement';render()});
 document.addEventListener('change',event=>{if(event.target.dataset.individual){individualMovement[event.target.dataset.individual]=event.target.value;render()}if(event.target.dataset.serviceFilter){serviceFilters[event.target.dataset.serviceFilter]=event.target.value;render()}});
 
-function weekdayFor(date){return new Intl.DateTimeFormat('en-AU',{weekday:'long',timeZone:'Australia/Brisbane'}).format(new Date(date+'T12:00:00+10:00'))}
+function weekdayFor(date){return ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date(date+'T12:00:00Z').getUTCDay()]}
 function dateOffset(date,days){const d=new Date(date+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+days);return d.toISOString().slice(0,10)}
 function scheduledClassesFor(date){
  const weekday=weekdayFor(date),plans=workspace.coverPlans.filter(p=>p.date===date);
@@ -2594,7 +2594,7 @@ function rfStudentSemester(date){
 function rfAttendanceStart(date){
  const d=new Date(date+'T12:00:00Z'),day=d.getUTCDate();d.setUTCDate(1);d.setUTCMonth(d.getUTCMonth()-8);const last=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,0)).getUTCDate();d.setUTCDate(Math.min(day,last));return d.toISOString().slice(0,10);
 }
-function rfAttendanceSources(){
+function rfAttendanceSources(classCodes=null){
  const all=[{marks:state.marks,submitted:state.submitted}];
  for(const key of ['rollflow_teacher_2026_v1','rollflow_teacher_swilliams_2026_v1']){
   if(key===KEY)continue;
@@ -2603,19 +2603,20 @@ function rfAttendanceSources(){
  // Deterministic fictional historical lessons; real browser receipts take precedence.
  const demo={marks:{},submitted:{}},today=brisbaneToday(),start=rfAttendanceStart(today);
  const occupied=new Set(all.flatMap(src=>Object.keys(src.submitted||{}).filter(k=>src.submitted[k])));
- const fixtures=new Set([...schoolClasses.map(c=>c.id),...planning.classes.filter(c=>c.fictionalTimetable).map(c=>c.code)]),enrolmentsByClass=new Map();
- for(const e of planning.enrolments){if(!enrolmentsByClass.has(e.classCode))enrolmentsByClass.set(e.classCode,[]);enrolmentsByClass.get(e.classCode).push(e)}
+ const fixtures=new Set([...schoolClasses.map(c=>c.id),...planning.classes.filter(c=>c.fictionalTimetable).map(c=>c.code)]),enrolmentsByClass=new Map(),personIds=new Set(people.map(p=>p.id)),allowed=classCodes?new Set(classCodes):null,classesByDay=new Map();
+ const active=new Set(planning.classes.filter(c=>c.active&&fixtures.has(c.code)&&(!allowed||allowed.has(c.code))).map(c=>c.code));
+ for(const slot of planning.slots){if(!slot.active||!active.has(slot.classCode))continue;if(!classesByDay.has(slot.day))classesByDay.set(slot.day,new Set());classesByDay.get(slot.day).add(slot.classCode)}
+ for(const e of planning.enrolments){if(!active.has(e.classCode)||!personIds.has(e.studentId))continue;if(!enrolmentsByClass.has(e.classCode))enrolmentsByClass.set(e.classCode,[]);enrolmentsByClass.get(e.classCode).push(e)}
  for(let n=1;n<=250;n++){
   const date=dateOffset(today,-n);if(date<start)break;
   if(date.startsWith('2026-')&&sarahSchoolStatus(date))continue;
-  const day=planDays.indexOf(weekdayFor(date))+1;if(!day)continue;
-  for(const c of planning.classes){
-   if(!c.active||!fixtures.has(c.code)||!planning.slots.some(x=>x.active&&x.classCode===c.code&&x.day===day))continue;
-   const key=date+'|'+c.code;if(occupied.has(key))continue;
+  const day=new Date(date+'T12:00:00Z').getUTCDay();if(day<1||day>5)continue;
+  for(const code of classesByDay.get(day)||[]){
+   const key=date+'|'+code;if(occupied.has(key))continue;
    const marks={};
-   for(const e of enrolmentsByClass.get(c.code)||[]){
-    if(e.start>date||e.end&&e.end<date||!getPerson(e.studentId))continue;
-    let h=2166136261;for(const ch of e.studentId+'|'+c.code+'|'+date)h=Math.imul(h^ch.charCodeAt(0),16777619);
+   for(const e of enrolmentsByClass.get(code)||[]){
+    if(e.start>date||e.end&&e.end<date)continue;
+    let h=2166136261;for(const ch of e.studentId+'|'+code+'|'+date)h=Math.imul(h^ch.charCodeAt(0),16777619);
     let profile=2166136261;for(const ch of e.studentId)profile=Math.imul(profile^ch.charCodeAt(0),16777619);
     const band=(profile>>>0)%100,absence=band<12?38:band<32?23:band<60?13:band<85?6:2;
     let daily=2166136261;for(const ch of e.studentId+'|'+date)daily=Math.imul(daily^ch.charCodeAt(0),16777619);
@@ -2627,13 +2628,18 @@ function rfAttendanceSources(){
  }
  all.push(demo);return all;
 }
-function rfStudentAttendance(id,asOf=brisbaneToday(),sources=rfAttendanceSources(),period='semester'){
- const sem=period==='history'?{name:'Last 8 months',start:rfAttendanceStart(asOf),end:asOf}:rfStudentSemester(asOf),current=rfStudentCurrentClasses(id,asOf);
+const rfAttendanceSourceIndex=new WeakMap();
+function rfIndexedAttendance(sources){
+ if(rfAttendanceSourceIndex.has(sources))return rfAttendanceSourceIndex.get(sources);
+ const index=new Map();for(const src of sources)for(const [key,receipt] of Object.entries(src.submitted||{})){if(!receipt)continue;const [date,code]=key.split('|');if(!code||!/^\d{4}-\d{2}-\d{2}$/.test(date))continue;if(!index.has(code))index.set(code,[]);index.get(code).push({key,date,marks:src.marks?.[key]||{}})}rfAttendanceSourceIndex.set(sources,index);return index;
+}
+function rfStudentAttendance(id,asOf=brisbaneToday(),sources=rfAttendanceSources(),period='semester',classCodes=null){
+ const sem=period==='history'?{name:'Last 8 months',start:rfAttendanceStart(asOf),end:asOf}:rfStudentSemester(asOf),current=rfStudentCurrentClasses(id,asOf).filter(c=>!classCodes||classCodes.has(c.code)),index=rfIndexedAttendance(sources);
  return {sem,rows:current.map(c=>{
   const marks=new Map(),intervals=planning.enrolments.filter(e=>e.studentId===id&&e.classCode===c.code);
-  for(const src of sources)for(const [key,receipt] of Object.entries(src.submitted||{})){
-   const [date,code]=key.split('|');if(code!==c.code||!receipt||!/^\d{4}-\d{2}-\d{2}$/.test(date)||date<sem.start||date>sem.end||date>asOf||!intervals.some(e=>e.start<=date&&(!e.end||e.end>=date)))continue;
-   const mark=src.marks?.[key]?.[id];if(!['P','A','L'].includes(mark))continue;
+  for(const {key,date,marks:record} of index.get(c.code)||[]){
+   if(date<sem.start||date>sem.end||date>asOf||!intervals.some(e=>e.start<=date&&(!e.end||e.end>=date)))continue;
+   const mark=record[id];if(!['P','A','L'].includes(mark))continue;
    const old=marks.get(key);if(!old)marks.set(key,mark);else if(old!==mark)marks.set(key,'conflict');
   }
   const counts={P:0,A:0,L:0,conflict:0},monthly={};for(const [key,v] of marks){counts[v]++;const month=key.slice(0,7);if(!monthly[month])monthly[month]={P:0,A:0,L:0,conflict:0};monthly[month][v]++;}
@@ -2775,7 +2781,9 @@ function rfModuleClasses(){
  return planning.classes.filter(c=>c.active&&planning.slots.some(s=>s.classCode===c.code&&s.active&&s.teacher===actor)&&planning.enrolments.some(e=>e.classCode===c.code&&e.start<=today&&(!e.end||e.end>=today)));
 }
 function rfModuleRoster(code){
- const ids=new Set(planning.enrolments.filter(e=>e.classCode===code&&rfStudentCurrentClasses(e.studentId).some(c=>c.code===code)).map(e=>e.studentId));
+ const today=brisbaneToday(),cls=planning.classes.find(c=>c.code===code&&c.active);if(!cls||!planning.slots.some(s=>s.classCode===code&&s.active)||today>SARAH_2026_YEAR10_FINISH&&today<='2026-12-11'&&['10BH','ENG101B','ENG101C'].includes(code))return [];
+ const directory=new Map(previewStudents.map(p=>[p.id,p]));
+ const ids=new Set(planning.enrolments.filter(e=>{if(e.classCode!==code||e.start>today||e.end&&e.end<today)return false;const p=directory.get(e.studentId);return !p||p.status==='active'&&(!p.enrolled||p.enrolled<=today)&&(!p.left||p.left>=today)}).map(e=>e.studentId));
  return people.filter(p=>ids.has(p.id)).sort((a,b)=>a.name.localeCompare(b.name));
 }
 function rfModulePeople(){const ids=new Set(rfModuleClasses().flatMap(c=>rfModuleRoster(c.code).map(p=>p.id)));return people.filter(p=>ids.has(p.id)).sort((a,b)=>a.name.localeCompare(b.name))}
@@ -2912,8 +2920,8 @@ function rfOpenClassDisplay(){
  if(demoRole!=='teacher'||state.page!=='attendance-overview')return;
  const cls=rfModuleClasses().find(c=>c.code===rfModuleFilters.classCode);
  if(!cls){showToast('Select one of your classes first');return}
- const today=brisbaneToday(),period=rfOverviewPeriod,sem=period==='history'?{name:'Last 8 months',start:rfAttendanceStart(today)}:rfStudentSemester(today),sources=rfAttendanceSources();
- const rows=rfModuleRoster(cls.code).map(p=>rfStudentAttendance(p.id,today,sources,period).rows.find(r=>r.code===cls.code)).filter(Boolean);
+ const today=brisbaneToday(),period=rfOverviewPeriod,sem=period==='history'?{name:'Last 8 months',start:rfAttendanceStart(today)}:rfStudentSemester(today),codes=new Set([cls.code]),sources=rfAttendanceSources(codes);
+ const rows=rfModuleRoster(cls.code).map(p=>rfStudentAttendance(p.id,today,sources,period,codes).rows.find(r=>r.code===cls.code)).filter(Boolean);
  const minimum=10,marked=rows.filter(r=>r.total>0),enough=marked.length>=minimum;
  const totals={P:0,L:0,A:0};for(const r of marked)for(const k of Object.keys(totals))totals[k]+=r[k];
  const n=totals.P+totals.L+totals.A,rate=n?100*(totals.P+totals.L)/n:null,onTime=n?100*totals.P/n:null;
@@ -2942,8 +2950,8 @@ function rfOpenClassDisplay(){
 }
 
 function rfModuleAttendancePage(){
- const classes=rfModuleClasses(),code=rfModuleFilters.classCode,threshold=90,sources=rfAttendanceSources(),today=brisbaneToday(),sem=rfOverviewPeriod==='history'?{name:'Last 8 months'}:rfStudentSemester(today),rows=[];
- const cache=new Map();for(const c of classes)for(const p of rfModuleRoster(c.code)){if(!cache.has(p.id))cache.set(p.id,rfStudentAttendance(p.id,today,sources,rfOverviewPeriod));const r=cache.get(p.id).rows.find(x=>x.code===c.code);if(r)rows.push({...r,student:p})}
+ const classes=rfModuleClasses(),codes=new Set(classes.map(c=>c.code)),code=codes.has(rfModuleFilters.classCode)?rfModuleFilters.classCode:'',threshold=90,sources=rfAttendanceSources(codes),today=brisbaneToday(),sem=rfOverviewPeriod==='history'?{name:'Last 8 months'}:rfStudentSemester(today),rows=[];
+ const cache=new Map();for(const c of classes)for(const p of rfModuleRoster(c.code)){if(!cache.has(p.id))cache.set(p.id,rfStudentAttendance(p.id,today,sources,rfOverviewPeriod,codes));const r=cache.get(p.id).rows.find(x=>x.code===c.code);if(r)rows.push({...r,student:p})}
  const selected=rows.filter(r=>!code||r.code===code),marked=selected.filter(r=>r.total),below=marked.filter(r=>r.percent<threshold),late=marked.filter(r=>r.L>=2),charts=rfAttendanceCharts(selected,rfOverviewPeriod==='history'?rfAttendanceStart(today):rfStudentSemester(today).start,today);
  const unique=rs=>new Set(rs.map(r=>r.student.id)).size;
  const rate=rs=>{const total=rs.reduce((n,r)=>n+r.total,0);return total?100*rs.reduce((n,r)=>n+r.P+r.L,0)/total:null};
