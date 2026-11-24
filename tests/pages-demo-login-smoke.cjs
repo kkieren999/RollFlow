@@ -89,7 +89,7 @@ async function test() {
     // The full five-day grid and six-session day fit ordinary laptop and desktop viewports.
     // Turn motion off for geometry measurements so transient transforms do not affect overflow.
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    for (const size of [{ width: 1440, height: 900 }, { width: 1280, height: 720 }]) {
+    for (const size of [{ width: 1920, height: 1200 }, { width: 1440, height: 900 }, { width: 1280, height: 720 }, { width: 1180, height: 820 }, { width: 1024, height: 768 }, { width: 820, height: 1180 }, { width: 768, height: 1024 }]) {
       await page.setViewportSize(size);
       for (const mode of ['week', 'day']) {
         await page.locator('[data-timetable-view="' + mode + '"]').click();
@@ -536,6 +536,35 @@ async function test() {
     await page.locator('#movementIssueButton').click();
     assert.equal(await page.locator('.rf-movement-stat-total strong').innerText(), beforeInvalid,
       'A stale/forged removed destination should not create a pass');
+
+    // Exercise visible teacher/admin navigation across representative desktop and iPad sizes.
+    async function assertWorkspaceFits(label, selector) {
+      const result = await page.locator(selector).first().evaluate(main => {
+        const r = main.getBoundingClientRect();
+        return { left:r.left, right:r.right, bottom:r.bottom, width:innerWidth, height:innerHeight,
+          xOverflow:main.scrollWidth-main.clientWidth };
+      });
+      assert(result.left >= -3 && result.right <= result.width+3 && result.bottom <= result.height+3,
+        label+' workspace exceeds viewport: '+JSON.stringify(result));
+      assert(result.xOverflow <= 3, label+' page has horizontal overflow: '+JSON.stringify(result));
+    }
+    const deviceSizes = [{width:1920,height:1200},{width:1024,height:768},{width:768,height:1024},{width:820,height:1180}];
+    for (const size of deviceSizes) {
+      await page.setViewportSize(size);
+      for (const route of ['home','timetable','master','classes','finder','search','movements','alerts','profile','preferences','help']) {
+        await page.locator('.permanent-sidebar [data-nav="'+route+'"]').first().click();
+        await assertWorkspaceFits('Teacher '+route+' '+JSON.stringify(size), '.content-shell>.main');
+      }
+    }
+    await page.locator('[data-demo-signout]').first().click();
+    await logIn(page, 'admin', 'admin', '.v31-admin');
+    for (const size of deviceSizes) {
+      await page.setViewportSize(size);
+      for (const route of ['dashboard','staff','students','classes','timetable','master','movements','roles','data','oneschool','audit']) {
+        await page.locator('.v31-nav [data-admin-page="'+route+'"]').click();
+        await assertWorkspaceFits('Admin '+route+' '+JSON.stringify(size), '.v31-content>main');
+      }
+    }
 
     console.log('PASS: swilliams login, separate class ownership, teacher switch and admin login.');
   }
