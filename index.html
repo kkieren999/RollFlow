@@ -1211,9 +1211,9 @@ function closeDrawer(){const d=document.getElementById('overlay');if(d)d.remove(
 
 const rfStudentWeekdays=['Monday','Tuesday','Wednesday','Thursday','Friday'];
 let rfStudentTimetableDay='Monday';
-function rfStudentDayRows(person,day){
+function rfStudentDayRows(person,day,asOf=brisbaneToday()){
  if(!person)return [];
- const dayNo=planDays.indexOf(day)+1,classes=rfStudentCurrentClasses(person.id);
+ const dayNo=planDays.indexOf(day)+1,classes=rfStudentCurrentClasses(person.id,asOf);
  return planning.slots.filter(s=>s.active&&s.day===dayNo&&classes.some(c=>c.code===s.classCode)).map(s=>{
   const c=classes.find(c=>c.code===s.classCode),p=planning.periods.find(p=>p.code===s.period&&p.active!==false);
   if(!p)return null;
@@ -2641,7 +2641,26 @@ function rfStudentProfileBody(p){
  values.pin='Restricted';
  return `<section class="rf-student-record"><div class="rf-student-record-head"><strong>${esc(values.displayName)}</strong><span>${esc(p.id)}</span></div><dl class="rf-student-profile-grid">${rfProfileFields.map(([label,key])=>`<div><dt>${esc(label)}</dt><dd>${esc(values[key]===true?'Yes':values[key]===false?'No':values[key]??'Not recorded')||'Not recorded'}</dd></div>`).join('')}</dl></section>`;
 }
+function rfLateClassChoices(p,date,time){
+ if(!date||!studentDateValid(date)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)||date>brisbaneToday())return [];
+ if(date.startsWith('2026-')&&sarahSchoolStatus(date))return [];
+ const rows=rfStudentDayRows(p,weekdayFor(date),date);
+ return rows.filter(row=>{const period=planning.periods.find(x=>x.code===row.slot);return period&&time>=period.start&&time<period.end}).filter((row,i,arr)=>arr.findIndex(x=>x.id===row.id)===i);
+}
+function rfLateClassField(p,date,time){
+ const rows=rfLateClassChoices(p,date,time);
+ return '<option value="">'+(rows.length?'Select scheduled class':'No class scheduled at this time')+'</option>'+rows.map(row=>'<option value="'+esc(row.id)+'" '+(rows.length===1?'selected':'')+'>'+esc(row.id+' · '+row.name+' · '+row.period)+'</option>').join('');
+}
+function rfLateIncidentBody(p,a){
+ const date=brisbaneToday(),time=new Intl.DateTimeFormat('en-AU',{timeZone:'Australia/Brisbane',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date());
+ return `<section class="rf-student-record"><div class="rf-student-record-head"><strong>${esc(p.name)}</strong><span>${esc(p.id)}</span></div><form id="rf-student-incident-form" data-rf-action-id="${esc(a.id)}" data-rf-student-id="${esc(p.id)}" class="rf-student-incident-form"><label>Date<input type="date" name="date" value="${date}" max="${date}" required></label><label>Arrival time<input type="time" name="time" value="${time}" required></label><label class="rf-student-wide">Scheduled class<select name="classCode" required>${rfLateClassField(p,date,time)}</select></label><button class="btn green rf-student-wide" type="submit">Record late arrival</button></form></section>`;
+}
+document.addEventListener('input',e=>{
+ const f=e.target.closest('#rf-student-incident-form');if(!f||f.dataset.rfActionId!=='late'||!['date','time'].includes(e.target.name))return;
+ const p=rfModuleCurrentPerson();if(p)f.elements.classCode.innerHTML=rfLateClassField(p,f.elements.date.value,f.elements.time.value);
+});
 function rfStudentIncidentBody(p,a){
+ if(a.id==='late')return rfLateIncidentBody(p,a);
  const date=brisbaneToday(),classes=rfStudentCurrentClasses(p.id,date),selected=state.page==='roll'?state.classId:'';
  const options=(arr)=>arr.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');
  return `<section class="rf-student-record"><div class="rf-student-record-head"><strong>${esc(p.name)}</strong><span>${esc(p.id)}</span></div><form id="rf-student-incident-form" data-rf-action-id="${esc(a.id)}" data-rf-student-id="${esc(p.id)}" class="rf-student-incident-form"><label>Date<input type="date" name="date" value="${date}" max="${date}" required></label>${a.time?'<label>Time<input type="time" name="time" value="'+esc(new Intl.DateTimeFormat('en-AU',{timeZone:'Australia/Brisbane',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date()))+'" required></label>':''}<label>Class<select name="classCode"><option value="">Not class-specific</option>${classes.map(c=>`<option value="${esc(c.code)}" ${selected===c.code?'selected':''}>${esc(c.code+' · '+c.name)}</option>`).join('')}</select></label><label>Action type<select name="type" required><option value="">Select type</option>${options(a.types||[])}</select></label><label>Response<select name="response" required><option value="">Select response</option>${options(a.responses||[])}</select></label><label class="rf-student-wide">Notes<textarea name="notes" maxlength="1000" rows="3" placeholder="Optional factual notes"></textarea></label><label class="rf-student-check"><input type="checkbox" name="refer" ${a.refer?'checked disabled':''}> Refer to admin support</label><p class="rf-student-source">Saved locally; referrals appear in the administration queue in this browser.</p><button class="btn green rf-student-wide" type="submit">Save record</button></form></section>`;
@@ -2694,8 +2713,8 @@ document.addEventListener('submit',e=>{
  }
  if(form.id!=='rf-student-incident-form'||demoRole!=='teacher')return;
  e.preventDefault();e.stopImmediatePropagation();const data=new FormData(form),p=rfModuleCurrentPerson(),a=rfStudentActions().find(x=>x.id===form.dataset.rfActionId&&x.active&&x.kind==='incident');
- const val=k=>String(data.get(k)||'').trim(),date=val('date'),time=val('time'),code=val('classCode'),type=val('type'),response=val('response'),notes=val('notes');
- if(!p||p.id!==form.dataset.rfStudentId||!a||!date||!studentDateValid(date)||date>brisbaneToday()||a.time&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)||!a.types.includes(type)||!a.responses.includes(response)||notes.length>1000||code&&!rfStudentCurrentClasses(p.id).some(c=>c.code===code)){showToast('Check the action date, time and choices.');return}
+ const val=k=>String(data.get(k)||'').trim(),date=val('date'),time=val('time'),code=val('classCode'),type=a?.id==='late'?'Late arrival':val('type'),response=a?.id==='late'?'Record only':val('response'),notes=a?.id==='late'?'':val('notes');
+ if(!p||p.id!==form.dataset.rfStudentId||!a||!date||!studentDateValid(date)||date>brisbaneToday()||a.time&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)||(a.id==='late'?!rfLateClassChoices(p,date,time).some(c=>c.id===code):!a.types.includes(type)||!a.responses.includes(response)||notes.length>1000||code&&!rfStudentCurrentClasses(p.id).some(c=>c.code===code))){showToast('Check the action date, time and choices.');return}
  const record={id:'incident-'+Date.now()+'-'+Math.random().toString(36).slice(2,8),studentId:p.id,studentName:p.name,actionId:a.id,actionName:a.name,date,time,classCode:code,type,response,notes,refer:!!a.refer||data.has('refer')||response==='Refer to admin support',resolved:false,recordedAt:new Date().toISOString(),recordedBy:demoTeacherUsername};
  if(!rfWriteStudentLocal(RF_STUDENT_INCIDENT_KEY,[...rfStudentIncidents(),record]))return;
  document.getElementById('review-dialog')?.remove();if(rfModuleStudentId&&!state.drawer){if(state.page!=='classroom-management')rfModuleStudentId='';render()}showToast(record.refer?'Record saved to local admin support queue':'Classroom action saved');
