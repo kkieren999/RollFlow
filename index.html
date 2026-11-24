@@ -1982,7 +1982,7 @@ function rfMasterTable(rows,find=false,imported=false){
 function rfMasterGroups(rows,imported){
  const groups=new Map();for(const r of rows){const y=String(r.year??'unknown');if(!groups.has(y))groups.set(y,[]);groups.get(y).push(r)}
  const sorted=[...groups].sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true}));
- return sorted.map(([year,items])=>{const open=rfMasterOpen===year||!!rfMasterQuery.trim();const list=items.sort((a,b)=>String(a.code).localeCompare(String(b.code))),visible=list.slice(0,rfMasterLimit);return '<section class="rf-master-year"><button type="button" class="rf-master-year-toggle" data-rf-master-action="year" data-rf-master-id="'+esc(year)+'" aria-expanded="'+open+'"><span aria-hidden="true">'+(open?'▾':'▸')+'</span><strong>'+esc(rfMasterYearLabel(year))+'</strong><small>'+items.length+' '+(items.length===1?'class':'classes')+'</small></button>'+(open?rfMasterTable(visible,false,imported)+(list.length>visible.length?'<button type="button" class="mt-button rf-master-more" data-rf-master-action="more">Show more ('+(list.length-visible.length)+' remaining)</button>':''):'')+'</section>'}).join('')||'<div class="rf-master-empty">No matching classes in this period.</div>';
+ return sorted.map(([year,items])=>{const open=rfMasterOpen===year||!!rfMasterQuery.trim();const list=items.sort((a,b)=>String(a.code).localeCompare(String(b.code))),visible=list.slice(0,rfMasterLimit);return '<section class="rf-master-year"><button type="button" class="rf-master-year-toggle" data-rf-master-action="year" data-rf-master-id="'+esc(year)+'" aria-expanded="'+open+'"><span class="rf-master-year-icon" aria-hidden="true">'+esc(year==='0'?'P':year==='unknown'?'—':year)+'</span><strong>'+esc(rfMasterYearLabel(year))+'</strong><small>'+items.length+' '+(items.length===1?'class':'classes')+'</small><span class="rf-master-chevron" aria-hidden="true"></span></button>'+(open?rfMasterTable(visible,false,imported)+(list.length>visible.length?'<button type="button" class="mt-button rf-master-more" data-rf-master-action="more">Show more ('+(list.length-visible.length)+' remaining)</button>':''):'')+'</section>'}).join('')||'<div class="rf-master-empty">No matching classes in this period.</div>';
 }
 function rfMasterTeacherContent(){
  const imported=!!osPublished(),today=brisbaneToday(),q=rfMasterQuery.trim().toLowerCase(),day=masterDay,date=imported?osDate:'',monday=imported?polishShift(osDate,-((new Date(osDate+'T12:00:00Z').getUTCDay()+6)%7)):'',data=rfMasterDayData(imported,day,date);
@@ -1992,10 +1992,11 @@ function rfMasterTeacherContent(){
  const periods=data.periods.filter(p=>!p.break),current=(imported?date===today:planDays[Number(day)-1]===weekdayFor(today)),now=polishClock();
  if(!periods.some(p=>p.key===rfMasterPeriod)){rfMasterPeriod=(current?(periods.find(p=>p.start<=now&&now<p.end)||periods.find(p=>p.start>now)||periods.at(-1)):periods[0])?.key||''}
  const periodButtons='<div class="rf-master-periods" role="group" aria-label="School period">'+periods.map(p=>'<button type="button" data-rf-master-action="period" data-rf-master-id="'+esc(p.key)+'" aria-pressed="'+(rfMasterPeriod===p.key)+'"><strong>'+esc(p.label)+'</strong><small>'+esc(p.start)+'–'+esc(p.end)+'</small></button>').join('')+'</div>';
- const search='<div class="rf-master-search"><label class="mt-sr" for="rf-master-query">Search timetable</label><input type="search" id="rf-master-query" value="'+esc(rfMasterQuery)+'" placeholder="Search class, teacher or room…" maxlength="150">'+(q?'<button type="button" class="mt-button" data-rf-master-action="clear">Clear</button>':'')+'</div>';
+ const search='<div class="rf-master-search"><label class="mt-sr" for="rf-master-query">Search timetable</label><span class="rf-master-search-icon" aria-hidden="true"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/></svg></span><input type="search" id="rf-master-query" value="'+esc(rfMasterQuery)+'" placeholder="Search class, teacher or room…" maxlength="150">'+(q?'<button type="button" class="mt-button" data-rf-master-action="clear">Clear</button>':'')+'</div>';
  const rows=data.rows.filter(r=>r.period===rfMasterPeriod&&rfMasterMatches(r,q)),p=periods.find(p=>p.key===rfMasterPeriod);
- const body=periodButtons+'<div class="rf-master-summary"><strong>'+esc(p?.label||'No scheduled periods')+'</strong><span>'+rows.length+' matching classes</span></div>'+(!imported?masterDetail(masterData()):'')+(periods.length?rfMasterGroups(rows,imported):'<div class="rf-master-empty">No timetable available for this day.</div>');
- return '<div class="mt-root rf-master-root">'+dates+days+search+body+(imported?osCoverageNotice(osPublished())+'<p class="mt-caption">Masked imported timetable · not live attendance or staff availability.</p>':'<p class="mt-caption">Recurring demo timetable · not live attendance or staff availability.</p>')+'</div>';
+ const dayName=imported?weekdayFor(date):planDays[Number(day)-1]||'',groupCount=new Set(rows.map(r=>String(r.year??'unknown'))).size;
+ const body='<section class="rf-master-summary" aria-label="Selected timetable period"><div class="rf-master-summary-main"><span class="rf-master-eyebrow">'+esc(dayName)+'</span><strong>'+esc(p?.label||'No scheduled periods')+'</strong>'+(p?'<span class="rf-master-summary-time">'+esc(p.start)+' – '+esc(p.end)+'</span>':'')+'</div><div class="rf-master-summary-stats"><div><strong>'+rows.length+'</strong><span>'+(q?'Matching classes':'Classes')+'</span></div><div><strong>'+groupCount+'</strong><span>Year levels</span></div></div></section>'+search+(!imported?masterDetail(masterData()):'')+(periods.length?rfMasterGroups(rows,imported):'<div class="rf-master-empty">No timetable available for this day.</div>');
+ return '<div class="mt-root rf-master-root"><section class="rf-master-navigation">'+dates+'<div class="rf-master-section-label">School day</div>'+days+'<div class="rf-master-section-label">Teaching period</div>'+periodButtons+'</section>'+body+(imported?osCoverageNotice(osPublished())+'<p class="mt-caption">Masked imported timetable · not live attendance or staff availability.</p>':'<p class="mt-caption">Recurring demo timetable · not live attendance or staff availability.</p>')+'</div>';
 }
 function masterTeacherPage(){return shell(rfMasterTeacherContent(),'Master Timetable','School-wide timetable');}
 document.addEventListener('click',e=>{
@@ -2017,35 +2018,34 @@ document.addEventListener('input',e=>{
 },true);
 document.addEventListener('change',e=>{if(demoRole==='teacher'&&state.page==='master'&&e.target.id==='rf-master-date'&&osDateValid(e.target.value)){osDate=e.target.value;masterSelected='';refreshMaster()}},true);
 const rfMasterStyle=document.createElement('style');rfMasterStyle.textContent=`
-.rf-master-root{display:grid;gap:14px;width:100%;min-width:0}
-.rf-master-modes,.rf-master-days,.rf-master-periods,.rf-master-datebar,.rf-master-search,.rf-master-summary{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.rf-master-modes{border-bottom:1px solid #ccdbe3;padding-bottom:10px}
-.rf-master-modes button,.rf-master-days button,.rf-master-periods button{background:transparent;border:1px solid #b8cbd5;color:inherit;border-radius:8px;padding:10px 15px;font:inherit;font-weight:600;cursor:pointer}
-.rf-master-modes button[aria-pressed="true"],.rf-master-days button[aria-pressed="true"],.rf-master-periods button[aria-pressed="true"]{background:#007b97;color:white;border-color:#007b97}
-.rf-master-days button,.rf-master-periods button{flex:0 1 auto;min-width:80px}
-.rf-master-days small,.rf-master-periods small{display:block;font-weight:400;font-size:11px;margin-top:3px}
-.rf-master-search input,.rf-master-date-label input{border:1px solid #b8cbd5;border-radius:8px;padding:10px 12px;min-height:42px;font:inherit;background:transparent;color:inherit}
-.rf-master-search input{flex:1;min-width:120px}
-.rf-master-date-label{display:flex;align-items:center;gap:7px}
-.rf-master-summary{gap:10px}.rf-master-summary span{opacity:.75}.rf-master-summary .mt-button{margin-left:auto}
-.rf-master-year{border:1px solid #cadbe4;border-radius:10px;overflow:hidden;background:#fff;color:#263d4c}
-.rf-master-year-toggle{display:flex;align-items:center;gap:12px;padding:14px 16px;background:transparent;color:inherit;border:0;width:100%;cursor:pointer;text-align:left;font:inherit}
-.rf-master-year-toggle[aria-expanded="true"]{background:#e8f3f6;color:#006c84}
-.rf-master-year-toggle small{margin-left:auto;font-size:12px;font-weight:400;opacity:.85}
-.rf-master-table-wrap{overflow:auto;max-width:100%;border:1px solid #d4e0e7;border-radius:8px}
-.rf-master-year .rf-master-table-wrap{border:0;border-radius:0}
-.rf-master-table{width:100%;border-collapse:collapse;text-align:left;font:inherit}
-.rf-master-table th{background:#edf3f6;color:#284657;padding:10px 14px;white-space:nowrap;font-size:12px}
-.rf-master-table td{padding:10px 14px;border-top:1px solid #e0e8ed;vertical-align:middle}
-.rf-master-table td small{display:block;font-size:11px;opacity:.75;margin-top:3px}
-.rf-master-detail-btn{min-height:30px;padding:5px 9px;font-size:12px}
-.rf-master-empty{border:1px solid #d4e0e7;border-radius:10px;text-align:center;padding:34px 16px}.rf-master-empty p{margin-top:8px}
-.rf-master-more{margin:10px;justify-self:start}.rf-master-count{margin:0;opacity:.8}
-body[data-theme="Dark"] .rf-master-year{background:#203744;color:#e9f3f8;border-color:#41616f}
-body[data-theme="Dark"] .rf-master-year-toggle[aria-expanded="true"],body[data-theme="Dark"] .rf-master-table th{background:#294756;color:#d9f2fa}
-body[data-theme="Dark"] .rf-master-table td,body[data-theme="Dark"] .rf-master-table-wrap{border-color:#41616f}
-@media(max-width:600px){.rf-master-days button,.rf-master-periods button{flex:1 1 auto;padding:8px;min-width:62px}.rf-master-table td,.rf-master-table th{padding:9px 7px}.rf-master-year-toggle{padding:12px}.rf-master-detail-btn{padding:4px 6px}}
-@media print{.rf-master-modes,.rf-master-days,.rf-master-periods,.rf-master-datebar,.rf-master-search,.rf-master-summary .mt-button,.rf-master-detail-btn{display:none!important}}
+.rf-master-root{--mt-ink:#203c4d;--mt-muted:#526c7b;--mt-line:#d7e3e8;--mt-surface:#fff;--mt-soft:#eef5f7;--mt-accent:#007b97;display:grid;gap:12px;width:100%;min-width:0;font-size:14px}
+.rf-master-navigation{display:grid;gap:9px;background:var(--mt-surface);color:var(--mt-ink);border:1px solid var(--mt-line);border-radius:14px;padding:16px;box-shadow:0 2px 7px #19394b09}
+.rf-master-section-label{font-weight:700;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--mt-muted)}
+.rf-master-days,.rf-master-periods{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(min(100%,112px),1fr))}
+.rf-master-days{grid-template-columns:repeat(5,minmax(0,1fr));margin-bottom:5px}
+.rf-master-days button,.rf-master-periods button{min-width:0;background:var(--mt-soft);border:1px solid transparent;color:var(--mt-ink);border-radius:9px;padding:11px 13px;font:inherit;font-weight:700;cursor:pointer;text-align:left;overflow-wrap:anywhere}
+.rf-master-days button{text-align:center;min-height:43px}.rf-master-periods button{min-height:62px}
+.rf-master-days button[aria-pressed="true"]{background:#163b50;color:white;border-color:#163b50}
+.rf-master-periods button[aria-pressed="true"]{background:#00728a;color:#fff;border-color:#00728a;box-shadow:0 3px 8px #00728a22}
+.rf-master-days button:hover,.rf-master-periods button:hover{border-color:var(--mt-accent)}
+.rf-master-days small,.rf-master-periods small{display:block;font-weight:400;font-size:11px;line-height:1.3;margin-top:5px}
+.rf-master-datebar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin-bottom:5px}
+.rf-master-date-label{display:flex;gap:8px;align-items:center}.rf-master-date-label input{border:1px solid var(--mt-line);border-radius:8px;padding:8px;font:inherit;background:var(--mt-surface);color:var(--mt-ink)}
+.rf-master-summary{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;background:linear-gradient(115deg,#13394c,#12576a);color:#fff;border-radius:13px;padding:17px 21px}
+.rf-master-summary-main{display:grid;gap:4px;min-width:0}.rf-master-eyebrow{font-size:11px;letter-spacing:.10em;text-transform:uppercase;color:#c4e0e8;font-weight:600}.rf-master-summary-main>strong{font-size:clamp(20px,2.2vw,28px);line-height:1.2;overflow-wrap:anywhere}.rf-master-summary-time{font-size:12px;color:#d5e8ed}
+.rf-master-summary-stats{display:flex;gap:24px}.rf-master-summary-stats>div{border-left:1px solid #ffffff35;padding-left:20px;display:grid;gap:3px}.rf-master-summary-stats strong{font-size:25px;line-height:1.1}.rf-master-summary-stats span{font-size:11px;color:#e0edf2}
+.rf-master-search{display:flex;gap:9px;align-items:center;min-width:0;border:1px solid var(--mt-line);border-radius:11px;background:var(--mt-surface);color:var(--mt-ink);padding:4px 12px}.rf-master-search:focus-within{border-color:var(--mt-accent);box-shadow:0 0 0 2px #007b9718}.rf-master-search-icon{display:flex;color:var(--mt-muted)}
+.rf-master-search input{flex:1;min-width:0;min-height:42px;border:0!important;background:transparent;color:inherit;font:inherit;outline:none!important;padding:8px 2px}.rf-master-search input::placeholder{color:var(--mt-muted)}.rf-master-search .mt-button{min-height:32px;padding:5px 10px}
+.rf-master-year{background:var(--mt-surface);color:var(--mt-ink);border:1px solid var(--mt-line);border-radius:12px;overflow:hidden;box-shadow:0 2px 6px #19394b08}
+.rf-master-year-toggle{display:flex;align-items:center;gap:13px;width:100%;border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;text-align:left;padding:10px 15px;min-height:60px}.rf-master-year-toggle:hover{background:var(--mt-soft)}.rf-master-year-toggle[aria-expanded="true"]{background:var(--mt-soft);box-shadow:inset 4px 0 var(--mt-accent)}
+.rf-master-year-icon{display:grid;place-items:center;flex:0 0 37px;height:37px;border-radius:10px;background:#dceff2;color:#075c70;font-weight:800;font-size:16px}.rf-master-year-toggle>strong{font-size:15px;overflow-wrap:anywhere}.rf-master-year-toggle small{margin-left:auto;color:var(--mt-muted);font-size:12px;white-space:nowrap;font-weight:500}
+.rf-master-chevron{display:block;flex:0 0 8px;width:8px;height:8px;border-right:2px solid var(--mt-muted);border-bottom:2px solid var(--mt-muted);transform:rotate(-45deg);margin:0 4px}.rf-master-year-toggle[aria-expanded="true"] .rf-master-chevron{transform:rotate(45deg)}
+.rf-master-table-wrap{overflow:auto;max-width:100%}.rf-master-table{width:100%;border-collapse:collapse;text-align:left;font:inherit}.rf-master-table th{background:var(--mt-soft);color:var(--mt-muted);padding:10px 16px;white-space:nowrap;font-size:11px;letter-spacing:.05em;text-transform:uppercase}.rf-master-table td{padding:11px 16px;border-top:1px solid var(--mt-line);vertical-align:middle;overflow-wrap:anywhere}.rf-master-table td strong{color:var(--mt-ink);font-size:13px}.rf-master-table td small{display:block;font-size:11px;color:var(--mt-muted);margin-top:3px}.rf-master-table tbody tr:hover{background:var(--mt-soft)}
+.rf-master-detail-btn{min-height:32px;padding:5px 10px;font-size:12px}.rf-master-empty{background:var(--mt-surface);border:1px solid var(--mt-line);border-radius:12px;text-align:center;padding:34px 16px;color:var(--mt-muted)}.rf-master-more{margin:10px;justify-self:start}
+body[data-theme="Dark"] .rf-master-root,[data-theme="dark"] .rf-master-root{--mt-ink:#e6f2f7;--mt-muted:#b7cdd7;--mt-line:#41616f;--mt-surface:#203744;--mt-soft:#294756;--mt-accent:#69cadb}
+body[data-theme="Dark"] .rf-master-year-icon,[data-theme="dark"] .rf-master-year-icon{background:#325c6b;color:#d0f3fa}
+@media(max-width:650px){.rf-master-navigation{padding:12px}.rf-master-days{grid-template-columns:repeat(auto-fit,minmax(82px,1fr))}.rf-master-periods{grid-template-columns:repeat(auto-fit,minmax(100px,1fr))}.rf-master-days button,.rf-master-periods button{padding:9px}.rf-master-summary{padding:15px;gap:14px}.rf-master-summary-stats{gap:15px}.rf-master-summary-stats>div{padding-left:12px}.rf-master-year-toggle{padding:10px 12px;gap:10px}.rf-master-table th,.rf-master-table td{padding:9px 8px}.rf-master-detail-btn{padding:4px 6px}}
+@media print{.rf-master-navigation,.rf-master-search,.rf-master-detail-btn,.rf-master-more{display:none!important}.rf-master-summary{background:white;color:#203c4d;border:1px solid #d7e3e8}.rf-master-summary span{color:#526c7b}.rf-master-year{break-inside:avoid}}
 `;document.head.appendChild(rfMasterStyle);
 function refreshMaster(focusAction='',id=''){
  const root=document.querySelector('.mt-scroll'),left=root?.scrollLeft||0,top=root?.scrollTop||0,main=document.querySelector('main'),scroll=main?.scrollTop||0,appTop=app.scrollTop||0;
