@@ -3,6 +3,7 @@ import csv
 import hashlib
 import io
 import json
+import re
 from collections import Counter, defaultdict
 from datetime import datetime
 
@@ -39,6 +40,15 @@ def validate_quoting(text):
         i+=1
     if mode==1:
         raise ValueError("Unclosed quoted CSV field.")
+
+def parse_year(value):
+    label=value.strip()
+    if label.casefold() in {"prep","preparatory","foundation","reception","p","f","k","kindergarten"}:
+        return 0
+    match=re.fullmatch(r"(?:year\s*)?([0-9]{1,2})",label,re.I)
+    if match and int(match.group(1))<=12:
+        return int(match.group(1))
+    raise ValueError("Invalid year level.")
 
 def parse(raw):
     if not raw or len(raw)>MAX_BYTES:
@@ -77,8 +87,8 @@ def parse(raw):
                 date=datetime.strptime(r["Date"],"%d/%m/%Y").date()
                 start=datetime.strptime(r["Start_Time"],"%H:%M").time().strftime("%H:%M")
                 end=datetime.strptime(r["End_Time"],"%H:%M").time().strftime("%H:%M")
-                year=int(r["Subject_Level_Code"])
-                if not 1900<=date.year<=2099 or not r["Subject_Level_Code"].isascii() or not r["Subject_Level_Code"].isdigit() or len(r["Subject_Level_Code"])>2 or date.weekday()>4 or r["Day"]!=DAYS[date.weekday()] or start>=end or year not in range(7,13) or not all(r[k] for k in ("Class_Name","Subject_Name","Period")):
+                year=parse_year(r["Subject_Level_Code"])
+                if not 1900<=date.year<=2099 or date.weekday()>4 or r["Day"]!=DAYS[date.weekday()] or start>=end or year not in range(13) or not all(r[k] for k in ("Class_Name","Subject_Name","Period")):
                     raise ValueError()
             except ValueError:
                 raise ValueError(f"Invalid required class, year, weekday, date or times on row {number}.") from None
