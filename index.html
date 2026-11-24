@@ -2778,7 +2778,7 @@ document.addEventListener('submit',e=>{
  if(!p||p.id!==form.dataset.rfStudentId||!a||!date||!studentDateValid(date)||date>brisbaneToday()||(quick||a.time)&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)||(quick?((rfQuickNeedsClass(a)||code)&&!rfQuickClassChoices(p,date,time,a).some(c=>c.id===code)||a.id==='uniform'&&!a.types.includes(type)):!a.types.includes(type)||!a.responses.includes(response)||notes.length>1000||code&&!rfStudentCurrentClasses(p.id).some(c=>c.code===code))){showToast('Check the action date, time and choices.');return}
  const record={id:'incident-'+Date.now()+'-'+Math.random().toString(36).slice(2,8),studentId:p.id,studentName:p.name,actionId:a.id,actionName:a.name,date,time,classCode:code,type,response,notes,refer:!!a.refer||data.has('refer')||response==='Refer to admin support',resolved:false,recordedAt:new Date().toISOString(),recordedBy:demoTeacherUsername};
  if(!rfWriteStudentLocal(RF_STUDENT_INCIDENT_KEY,[...rfStudentIncidents(),record]))return;
- document.getElementById('review-dialog')?.remove();if(rfModuleStudentId&&!state.drawer){if(state.page!=='classroom-management')rfModuleStudentId='';render()}showToast(record.refer?'Record saved to local admin support queue':'Classroom action saved');
+ document.getElementById('review-dialog')?.remove();if(rfModuleStudentId&&!state.drawer){if(state.page!=='classroom-management')rfModuleStudentId='';else rfClassroomActionId='';render()}showToast(record.refer?'Record saved to local admin support queue':'Classroom action saved');
 },true);
 
 
@@ -2795,7 +2795,7 @@ const rfModuleActor=()=>demoTeacherUsername;
 const rfModuleStore=()=> 'rollflow_teacher_modules_v1_'+rfModuleActor();
 const rfModuleVisible=id=>!rfReadStudentLocal(RF_MODULE_VISIBILITY,[]).includes(id);
 navPrimary.push(...rfModuleDefs);
-let rfModuleStudentId='',rfModuleFilters={classCode:'',student:'',status:'all',threshold:90,month:'',query:''},rfSeatClass='',rfSeatSelected='',rfSeatColumns=5,rfListClass='';
+let rfClassroomActionId='',rfModuleStudentId='',rfModuleFilters={classCode:'',student:'',status:'all',threshold:90,month:'',query:''},rfSeatClass='',rfSeatSelected='',rfSeatColumns=5,rfListClass='';
 function rfModuleData(){return rfReadStudentLocal(rfModuleStore(),rfModulePeople().slice(0,3).map((p,i)=>({id:'demo-task-'+i,kind:'followup',student:p.id,title:['Check assessment progress','Discuss learning goals','Review homework routine'][i],due:dateOffset(brisbaneToday(),i-1),notes:'Fictional demo task',done:i===2})))}
 function rfModuleSave(next){return rfWriteStudentLocal(rfModuleStore(),next)}
 function rfModuleClasses(){
@@ -2821,13 +2821,42 @@ function rfClassroomSearchResults(query){
  const matches=rfModulePeople().filter(p=>q.split(/\s+/).every(word=>(p.name+' '+p.id).toLowerCase().includes(word)));
  return matches.length?'<div class="action-list">'+matches.slice(0,30).map(p=>'<button type="button" data-rf-classroom-select="'+esc(p.id)+'"><span><strong>'+esc(p.name)+'</strong> · Year '+esc(p.year)+' · '+esc(p.id)+'</span><span aria-hidden="true">›</span></button>').join('')+'</div>':rfModuleEmpty('No matching students.');
 }
-function rfClassroomManagementPage(){
- const p=rfModulePeople().find(p=>p.id===rfModuleStudentId);
- const search='<div class="rf-module-controls"><label style="flex:1">Search for a student<input id="rf-classroom-search" type="search" autocomplete="off" placeholder="Enter student name or ID" value="'+esc(rfModuleFilters.query)+'"></label></div><div id="rf-classroom-results" aria-live="polite">'+rfClassroomSearchResults(rfModuleFilters.query)+'</div>';
- const actions=rfStudentActions().filter(a=>a.active&&a.kind==='incident'&&!a.refer);
- const selected=p?rfModulePanel('Selected student','<div class="rf-module-task"><div><strong>'+esc(p.name)+'</strong><small>Year '+esc(p.year)+' · '+esc(p.id)+'</small></div><button class="btn small" type="button" data-rf-classroom-clear>Change student</button></div>')+rfModulePanel('Classroom actions','<p class="quiet">Select an action to record for this student.</p><div class="action-list">'+actions.map(a=>'<button type="button" data-rf-student-action="'+esc(a.id)+'">'+esc(a.name)+' <span aria-hidden="true">›</span></button>').join('')+'</div>'):rfModulePanel('Find a student',search);
- return shell('<div class="rf-module-root">'+selected+'</div>','Classroom Management','','');
+function rfWizardIcon(name){
+ const paths={student:'<circle cx="12" cy="7" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2z"/>',late:'<circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/>',uniform:'<path d="m8 3-6 4 3 5 3-2v11h8V10l3 2 3-5-6-4a4 4 0 0 1-8 0z"/>',left:'<path d="M12 3H4v18h8M9 12h12m-4-4 4 4-4 4"/>',truant:'<circle cx="9" cy="7" r="3"/><path d="M2 20v-2a7 7 0 0 1 14 0v2zM16 4a3 3 0 0 1 0 6m3 3a6 6 0 0 1 3 5v2"/>',change:'<path d="M3 7h17l-4-4m4 4-4 4M21 17H4l4-4m-4 4 4 4"/>',check:'<path d="m5 12 4 4L19 6"/>',search:'<circle cx="10" cy="10" r="6"/><path d="m15 15 5 5"/>',arrow:'<path d="m9 5 7 7-7 7"/>'};
+ return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(paths[name]||paths.arrow)+'</svg>';
 }
+function rfClassroomManagementPage(){
+ const p=rfModulePeople().find(p=>p.id===rfModuleStudentId),actions=rfStudentActions().filter(a=>a.active&&a.kind==='incident'&&!a.refer),action=p&&actions.find(a=>a.id===rfClassroomActionId),step=action?3:p?2:1;
+ const progress='<ol class="rf-wiz-steps" aria-label="Recording progress">'+['Select student','Choose action','Record'].map((label,i)=>'<li class="'+(i+1===step?'current':i+1<step?'complete':'')+'" '+(i+1===step?'aria-current="step"':'')+'><span class="rf-wiz-number">'+(i+1<step?rfWizardIcon('check'):i+1)+'</span><span>'+label+'</span></li>').join('')+'</ol>';
+ const search='<h2>Find a student</h2><label class="rf-wiz-search"><span class="rf-wiz-icon student">'+rfWizardIcon('search')+'</span><input id="rf-classroom-search" type="search" aria-label="Search for a student" autocomplete="off" placeholder="Enter student name or ID" value="'+esc(rfModuleFilters.query)+'"></label><div id="rf-classroom-results" aria-live="polite">'+rfClassroomSearchResults(rfModuleFilters.query)+'</div>';
+ const student=p?'<div class="rf-wiz-student"><span class="rf-wiz-icon student">'+rfWizardIcon('student')+'</span><div class="rf-wiz-person"><small>Selected student</small><strong>'+esc(p.name)+'</strong><span>Year '+esc(p.year)+' · '+esc(p.id)+'</span></div><button class="rf-wiz-change" type="button" data-rf-classroom-clear>'+rfWizardIcon('change')+'<span>Change student</span></button></div>':'';
+ const choices='<h2>Choose an action</h2><div class="rf-wiz-actions">'+actions.map(a=>'<button type="button" data-rf-wiz-action="'+esc(a.id)+'"><span class="rf-wiz-icon '+esc(['late','uniform','left','truant'].includes(a.id)?a.id:'student')+'">'+rfWizardIcon(a.id)+'</span><strong>'+esc(a.name)+'</strong><span class="rf-wiz-arrow">'+rfWizardIcon('arrow')+'</span></button>').join('')+'</div>';
+ const record=action?'<div class="rf-wiz-record-title"><h2>'+esc(action.name)+'</h2><button type="button" class="rf-wiz-change" data-rf-wiz-back>← Change action</button></div>'+rfQuickIncidentBody(p,action):'';
+ return shell('<div class="rf-module-root rf-wiz"><section class="rf-wiz-panel">'+progress+student+(p?(action?record:choices):search)+'</section></div>','Classroom Management','','');
+}
+const rfWizardStyle=document.createElement('style');
+rfWizardStyle.textContent=`
+.rf-wiz{width:100%;max-width:1400px;margin:0 auto;padding:8px 12px 24px;box-sizing:border-box}
+.rf-wiz-panel{background:#fff;border:1px solid #d6e0e6;border-radius:12px;box-shadow:0 3px 12px #1837490b;padding:24px 28px 30px;color:#17283a}
+.rf-wiz-steps{display:flex;align-items:center;justify-content:center;list-style:none;padding:4px 0 24px;margin:0 0 8px;gap:16px}
+.rf-wiz-steps li{display:flex;align-items:center;gap:9px;flex:1;color:#526a7a;font-size:14px;white-space:nowrap}
+.rf-wiz-steps li:not(:last-child):after{content:'';height:1px;background:#bacbd6;flex:1;margin-left:10px}
+.rf-wiz-steps li:last-child{flex:0 0 auto}
+.rf-wiz-number{width:32px;height:32px;border:1px solid #a7bbc9;border-radius:50%;display:grid;place-items:center;font-weight:700;flex-shrink:0}
+.rf-wiz-steps .current{color:#122c40;font-weight:700}.rf-wiz-steps .current .rf-wiz-number{background:#007b97;border-color:#007b97;color:white}.rf-wiz-steps .complete .rf-wiz-number{background:#e1f2f6;border-color:#b6dbe5;color:#007b97}.rf-wiz-number svg{width:18px;height:18px}
+.rf-wiz-student{display:flex;align-items:center;gap:16px;border:1px solid #d2dee7;border-radius:10px;background:#f9fbfc;padding:17px 20px;margin-bottom:25px}
+.rf-wiz-person{display:flex;flex:1;min-width:0;flex-direction:column;gap:3px}.rf-wiz-person small{font-size:12px;color:#4c6273}.rf-wiz-person strong{font-size:19px;color:#132438}.rf-wiz-person>span{font-size:13px;color:#466176}
+.rf-wiz-icon{width:48px;height:44px;flex-shrink:0;display:grid;place-items:center;border-radius:9px}.rf-wiz-icon svg{width:25px;height:25px}
+.rf-wiz-icon.student,.rf-wiz-icon.late{background:#dceefa;color:#006d9f}.rf-wiz-icon.uniform{background:#eee8ff;color:#6335d8}.rf-wiz-icon.left{background:#fff1dc;color:#c77805}.rf-wiz-icon.truant{background:#fde8e8;color:#c72b35}
+.rf-wiz-change{display:inline-flex;align-items:center;justify-content:center;gap:8px;background:#fff;border:1px solid #c9d8e1;border-radius:7px;padding:9px 13px;font:inherit;font-size:13px;font-weight:600;color:#24465b;cursor:pointer}.rf-wiz-change svg{width:19px;height:19px;color:#007b97}
+.rf-wiz h2{font-size:20px;line-height:1.3;margin:0 0 14px;color:#17283a;font-weight:750}
+.rf-wiz-actions{display:grid;gap:10px}.rf-wiz-actions button{display:flex;align-items:center;gap:18px;width:100%;padding:10px 16px;border:1px solid #cfdee7;background:white;border-radius:9px;min-height:66px;text-align:left;font:inherit;color:#162c40;cursor:pointer}.rf-wiz-actions button strong{font-size:16px;flex:1}.rf-wiz-arrow{display:grid;place-items:center;color:#526d80}.rf-wiz-arrow svg{width:20px;height:20px}
+.rf-wiz-actions button:hover,.rf-wiz-change:hover{border-color:#007b97;background:#f1f9fb}.rf-wiz button:focus-visible,.rf-wiz input:focus-visible{outline:2px solid #007b97;outline-offset:2px}
+.rf-wiz-search{display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid #cfdee7;border-radius:9px;margin-bottom:14px}.rf-wiz-search input{flex:1;min-width:0;border:0;background:transparent;font:inherit;font-size:16px;padding:10px}.rf-wiz-search .rf-wiz-icon{width:36px;height:36px}
+.rf-wiz-record-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}.rf-wiz-record-title h2{margin:0}.rf-wiz .rf-student-record-head{display:none}.rf-wiz .rf-student-record{padding:0;border:0;background:transparent}.rf-wiz .rf-student-incident-form{max-width:780px}.rf-wiz .rf-student-incident-form .btn{min-height:44px}
+@media(max-width:650px){.rf-wiz{padding:5px}.rf-wiz-panel{padding:15px}.rf-wiz-steps{gap:7px}.rf-wiz-steps li{font-size:11px;gap:5px;white-space:normal}.rf-wiz-steps li:not(:last-child):after{margin-left:3px}.rf-wiz-number{width:25px;height:25px}.rf-wiz-student{padding:12px;gap:10px;flex-wrap:wrap}.rf-wiz-person strong{font-size:16px}.rf-wiz-actions button{gap:12px;padding:8px 12px}.rf-wiz-actions button strong{font-size:14px}.rf-wiz-record-title{flex-wrap:wrap}}
+`;
+document.head.appendChild(rfWizardStyle);
 document.addEventListener('input',e=>{
  if(demoRole!=='teacher'||state.page!=='classroom-management'||e.target.id!=='rf-classroom-search')return;
  rfModuleFilters.query=e.target.value;
@@ -2835,9 +2864,12 @@ document.addEventListener('input',e=>{
 });
 document.addEventListener('click',e=>{
  if(demoRole!=='teacher'||state.page!=='classroom-management')return;
- const select=e.target.closest('[data-rf-classroom-select]'),clear=e.target.closest('[data-rf-classroom-clear]');
- if(!select&&!clear)return;
+ const select=e.target.closest('[data-rf-classroom-select]'),clear=e.target.closest('[data-rf-classroom-clear]'),action=e.target.closest('[data-rf-wiz-action]'),back=e.target.closest('[data-rf-wiz-back]');
+ if(!select&&!clear&&!action&&!back)return;
  e.preventDefault();e.stopImmediatePropagation();
+ if(action){if(!rfModuleStudentId||!rfStudentActions().some(a=>a.id===action.dataset.rfWizAction&&a.active&&a.kind==='incident'&&!a.refer))return;rfClassroomActionId=action.dataset.rfWizAction;render();return}
+ if(back){rfClassroomActionId='';render();return}
+ rfClassroomActionId='';
  if(select){const p=rfModulePeople().find(p=>p.id===select.dataset.rfClassroomSelect);if(!p)return;rfModuleStudentId=p.id;rfModuleFilters.query='';render()}
  else{rfModuleStudentId='';rfModuleFilters.query='';render();document.getElementById('rf-classroom-search')?.focus()}
 },true);
@@ -2951,7 +2983,7 @@ document.addEventListener('submit',e=>{
  if(id==='rf-followup-form'){e.preventDefault();e.stopImmediatePropagation();const title=rfModuleValue(f,'title'),due=rfModuleValue(f,'due'),student=rfModuleValue(f,'student'),notes=rfModuleValue(f,'notes');if(!title||title.length>120||!due||!studentDateValid(due)||notes.length>500||student&&!rfModulePeople().some(p=>p.id===student))return;rfModuleSave([...rfModuleData(),{id:rfModuleId(),kind:'followup',title,due,student,notes,done:false}]);render()}
 },true);
 const rfModuleOriginalNav=nav;
-nav=function(page){rfModuleStudentId='';if(page!==state.page){rfModuleFilters.status='all';rfModuleFilters.query='';rfModuleFilters.classCode=''}if(rfModuleDefs.some(x=>x[0]===page)&&!rfModuleVisible(page))page='timetable';rfModuleOriginalNav(page)};
+nav=function(page){rfModuleStudentId='';rfClassroomActionId='';if(page!==state.page){rfModuleFilters.status='all';rfModuleFilters.query='';rfModuleFilters.classCode=''}if(rfModuleDefs.some(x=>x[0]===page)&&!rfModuleVisible(page))page='timetable';rfModuleOriginalNav(page)};
 
 const rfDeviceRender=render;
 render=function(){
