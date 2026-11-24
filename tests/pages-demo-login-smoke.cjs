@@ -106,7 +106,8 @@ async function test() {
     await page.locator('[data-rf-student-action="attendance"]').click();
     assert.match(await page.locator('#review-dialog').innerText(),/Semester [12]/);
     await page.locator('#review-dialog [data-review-close]').first().click();
-    await page.locator('[data-rf-student-action="late"]').click();
+    await page.locator('[data-rf-classroom-picker]').click();
+    await page.locator('#review-dialog [data-rf-student-action="late"]').click();
     assert(await page.locator('#rf-student-incident-form [name="time"]').isVisible());
     await page.locator('#rf-student-incident-form [name="type"]').selectOption('Late arrival');
     await page.locator('#rf-student-incident-form [name="response"]').selectOption('Refer to admin support');
@@ -129,12 +130,51 @@ async function test() {
     await logIn(page,'swilliams','swilliams');
     await page.locator('[data-nav="search"]').first().click();
     await page.locator('[data-open-student]').first().click();
-    assert.equal(await page.locator('[data-rf-student-action="uniform"]').count(),0);
+    await page.locator('[data-rf-classroom-picker]').click();
+    assert.equal(await page.locator('#review-dialog [data-rf-student-action="uniform"]').count(),0);
     await page.getByRole('button',{name:'Classroom follow-up',exact:false}).click();
     assert.deepEqual(await page.locator('#rf-student-incident-form [name="type"] option').allTextContents(),['Select type','Learning concern','Equipment concern']);
     await page.locator('#review-dialog [data-review-close]').first().click();
     await page.locator('#overlay [data-action="closeDrawer"]').first().click();
     console.log('PASS: student profiles, semester attendance action, incidents, admin referrals and configurable choices.');
+
+    // Newly approved classroom modules and local teacher tools.
+    for(const route of ['attendance-overview','classroom-management','student-support','follow-ups','seating-plans','class-lists','school-calendar']){
+      await page.locator('[data-nav="'+route+'"]').first().click();
+      assert(await page.locator('.rf-module-root').isVisible(),'Module failed to render: '+route);
+    }
+    await page.locator('[data-nav="follow-ups"]').click();
+    await page.locator('#rf-followup-form [name="title"]').fill('Fictional follow-up');
+    await page.locator('#rf-followup-form button[type="submit"],#rf-followup-form button').first().click();
+    assert.match(await page.locator('.rf-module-task').innerText(),/Fictional follow-up/);
+    await page.locator('[data-rf-followup-toggle]').first().click();
+    assert.match(await page.locator('[data-rf-followup-toggle]').first().innerText(),/Reopen/);
+    await page.locator('[data-nav="seating-plans"]').click();
+    const seats=page.locator('[data-rf-seat-id]');
+    if(await seats.count()>1){
+      const first=await seats.nth(0).getAttribute('data-rf-seat-id'),second=await seats.nth(1).getAttribute('data-rf-seat-id');
+      await seats.nth(0).click();await seats.nth(1).click();
+      assert.equal(await seats.nth(0).getAttribute('data-rf-seat-id'),second);
+      assert.equal(await seats.nth(1).getAttribute('data-rf-seat-id'),first);
+    }
+    await page.locator('[data-demo-signout]').first().click();
+    await logIn(page,'admin','admin','.v31-admin');
+    await page.locator('[data-admin-page="teacher-modules"]').click();
+    await page.locator('[data-rf-module-toggle="class-lists"]').click();
+    await page.locator('#rf-calendar-admin [name="title"]').fill('Fictional assembly');
+    await page.locator('#rf-calendar-admin button').click();
+    await page.locator('[data-demo-signout]').first().click();
+    await logIn(page,'swilliams','swilliams');
+    assert.equal(await page.locator('[data-nav="class-lists"]').count(),0);
+    await page.locator('[data-nav="school-calendar"]').click();
+    assert.match(await page.locator('.rf-module-root').innerText(),/Fictional assembly/);
+    console.log('PASS: teacher modules, follow-up completion, seating swaps, admin visibility and calendar.');
+    await page.locator('[data-demo-signout]').first().click();
+    await logIn(page,'admin','admin','.v31-admin');
+    await page.locator('[data-admin-page="teacher-modules"]').click();
+    await page.locator('[data-rf-module-toggle="class-lists"]').click();
+    await page.locator('[data-demo-signout]').first().click();
+    await logIn(page,'swilliams','swilliams');
 
     // A real browser renders the full Monday-Friday timetable for any 2026 term week.
     await page.locator('[data-nav="timetable"]').first().click();
@@ -670,7 +710,7 @@ async function test() {
     const deviceSizes = [{width:1920,height:1200},{width:1024,height:768},{width:768,height:1024},{width:820,height:1180}];
     for (const size of deviceSizes) {
       await page.setViewportSize(size);
-      for (const route of ['home','timetable','master','finder','search','movements','alerts','profile','preferences','help']) {
+      for (const route of ['home','timetable','master','finder','search','movements','alerts','profile','preferences','help','attendance-overview','classroom-management','student-support','follow-ups','seating-plans','class-lists','school-calendar']) {
         await page.locator('.permanent-sidebar [data-nav="'+route+'"]').first().click();
         await assertWorkspaceFits('Teacher '+route+' '+JSON.stringify(size), '.content-shell>.main');
       }
@@ -679,7 +719,7 @@ async function test() {
     await logIn(page, 'admin', 'admin', '.v31-admin');
     for (const size of deviceSizes) {
       await page.setViewportSize(size);
-      for (const route of ['dashboard','staff','students','classes','timetable','master','movements','student-actions','roles','data','oneschool','audit']) {
+      for (const route of ['dashboard','staff','students','classes','timetable','master','movements','student-actions','teacher-modules','roles','data','oneschool','audit']) {
         await page.locator('.v31-nav [data-admin-page="'+route+'"]').click();
         await assertWorkspaceFits('Admin '+route+' '+JSON.stringify(size), '.v31-content>main');
       }
