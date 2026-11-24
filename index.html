@@ -2984,10 +2984,11 @@ document.addEventListener('submit',e=>{
  if(id==='rf-followup-form'){e.preventDefault();e.stopImmediatePropagation();const title=rfModuleValue(f,'title'),due=rfModuleValue(f,'due'),student=rfModuleValue(f,'student'),notes=rfModuleValue(f,'notes');if(!title||title.length>120||!due||!studentDateValid(due)||notes.length>500||student&&!rfModulePeople().some(p=>p.id===student))return;rfModuleSave([...rfModuleData(),{id:rfModuleId(),kind:'followup',title,due,student,notes,done:false}]);render()}
 },true);
 const rfModuleOriginalNav=nav;
-nav=function(page){rfSupportQuery='';rfSupportStudent='';rfSupportAction='';rfSupportType='';rfModuleStudentId='';rfClassroomActionId='';if(page!==state.page){rfModuleFilters.status='all';rfModuleFilters.query='';rfModuleFilters.classCode=''}if(rfModuleDefs.some(x=>x[0]===page)&&!rfModuleVisible(page))page='timetable';rfModuleOriginalNav(page)};
+nav=function(page){if(page==='search'&&state.page!=='search')state.studentQuery='';rfSupportQuery='';rfSupportStudent='';rfSupportAction='';rfSupportType='';rfModuleStudentId='';rfClassroomActionId='';if(page!==state.page){rfModuleFilters.status='all';rfModuleFilters.query='';rfModuleFilters.classCode=''}if(rfModuleDefs.some(x=>x[0]===page)&&!rfModuleVisible(page))page='timetable';rfModuleOriginalNav(page)};
 
 // Shared teacher workspace design, preserving all existing data handlers.
 studentRows=function(){
+ if(!state.studentQuery.trim())return '<div class="empty-state" style="padding:32px 20px;text-align:center"><span class="rf-wiz-icon student" style="margin:0 auto 12px">'+rfWizardIcon('search')+'</span><strong>Search for a student</strong><p style="margin-top:6px">Enter a student name or ID to display matching students.</p></div>';
  const matches=studentMatches();
  return '<div class="rf-modern-count">'+matches.length+' students found</div><div class="rf-modern-directory">'+matches.map(p=>'<article class="student-result rf-modern-student"><img src="'+esc(photo(p))+'" alt=""><div><strong>'+esc(p.name)+'</strong><span>Year '+esc(p.year)+' · '+esc(p.id)+'</span></div><button class="btn small rf-modern-primary" data-open-student="'+esc(p.id)+'">Student details '+rfWizardIcon('arrow')+'</button></article>').join('')+'</div>'+(matches.length?'':'<div class="empty-state">No matching students.</div>');
 };
