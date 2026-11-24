@@ -149,7 +149,8 @@ def dated(request, personal=False,admin_only=False):
     rows=assigned_rows(all_rows, staff_id) if personal else all_rows
     query=request.GET.get("q","").strip()[:150]
     year=request.GET.get("year","")
-    if year not in [str(y) for y in range(7,13)]:
+    years=sorted({r["year"] for r in rows})
+    if year not in [str(y) for y in years]:
         year=""
     staff=request.GET.get("staff","").strip().upper()[:250] if not personal else ""
     staff_key=request.GET.get("staff_id","").strip().upper()[:250] if not personal else ""
@@ -176,7 +177,7 @@ def dated(request, personal=False,admin_only=False):
         r["current"]=is_today and r["start"]<=current_time<r["end"]
     groups=[]
     period_headers=[dict(start=p[0],end=p[1],label=p[2],current=is_today and p[0]<=current_time<p[1]) for p in periods]
-    for y in range(7,13):
+    for y in years:
         if not highlight and year and year!=str(y):
             continue
         cells=[]
@@ -187,7 +188,7 @@ def dated(request, personal=False,admin_only=False):
     tabs=[{"date":shift_date(monday,i).isoformat(),"label":["Monday","Tuesday","Wednesday","Thursday","Friday"][i],"url":params(date=shift_date(monday,i).isoformat())} for i in range(5)]
     current_periods=[p for p in period_headers if p["current"]]
     next_period=next((p for p in period_headers if is_today and p["start"]>current_time),None)
-    context=dict(live_timetable=settings.ROLLFLOW_LIVE_TIMETABLE,version=version,selected_date=day.isoformat(),day=day,tabs=tabs,periods=period_headers,groups=groups,rows=shown if personal else filtered,query=query,year=year,years=range(7,13),hide=hide,personal=personal,unlinked=personal and not staff_id,link_message=link_message,record_exists=record is not None,admin=role=="admin",staff=staff,room=room,highlight=highlight,has_filter=bool(query or year or staff or staff_key or room),staff_key=staff_key,visible_count=sum(1 for r in rows if (r["start"],r["end"],r["period"]) in visible),coverage_warning=coverage_message(version,today),staff_choices=sorted({r["staff_code"] for r in rows if r["staff_code"]}|({staff} if staff else set())),room_choices=sorted({r["room"] for r in rows if r["room"]}|({room} if room else set())),today_url=params(date=today.isoformat()),prev_url=params(date=shift_date(day,-7).isoformat()),next_url=params(date=shift_date(day,7).isoformat()),first_url=params(date=version.summary["first_date"]),clear_url=params(q="",year="",staff="",staff_id="",room=""),break_url=params(breaks="" if hide else "hide"),highlight_url=params(highlight="" if highlight else "1"),is_today=is_today,current_periods=current_periods,next_period=next_period)
+    context=dict(live_timetable=settings.ROLLFLOW_LIVE_TIMETABLE,version=version,selected_date=day.isoformat(),day=day,tabs=tabs,periods=period_headers,groups=groups,rows=shown if personal else filtered,query=query,year=year,years=years,hide=hide,personal=personal,unlinked=personal and not staff_id,link_message=link_message,record_exists=record is not None,admin=role=="admin",staff=staff,room=room,highlight=highlight,has_filter=bool(query or year or staff or staff_key or room),staff_key=staff_key,visible_count=sum(1 for r in rows if (r["start"],r["end"],r["period"]) in visible),coverage_warning=coverage_message(version,today),staff_choices=sorted({r["staff_code"] for r in rows if r["staff_code"]}|({staff} if staff else set())),room_choices=sorted({r["room"] for r in rows if r["room"]}|({room} if room else set())),today_url=params(date=today.isoformat()),prev_url=params(date=shift_date(day,-7).isoformat()),next_url=params(date=shift_date(day,7).isoformat()),first_url=params(date=version.summary["first_date"]),clear_url=params(q="",year="",staff="",staff_id="",room=""),break_url=params(breaks="" if hide else "hide"),highlight_url=params(highlight="" if highlight else "1"),is_today=is_today,current_periods=current_periods,next_period=next_period)
     if role=="admin":
         return page(request,"master",dated_import=True,**context)
     return render(request,"imported_teacher.html",context)
