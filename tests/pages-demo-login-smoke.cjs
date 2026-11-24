@@ -56,7 +56,9 @@ async function test() {
     await logIn(page, 'swilliams', 'swilliams');
     assert.equal((await page.locator('.top-user > span').innerText()).trim(), 'Sarah Williams');
     assert(await page.locator('.rf-training-notice').isVisible(), 'Teacher workspace must disclose its public training status');
-    await page.locator('[data-nav="classes"]').first().click();
+    assert.equal(await page.locator('.permanent-sidebar [data-nav="classes"]').count(), 0, 'My Classes must not appear in the menu');
+    await page.locator('[data-nav="finder"]').first().click();
+    await page.locator('[data-teacher-scope]').selectOption('mine');
     const englishClasses = await page.locator('main').innerText();
     for (const code of ['ENG071A', 'ENG091B', 'ENG101B', '10BH']) {
       assert(englishClasses.includes(code), 'Missing assigned English class ' + code);
@@ -480,7 +482,9 @@ async function test() {
 
     await logIn(page, 'teacher', 'teacher');
     assert.equal((await page.locator('.top-user > span').innerText()).trim(), 'Alex Morgan');
-    await page.locator('[data-nav="classes"]').first().click();
+    assert.equal(await page.locator('.permanent-sidebar [data-nav="classes"]').count(), 0, 'My Classes must not appear in the menu');
+    await page.locator('[data-nav="finder"]').first().click();
+    await page.locator('[data-teacher-scope]').selectOption('mine');
     const mathsClasses = await page.locator('main').innerText();
     assert(mathsClasses.includes('MAF102A'), 'Default teacher class missing');
     assert(!mathsClasses.includes('ENG071A'), 'Default teacher inherited Sarah class');
@@ -596,7 +600,7 @@ async function test() {
     const deviceSizes = [{width:1920,height:1200},{width:1024,height:768},{width:768,height:1024},{width:820,height:1180}];
     for (const size of deviceSizes) {
       await page.setViewportSize(size);
-      for (const route of ['home','timetable','master','classes','finder','search','movements','alerts','profile','preferences','help']) {
+      for (const route of ['home','timetable','master','finder','search','movements','alerts','profile','preferences','help']) {
         await page.locator('.permanent-sidebar [data-nav="'+route+'"]').first().click();
         await assertWorkspaceFits('Teacher '+route+' '+JSON.stringify(size), '.content-shell>.main');
       }
