@@ -1283,7 +1283,7 @@ preferencesPage=function(){
   preferenceSwitch('contrast','High contrast','Use stronger outlines and clearer text.')+
   preferenceSwitch('motion','Reduce animation','Minimise interface movement.'));
  const attendance=preferenceSection('Teaching & attendance','Set up your everyday teaching routine.','clipboard-check',
-  preferenceSelect('landing','Start RollFlow on','Choose what opens when you sign in.',[['home','Today’s overview'],['timetable','Daily Schedule'],['roll','Take Attendance']])+
+  preferenceSelect('landing','Start RollFlow on','Choose what opens when you sign in.',[['timetable','Daily Schedule'],['roll','Take Attendance']])+
   preferenceSelect('classView','Attendance layout','Choose photographs or a compact student list.',[['portraits','Photo grid'],['list','List view']])+
   preferenceSwitch('showHints','Show attendance marking guide','Show the short photo-tapping instructions.',true));
  const notices=preferenceSection('Reminders & notices','Choose which optional updates appear on your daily schedule.','bell',
@@ -2526,6 +2526,8 @@ const rfDeviceStyle=document.createElement('style');rfDeviceStyle.id='rf-device-
 const rfDeviceRender=render;
 render=function(){
  rfClearTimetableMorph();
+ // Legacy home links and the RollFlow brand now share the Daily Schedule route.
+ if(demoRole==='teacher'&&state.page==='home'){state.page='timetable';workspace.settings.timetableView='day';}
  rfDeviceRender();
  const nav=document.querySelector('.permanent-sidebar .side-nav,.v31-nav nav');
  const selected=nav?.querySelector('[aria-current="page"]');
