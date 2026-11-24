@@ -2698,7 +2698,7 @@ document.addEventListener('submit',e=>{
  if(!p||p.id!==form.dataset.rfStudentId||!a||!date||!studentDateValid(date)||date>brisbaneToday()||a.time&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)||!a.types.includes(type)||!a.responses.includes(response)||notes.length>1000||code&&!rfStudentCurrentClasses(p.id).some(c=>c.code===code)){showToast('Check the action date, time and choices.');return}
  const record={id:'incident-'+Date.now()+'-'+Math.random().toString(36).slice(2,8),studentId:p.id,studentName:p.name,actionId:a.id,actionName:a.name,date,time,classCode:code,type,response,notes,refer:!!a.refer||data.has('refer')||response==='Refer to admin support',resolved:false,recordedAt:new Date().toISOString(),recordedBy:demoTeacherUsername};
  if(!rfWriteStudentLocal(RF_STUDENT_INCIDENT_KEY,[...rfStudentIncidents(),record]))return;
- document.getElementById('review-dialog')?.remove();if(rfModuleStudentId&&!state.drawer){rfModuleStudentId='';render()}showToast(record.refer?'Record saved to local admin support queue':'Classroom action saved');
+ document.getElementById('review-dialog')?.remove();if(rfModuleStudentId&&!state.drawer){if(state.page!=='classroom-management')rfModuleStudentId='';render()}showToast(record.refer?'Record saved to local admin support queue':'Classroom action saved');
 },true);
 
 
@@ -2735,7 +2735,34 @@ function rfModuleMetrics(metrics){return '<div class="rf-module-metrics">'+metri
 function rfModuleTable(headers,rows){return '<div class="rf-module-table-wrap"><table class="schedule-table"><thead><tr>'+headers.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr></thead><tbody>'+rows.join('')+'</tbody></table></div>'}
 function rfModuleRecords(){return rfStudentIncidents().filter(r=>r.recordedBy===rfModuleActor())}
 function rfModuleStatus(r){return r.refer?(r.resolved?'Resolved':'Awaiting support'):'Recorded'}
+function rfClassroomSearchResults(query){
+ const q=String(query||'').trim().toLowerCase();
+ if(!q)return '<p class="quiet">Search by student name or student ID.</p>';
+ const matches=rfModulePeople().filter(p=>q.split(/\s+/).every(word=>(p.name+' '+p.id).toLowerCase().includes(word)));
+ return matches.length?'<div class="action-list">'+matches.slice(0,30).map(p=>'<button type="button" data-rf-classroom-select="'+esc(p.id)+'"><span><strong>'+esc(p.name)+'</strong> · Year '+esc(p.year)+' · '+esc(p.id)+'</span><span aria-hidden="true">›</span></button>').join('')+'</div>':rfModuleEmpty('No matching students.');
+}
+function rfClassroomManagementPage(){
+ const p=rfModulePeople().find(p=>p.id===rfModuleStudentId);
+ const search='<div class="rf-module-controls"><label style="flex:1">Search for a student<input id="rf-classroom-search" type="search" autocomplete="off" placeholder="Enter student name or ID" value="'+esc(rfModuleFilters.query)+'"></label></div><div id="rf-classroom-results" aria-live="polite">'+rfClassroomSearchResults(rfModuleFilters.query)+'</div>';
+ const actions=rfStudentActions().filter(a=>a.active&&a.kind==='incident'&&!a.refer);
+ const selected=p?rfModulePanel('Selected student','<div class="rf-module-task"><div><strong>'+esc(p.name)+'</strong><small>Year '+esc(p.year)+' · '+esc(p.id)+'</small></div><button class="btn small" type="button" data-rf-classroom-clear>Change student</button></div>')+rfModulePanel('Classroom actions','<p class="quiet">Select an action to record for this student.</p><div class="action-list">'+actions.map(a=>'<button type="button" data-rf-student-action="'+esc(a.id)+'">'+esc(a.name)+' <span aria-hidden="true">›</span></button>').join('')+'</div>'):rfModulePanel('Find a student',search);
+ return shell('<div class="rf-module-root">'+selected+'</div>','Classroom Management','','');
+}
+document.addEventListener('input',e=>{
+ if(demoRole!=='teacher'||state.page!=='classroom-management'||e.target.id!=='rf-classroom-search')return;
+ rfModuleFilters.query=e.target.value;
+ const results=document.getElementById('rf-classroom-results');if(results)results.innerHTML=rfClassroomSearchResults(rfModuleFilters.query);
+});
+document.addEventListener('click',e=>{
+ if(demoRole!=='teacher'||state.page!=='classroom-management')return;
+ const select=e.target.closest('[data-rf-classroom-select]'),clear=e.target.closest('[data-rf-classroom-clear]');
+ if(!select&&!clear)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ if(select){const p=rfModulePeople().find(p=>p.id===select.dataset.rfClassroomSelect);if(!p)return;rfModuleStudentId=p.id;rfModuleFilters.query='';render()}
+ else{rfModuleStudentId='';rfModuleFilters.query='';render();document.getElementById('rf-classroom-search')?.focus()}
+},true);
 function rfModuleRecordsPage(support=false){
+ if(!support)return rfClassroomManagementPage();
  const route=support?'student-support':'classroom-management',all=rfModuleRecords().filter(r=>!support||r.refer),today=brisbaneToday(),q=rfModuleFilters.query.toLowerCase(),status=rfModuleFilters.status;
  const rows=all.filter(r=>(!q||[r.studentName,r.actionName,r.classCode,r.type,r.response].join(' ').toLowerCase().includes(q))&&(status==='all'||rfModuleStatus(r)===status)).sort((a,b)=>b.recordedAt.localeCompare(a.recordedAt));
  const metrics=rfModuleMetrics([[all.filter(r=>r.date===today).length,'Today'],[all.filter(r=>r.refer&&!r.resolved).length,'Awaiting support'],[all.filter(r=>r.refer&&r.resolved).length,'Resolved']]);
