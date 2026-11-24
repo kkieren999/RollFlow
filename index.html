@@ -1962,7 +1962,98 @@ function masterContent(){
  const summaries=(label,key,clash=false)=>`<tr class="mt-summary"><th scope="row">${label}</th>${cols.map(p=>{const n=data.stats[p.code][key];return `<td class="${clash&&n?'mt-warning':''}">${n}</td>`}).join('')}</tr>`;
  return `<div class="mt-root"><div class="mt-tabs" role="group" aria-label="Weekday">${tab}</div><div class="mt-toolbar"><form id="mt-search"><label><span class="mt-sr">Search timetable</span><input name="q" value="${esc(masterQuery)}" placeholder="Search class, teacher or room" maxlength="150"></label><label><span class="mt-sr">Year level</span><select name="year">${planOpt([['','All years'],...[7,8,9,10,11,12].map(y=>[y,'Year '+y])],masterYear)}</select></label><button class="mt-button">Search</button>${masterQuery||masterYear?'<button type="button" class="mt-button" data-master-action="clear">Clear</button>':''}</form><div class="mt-controls"><button type="button" class="mt-button" data-master-action="breaks" aria-pressed="${masterHideBreaks}">${masterHideBreaks?'Show breaks':'Hide breaks'}</button><button type="button" class="mt-button" data-master-action="expand">Expand all</button><button type="button" class="mt-button" data-master-action="collapse">Collapse all</button><button type="button" class="mt-button" data-master-action="print">Print</button></div></div>${masterDetail(data)}${cols.length?`<div class="mt-scroll" tabindex="0" aria-label="Master timetable grid"><table class="mt-table"><thead><tr><th scope="col" class="mt-rowlabel">Year</th>${head}</tr></thead><tbody>${rows}<tr class="mt-band"><th colspan="${totalCols}">Clashes</th></tr>${summaries('Staff clashes','teacherClashes',true)}${summaries('Room clashes','roomClashes',true)}<tr class="mt-band"><th colspan="${totalCols}">Free resources</th></tr>${summaries('Staff resources','freeTeachers')}${summaries('Room resources','freeRooms')}</tbody></table></div>`:'<div class="mt-detail">No visible school periods. Add periods in Timetable Management or show breaks.</div>'}</div>`;
 }
-function masterTeacherPage(){return shell(osPublished()?osDatedContent(osPersonal):masterContent(),osPublished()&&osPersonal?'Staff timetable':'Master Timetable','School-wide weekly schedule');}
+let rfMasterMode='period',rfMasterPeriod='',rfMasterOpen=null,rfMasterQuery='',rfMasterLimit=50,rfMasterBreaks=false;
+function rfMasterReset(){
+ rfMasterMode='period';rfMasterPeriod='';rfMasterOpen=null;rfMasterQuery='';rfMasterLimit=50;rfMasterBreaks=false;masterSelected='';masterQuery='';masterYear='';masterDay=String(Math.max(1,planDays.indexOf(weekdayFor(brisbaneToday()))+1));osDate=brisbaneToday();osResetFilters();osHideBreaks=true;masterHideBreaks=true;
+}
+function rfMasterDayData(imported,day,date){
+ if(imported){
+  const raw=osPublished()?.days?.[date]||[],periods=[...new Map(raw.map(r=>{const key=JSON.stringify([r.start,r.end,r.period]);return [key,{key,label:r.period,start:r.start,end:r.end,break:isMasterBreak({label:r.period,code:r.period})}]})).values()].sort((a,b)=>a.start.localeCompare(b.start)||a.end.localeCompare(b.end)||a.label.localeCompare(b.label));
+  return {periods,rows:raw.map(r=>({code:r.code,year:r.year,teacher:r.staff_code,room:r.room,subject:'',period:JSON.stringify([r.start,r.end,r.period]),label:r.period,start:r.start,end:r.end,day,date,id:''}))};
+ }
+ const data=masterData(day);
+ return {periods:data.periods.map(p=>({key:p.code,label:p.label,start:p.start,end:p.end,break:isMasterBreak(p)})),rows:data.slots.map(r=>{const p=data.periods.find(p=>p.code===r.period);return {code:r.classCode,year:r.klass.year,teacher:r.teacherName,room:r.room,subject:r.klass.name,period:r.period,label:p?.label||r.period,start:p?.start||'',end:p?.end||'',day,date,id:r.id}})};
+}
+function rfMasterMatches(r,q){return q.split(/\s+/).filter(Boolean).every(t=>[r.code,r.year,'Year '+r.year,r.teacher,r.room,r.subject,r.label].join(' ').toLowerCase().includes(t))}
+function rfMasterYearLabel(year){return year==='unknown'?'Other classes':/^\d+$/.test(year)?'Year '+year:year}
+function rfMasterTable(rows,find=false,imported=false){
+ return '<div class="rf-master-table-wrap"><table class="rf-master-table"><thead><tr>'+(find?'<th>Day / period</th>':'')+'<th>Class</th><th>Teacher</th><th>Room</th>'+(!imported?'<th><span class="mt-sr">Details</span></th>':'')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+(find?'<td>'+esc(r.date||planDays[Number(r.day)-1])+'<small>'+esc(r.label+' · '+r.start)+'</small></td>':'')+'<td><strong>'+esc(r.code)+'</strong>'+(r.subject?'<small>'+esc(r.subject)+'</small>':'')+'</td><td>'+esc(r.teacher||'—')+'</td><td>'+esc(r.room||'—')+'</td>'+(!imported?'<td><button type="button" class="mt-button rf-master-detail-btn" data-rf-master-action="detail" data-rf-master-id="'+esc(r.id)+'" data-rf-master-day="'+esc(r.day)+'" data-rf-master-period="'+esc(r.period)+'" data-rf-master-year="'+esc(String(r.year??'unknown'))+'">Details</button></td>':'')+'</tr>').join('')+'</tbody></table></div>';
+}
+function rfMasterGroups(rows,imported){
+ const groups=new Map();for(const r of rows){const y=String(r.year??'unknown');if(!groups.has(y))groups.set(y,[]);groups.get(y).push(r)}
+ const sorted=[...groups].sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true}));
+ return sorted.map(([year,items])=>{const open=rfMasterOpen===year||!!rfMasterQuery.trim();const list=items.sort((a,b)=>String(a.code).localeCompare(String(b.code))),visible=list.slice(0,rfMasterLimit);return '<section class="rf-master-year"><button type="button" class="rf-master-year-toggle" data-rf-master-action="year" data-rf-master-id="'+esc(year)+'" aria-expanded="'+open+'"><span aria-hidden="true">'+(open?'▾':'▸')+'</span><strong>'+esc(rfMasterYearLabel(year))+'</strong><small>'+items.length+' '+(items.length===1?'class':'classes')+'</small></button>'+(open?rfMasterTable(visible,false,imported)+(list.length>visible.length?'<button type="button" class="mt-button rf-master-more" data-rf-master-action="more">Show more ('+(list.length-visible.length)+' remaining)</button>':''):'')+'</section>'}).join('')||'<div class="rf-master-empty">No matching classes in this period.</div>';
+}
+function rfMasterTeacherContent(){
+ const imported=!!osPublished(),today=brisbaneToday(),q=rfMasterQuery.trim().toLowerCase(),day=masterDay,date=imported?osDate:'',monday=imported?polishShift(osDate,-((new Date(osDate+'T12:00:00Z').getUTCDay()+6)%7)):'',data=rfMasterDayData(imported,day,date);
+ const modes='<div class="rf-master-modes" role="group" aria-label="Timetable view">'+[['period','By period'],['find','Find timetable'],['grid','Full grid']].map(([k,label])=>'<button type="button" data-rf-master-action="mode" data-rf-master-id="'+k+'" aria-pressed="'+(rfMasterMode===k)+'">'+label+'</button>').join('')+'</div>';
+ if(rfMasterMode==='grid')return '<div class="rf-master-root">'+modes+(imported?osDatedContent(osPersonal):masterContent())+'</div>';
+ const days='<div class="rf-master-days" role="group" aria-label="School day">'+planDays.map((label,i)=>{const id=imported?polishShift(monday,i):String(i+1);return '<button type="button" data-rf-master-action="day" data-rf-master-id="'+id+'" aria-pressed="'+(id===(imported?date:day))+'">'+esc(label)+(imported?'<small>'+id.slice(8)+'/'+id.slice(5,7)+'</small>':'')+'</button>'}).join('')+'</div>';
+ const dates='<div class="rf-master-datebar">'+(imported?'<button type="button" class="mt-button" data-rf-master-action="prev">← Previous week</button><label class="rf-master-date-label">Date <input type="date" id="rf-master-date" value="'+esc(date)+'"></label><button type="button" class="mt-button" data-rf-master-action="next">Next week →</button>':'')+'<button type="button" class="mt-button" data-rf-master-action="today">Today</button></div>';
+ const periods=data.periods.filter(p=>rfMasterBreaks||!p.break),current=(imported?date===today:planDays[Number(day)-1]===weekdayFor(today)),now=polishClock();
+ if(!periods.some(p=>p.key===rfMasterPeriod)){rfMasterPeriod=(current?(periods.find(p=>p.start<=now&&now<p.end)||periods.find(p=>p.start>now)||periods.at(-1)):periods[0])?.key||''}
+ const periodButtons='<div class="rf-master-periods" role="group" aria-label="School period">'+periods.map(p=>'<button type="button" data-rf-master-action="period" data-rf-master-id="'+esc(p.key)+'" aria-pressed="'+(rfMasterPeriod===p.key)+'"><strong>'+esc(p.label)+'</strong><small>'+esc(p.start)+'–'+esc(p.end)+'</small></button>').join('')+'</div>';
+ const search='<div class="rf-master-search"><label class="mt-sr" for="rf-master-query">Search timetable</label><input type="search" id="rf-master-query" value="'+esc(rfMasterQuery)+'" placeholder="Search class, teacher or room…" maxlength="150">'+(q?'<button type="button" class="mt-button" data-rf-master-action="clear">Clear</button>':'')+'</div>';
+ let body='';
+ if(rfMasterMode==='find'){
+  if(!q)body='<div class="rf-master-empty"><strong>Find a timetable</strong><p>Search for a class, teacher or room across the selected school week.</p></div>';
+  else{const rows=planDays.flatMap((_,i)=>rfMasterDayData(imported,String(i+1),imported?polishShift(monday,i):'').rows).filter(r=>rfMasterMatches(r,q)&&(rfMasterBreaks||!isMasterBreak({label:r.label,code:r.label}))).sort((a,b)=>String(a.date||a.day).localeCompare(String(b.date||b.day))||a.start.localeCompare(b.start)||String(a.code).localeCompare(String(b.code)));body='<p class="rf-master-count">'+rows.length+' matching allocations this week</p>'+(rows.length?rfMasterTable(rows.slice(0,rfMasterLimit),true,imported)+(rows.length>rfMasterLimit?'<button type="button" class="mt-button rf-master-more" data-rf-master-action="more">Show more ('+(rows.length-rfMasterLimit)+' remaining)</button>':''):'<div class="rf-master-empty">No matching allocations this week.</div>')}
+ }else{const rows=data.rows.filter(r=>r.period===rfMasterPeriod&&rfMasterMatches(r,q)),p=periods.find(p=>p.key===rfMasterPeriod);body=periodButtons+'<div class="rf-master-summary"><strong>'+esc(p?.label||'No scheduled periods')+'</strong><span>'+rows.length+' matching classes</span><button type="button" class="mt-button" data-rf-master-action="breaks" aria-pressed="'+rfMasterBreaks+'">'+(rfMasterBreaks?'Hide breaks':'Show breaks')+'</button></div>'+(!imported?masterDetail(masterData()):'')+(periods.length?rfMasterGroups(rows,imported):'<div class="rf-master-empty">No timetable available for this day.</div>')}
+ return '<div class="mt-root rf-master-root">'+modes+dates+days+search+body+(imported?osCoverageNotice(osPublished())+'<p class="mt-caption">Masked imported timetable · not live attendance or staff availability.</p>':'<p class="mt-caption">Recurring demo timetable · not live attendance or staff availability.</p>')+'</div>';
+}
+function masterTeacherPage(){return shell(rfMasterTeacherContent(),'Master Timetable','School-wide timetable');}
+document.addEventListener('click',e=>{
+ if(demoRole!=='teacher'||state.page!=='master')return;const b=e.target.closest('[data-rf-master-action]');if(!b)return;e.preventDefault();e.stopImmediatePropagation();
+ const a=b.dataset.rfMasterAction,id=b.dataset.rfMasterId||'',imported=!!osPublished();
+ if(a==='mode'&&['period','find','grid'].includes(id)){rfMasterMode=id;rfMasterLimit=50;masterSelected='';if(id==='grid'){masterQuery='';masterYear='';osResetFilters();osSetView(false);osHideBreaks=true;masterHideBreaks=true}}
+ else if(a==='day'){if(imported){if(!osDateValid(id))return;osDate=id}else{if(!['1','2','3','4','5'].includes(id))return;masterDay=id}masterSelected='';rfMasterLimit=50}
+ else if(a==='today'){masterDay=String(Math.max(1,planDays.indexOf(weekdayFor(brisbaneToday()))+1));osDate=brisbaneToday();rfMasterPeriod='';masterSelected=''}
+ else if(a==='prev'||a==='next'){if(!imported)return;osDate=polishShift(osDate,a==='prev'?-7:7);masterSelected=''}
+ else if(a==='period'){rfMasterPeriod=id;masterSelected='';rfMasterLimit=50}
+ else if(a==='year'){rfMasterOpen=rfMasterOpen===id?null:id;rfMasterLimit=50}
+ else if(a==='breaks'){rfMasterBreaks=!rfMasterBreaks;masterSelected=''}
+ else if(a==='clear'){rfMasterQuery='';rfMasterLimit=50;masterSelected=''}
+ else if(a==='more'){rfMasterLimit+=50}
+ else if(a==='detail'&&!imported){masterDay=b.dataset.rfMasterDay;rfMasterPeriod=b.dataset.rfMasterPeriod;rfMasterOpen=b.dataset.rfMasterYear;rfMasterMode='period';rfMasterQuery='';masterSelected=id;masterQuery='';masterYear=''}
+ else return;
+ refreshMaster();[...document.querySelectorAll('[data-rf-master-action]')].find(x=>x.dataset.rfMasterAction===a&&(!id||x.dataset.rfMasterId===id))?.focus({preventScroll:true});
+},true);
+document.addEventListener('input',e=>{
+ if(demoRole!=='teacher'||state.page!=='master'||e.target.id!=='rf-master-query')return;
+ rfMasterQuery=e.target.value.slice(0,150);rfMasterLimit=50;masterSelected='';const pos=e.target.selectionStart;refreshMaster();const input=document.getElementById('rf-master-query');input?.focus({preventScroll:true});if(input&&pos!==null)input.setSelectionRange(pos,pos);
+},true);
+document.addEventListener('change',e=>{if(demoRole==='teacher'&&state.page==='master'&&e.target.id==='rf-master-date'&&osDateValid(e.target.value)){osDate=e.target.value;masterSelected='';refreshMaster()}},true);
+const rfMasterStyle=document.createElement('style');rfMasterStyle.textContent=`
+.rf-master-root{display:grid;gap:14px;width:100%;min-width:0}
+.rf-master-modes,.rf-master-days,.rf-master-periods,.rf-master-datebar,.rf-master-search,.rf-master-summary{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.rf-master-modes{border-bottom:1px solid #ccdbe3;padding-bottom:10px}
+.rf-master-modes button,.rf-master-days button,.rf-master-periods button{background:transparent;border:1px solid #b8cbd5;color:inherit;border-radius:8px;padding:10px 15px;font:inherit;font-weight:600;cursor:pointer}
+.rf-master-modes button[aria-pressed="true"],.rf-master-days button[aria-pressed="true"],.rf-master-periods button[aria-pressed="true"]{background:#007b97;color:white;border-color:#007b97}
+.rf-master-days button,.rf-master-periods button{flex:0 1 auto;min-width:80px}
+.rf-master-days small,.rf-master-periods small{display:block;font-weight:400;font-size:11px;margin-top:3px}
+.rf-master-search input,.rf-master-date-label input{border:1px solid #b8cbd5;border-radius:8px;padding:10px 12px;min-height:42px;font:inherit;background:transparent;color:inherit}
+.rf-master-search input{flex:1;min-width:120px}
+.rf-master-date-label{display:flex;align-items:center;gap:7px}
+.rf-master-summary{gap:10px}.rf-master-summary span{opacity:.75}.rf-master-summary .mt-button{margin-left:auto}
+.rf-master-year{border:1px solid #cadbe4;border-radius:10px;overflow:hidden;background:#fff;color:#263d4c}
+.rf-master-year-toggle{display:flex;align-items:center;gap:12px;padding:14px 16px;background:transparent;color:inherit;border:0;width:100%;cursor:pointer;text-align:left;font:inherit}
+.rf-master-year-toggle[aria-expanded="true"]{background:#e8f3f6;color:#006c84}
+.rf-master-year-toggle small{margin-left:auto;font-size:12px;font-weight:400;opacity:.85}
+.rf-master-table-wrap{overflow:auto;max-width:100%;border:1px solid #d4e0e7;border-radius:8px}
+.rf-master-year .rf-master-table-wrap{border:0;border-radius:0}
+.rf-master-table{width:100%;border-collapse:collapse;text-align:left;font:inherit}
+.rf-master-table th{background:#edf3f6;color:#284657;padding:10px 14px;white-space:nowrap;font-size:12px}
+.rf-master-table td{padding:10px 14px;border-top:1px solid #e0e8ed;vertical-align:middle}
+.rf-master-table td small{display:block;font-size:11px;opacity:.75;margin-top:3px}
+.rf-master-detail-btn{min-height:30px;padding:5px 9px;font-size:12px}
+.rf-master-empty{border:1px solid #d4e0e7;border-radius:10px;text-align:center;padding:34px 16px}.rf-master-empty p{margin-top:8px}
+.rf-master-more{margin:10px;justify-self:start}.rf-master-count{margin:0;opacity:.8}
+body[data-theme="Dark"] .rf-master-year{background:#203744;color:#e9f3f8;border-color:#41616f}
+body[data-theme="Dark"] .rf-master-year-toggle[aria-expanded="true"],body[data-theme="Dark"] .rf-master-table th{background:#294756;color:#d9f2fa}
+body[data-theme="Dark"] .rf-master-table td,body[data-theme="Dark"] .rf-master-table-wrap{border-color:#41616f}
+@media(max-width:600px){.rf-master-days button,.rf-master-periods button{flex:1 1 auto;padding:8px;min-width:62px}.rf-master-table td,.rf-master-table th{padding:9px 7px}.rf-master-year-toggle{padding:12px}.rf-master-detail-btn{padding:4px 6px}}
+@media print{.rf-master-modes,.rf-master-days,.rf-master-periods,.rf-master-datebar,.rf-master-search,.rf-master-summary .mt-button,.rf-master-detail-btn{display:none!important}}
+`;document.head.appendChild(rfMasterStyle);
 function refreshMaster(focusAction='',id=''){
  const root=document.querySelector('.mt-scroll'),left=root?.scrollLeft||0,top=root?.scrollTop||0,main=document.querySelector('main'),scroll=main?.scrollTop||0,appTop=app.scrollTop||0;
  render();const newRoot=document.querySelector('.mt-scroll');if(newRoot){newRoot.scrollLeft=left;newRoot.scrollTop=top}const newMain=document.querySelector('main');if(newMain)newMain.scrollTop=scroll;app.scrollTop=appTop;
@@ -3073,7 +3164,7 @@ document.addEventListener('input',e=>{
  rfOverviewQuery=e.target.value;const pos=e.target.selectionStart;render();const input=document.getElementById('rf-overview-query');input?.focus();if(input&&pos!==null)input.setSelectionRange(pos,pos);
 },true);
 const rfModuleOriginalNav=nav;
-nav=function(page){if(page==='attendance-overview'&&state.page!==page){rfOverviewFilter='all';rfOverviewQuery='';rfOverviewSort='percent';rfOverviewDirection='asc'}if(page==='finder'&&state.page!=='finder'&&state.page!=='class-detail')state.finder={query:'',year:'all',subject:'all',day:'all',period:'all'};if(page==='search'&&state.page!=='search')state.studentQuery='';rfSupportQuery='';rfSupportStudent='';rfSupportAction='';rfSupportType='';rfModuleStudentId='';rfClassroomActionId='';if(page!==state.page){rfModuleFilters.status='all';rfModuleFilters.query='';rfModuleFilters.classCode=''}if(rfModuleDefs.some(x=>x[0]===page)&&!rfModuleVisible(page))page='timetable';rfModuleOriginalNav(page)};
+nav=function(page){if(page==='master'&&state.page!==page)rfMasterReset();if(page==='attendance-overview'&&state.page!==page){rfOverviewFilter='all';rfOverviewQuery='';rfOverviewSort='percent';rfOverviewDirection='asc'}if(page==='finder'&&state.page!=='finder'&&state.page!=='class-detail')state.finder={query:'',year:'all',subject:'all',day:'all',period:'all'};if(page==='search'&&state.page!=='search')state.studentQuery='';rfSupportQuery='';rfSupportStudent='';rfSupportAction='';rfSupportType='';rfModuleStudentId='';rfClassroomActionId='';if(page!==state.page){rfModuleFilters.status='all';rfModuleFilters.query='';rfModuleFilters.classCode=''}if(rfModuleDefs.some(x=>x[0]===page)&&!rfModuleVisible(page))page='timetable';rfModuleOriginalNav(page)};
 
 // Shared teacher workspace design, preserving all existing data handlers.
 studentRows=function(){
