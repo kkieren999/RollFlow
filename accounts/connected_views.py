@@ -195,8 +195,15 @@ def teacher_schedule(request, week=False):
     if role != "teacher":
         return HttpResponseForbidden("Teacher access required.")
     publication = publication_or_404()
-    return render(request, "connected_school.html", {
-        "mode": "teacher", **schedule_context(publication, request, personal_codes(publication, request.user), week)})
+    codes = personal_codes(publication, request.user)
+    context = schedule_context(publication, request, codes, week)
+    # Weekday Day/Week switching uses the same bounded, authorised week.
+    # Keep weekends on their existing empty-day view.
+    if week or context["day"].weekday() < 5:
+        weekly = schedule_context(publication, request, codes, True)
+        context["days"] = weekly["days"]
+        context["native_cards"] = True
+    return render(request, "connected_school.html", {"mode": "teacher", **context})
 
 
 @never_cache

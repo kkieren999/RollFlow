@@ -219,3 +219,16 @@ class SharedInterfaceTests(TestCase):
         html = (settings.BASE_DIR / "index.html").read_text(encoding="utf-8")
         self.assertEqual(html.count("<!-- ROLLFLOW_SERVER_BOOTSTRAP -->"), 1)
         self.assertIn("--green:#147f38", html)
+
+    def test_approved_windows_workspace_features(self):
+        html = (settings.BASE_DIR / "index.html").read_text(encoding="utf-8")
+        for marker in ("rf-daily-schedule-layout", "function rfMorphBox",
+                       "function rfStudentAttendance", "function rfStudentProfileBody",
+                       "function rfAdminStudentActions", "data-rf-student-day",
+                       "rollflow_sandbox_student_incidents_", "Class Percentage of Attendance"):
+            self.assertIn(marker, html)
+        for removed in (">View planned timetable</button>", "Browse classes <select",
+                        "Student photos remain fully visible in a portrait frame",
+                        "data-image=", "Resource counts cover the full day schedule"):
+            self.assertNotIn(removed, html)
+        self.assertIn("if(serverIdentity||event.target.id!==", html)

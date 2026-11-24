@@ -1,3 +1,9 @@
+# Approved teacher workspace update — Windows staging source
+
+The offline browser workspace includes the compact branded Daily Schedule (Day/Week), travelling-card animation, responsive desktop/tablet layouts, simplified Class Finder and student details, weekday student timetable, semester attendance summaries using current planning enrolments, and configurable incident actions and local referrals. These features remain **fictional/browser-local**. Authenticated fallback sandbox incident records are isolated per user; no school-wide delivery or official attendance is implied. The connected Django timetable uses the same neutral compact weekly cards and Day/Week movement, retaining server-side access checks. The connected portal still does not implement central attendance submission, sensitive student profile fields or the incident/referral backend. Never enter real student data in the training workspace.
+
+Build and test the updated staging branch before installing. Follow the existing backup-first upgrade procedure; do not run First Setup over an existing database.
+
 # Administrator-managed movement destinations — V3.6.7 offline demo
 
 The offline fictional browser UI shipped as `index.html` now provides

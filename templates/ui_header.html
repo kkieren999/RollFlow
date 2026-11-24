@@ -6,8 +6,7 @@
   </a>
   <nav class="rf-nav" aria-label="{% if portal == 'teacher' %}Teacher{% else %}Administration{% endif %} navigation">
     {% if portal == 'teacher' %}
-      <a class="rf-navlink" href="{% url 'teacher-timetable' %}" {% if active == 'day' %}aria-current="page"{% endif %}>My day</a>
-      <a class="rf-navlink" href="{% url 'teacher-week' %}" {% if active == 'week' %}aria-current="page"{% endif %}>My week</a>
+      <a class="rf-navlink" href="{% url 'teacher-timetable' %}" {% if active == 'day' or active == 'week' %}aria-current="page"{% endif %}>Daily Schedule</a>
     {% else %}
       <a class="rf-navlink" href="{% url 'management-dashboard' %}" {% if active == 'dashboard' %}aria-current="page"{% endif %}>Dashboard</a>
       <a class="rf-navlink" href="{% url 'management-section' section='staff' %}" {% if active == 'staff' %}aria-current="page"{% endif %}>Staff</a>

@@ -42,7 +42,7 @@ p{margin:6px 0}
 <a class="rf-skip" href="#main-content">Skip to main content</a>
 {% include "ui_header.html" with portal="teacher" active="week" %}
 <main id="main-content" class="rf-page">
-  <h1>My teaching week</h1>
+  <h1>Daily Schedule</h1>
   <p class="muted">{{ request.user.get_full_name|default:request.user.username }} · {{ week_start|date:"j F Y" }} · Published version: {{ version.name }}</p>
   <p class="summary">Your personal timetable is read-only. It comes from the currently published OneSchool snapshot; it is not an attendance register.</p>
   <nav aria-label="Timetable week navigation" class="actions">
@@ -55,7 +55,7 @@ p{margin:6px 0}
   {% if link_message %}
     <p role="status" class="notice warning">{{ link_message }} Until your account is verified, no imported lessons will be shown.</p>
   {% else %}
-    <p class="summary">{{ lesson_count }} assigned lesson{{ lesson_count|pluralize }} this week. Only your own OneSchool staff-ID allocations are shown.</p>
+    
     <div class="days" data-rf-native-timetable data-rf-selected="{{ anchor_date }}" data-rf-initial="week">
     {% for day in week_days %}
       <section class="day" data-rf-native-day="{{ day.iso }}" aria-label="{{ day.date|date:'l j F Y' }}">

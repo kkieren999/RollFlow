@@ -73,14 +73,14 @@ input[type=checkbox]{margin-right:6px}table{width:100%;text-align:left;border-co
 {% for c in classes %}<tr><td>{{ c.code }}</td><td>{{ c.name }}</td><td>{{ c.years|join:", "|default:"—" }}</td><td>{{ c.students|length }}</td><td><a href="{% url 'connected-admin-roster' c.code %}">View roster</a></td></tr>{% empty %}<tr><td colspan="5">No matching classes.</td></tr>{% endfor %}
 </tbody></table></div><nav>{% if classes.has_previous %}<a href="?q={{ query|urlencode }}&amp;page={{ classes.previous_page_number }}">Previous</a>{% endif %}Page {{ classes.number }} of {{ classes.paginator.num_pages }}{% if classes.has_next %}<a href="?q={{ query|urlencode }}&amp;page={{ classes.next_page_number }}">Next</a>{% endif %}</nav></section>
 {% elif mode == 'master' or mode == 'teacher' %}
-<h1>{% if mode == 'master' %}School master timetable{% elif week_view %}My teaching week{% else %}My teaching day{% endif %}</h1>
+<h1>{% if mode == 'master' %}School master timetable{% else %}Daily Schedule{% endif %}</h1>
 {% if no_mapping %}<p class="note">Your account has no currently verified mapping in this publication. Ask your administrator to verify the staff ID/code and publish again.</p>{% endif %}
 <form method="get"><label for="date">Choose a date in the published term</label><div class="rf-page-actions"><input id="date" name="date" type="date" value="{{ day|date:'Y-m-d' }}" min="{{ publication.starts|date:'Y-m-d' }}" max="{{ publication.ends|date:'Y-m-d' }}"><button type="submit">View date</button>
 <a class="btn" href="?date={{ previous_date|date:'Y-m-d' }}">Previous {% if week_view %}week{% else %}day{% endif %}</a>
 <a class="btn" href="?date={{ next_date|date:'Y-m-d' }}">Next {% if week_view %}week{% else %}day{% endif %}</a>
 </div></form>
-{% if mode == 'teacher' and week_view %}
-<div data-rf-native-timetable data-rf-selected="{{ day|date:'Y-m-d' }}" data-rf-initial="week" class="days">
+{% if mode == 'teacher' and native_cards %}
+<div data-rf-native-timetable data-rf-selected="{{ day|date:'Y-m-d' }}" data-rf-initial="{% if week_view %}week{% else %}day{% endif %}" class="days">
 {% for d in days %}<section class="day" data-rf-native-day="{{ d.date|date:'Y-m-d' }}" aria-label="{{ d.date|date:'l j F Y' }}">
 <div class="day-head"><h2>{{ d.date|date:"l j F" }}</h2><a class="btn" href="{% url 'teacher-timetable' %}?date={{ d.date|date:'Y-m-d' }}">Day view</a></div>
 <div class="day-body">{% for row in d.rows %}
