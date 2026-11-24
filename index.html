@@ -2453,7 +2453,7 @@ function rfMorphFrames(from,to){
  const clamp=(v,min,max)=>Math.min(max,Math.max(min,v));
  const mix=(a,b,q,cap)=>b+(q<0?clamp((a-b)*q,-cap,cap):(a-b)*q);
  return Array.from({length:51},(_,i)=>{
-  const t=i/50,phase=i===50?0:Math.exp(-7.8*t)*(Math.cos(12.8*t)+(7.8/12.8)*Math.sin(12.8*t));
+  const t=i/50,phase=i===50?0:Math.exp(-5.8*t)*(Math.cos(6.8*t)+(5.8/6.8)*Math.sin(6.8*t));
   const width=Math.max(1,mix(from.width,to.width,phase,Math.min(18,to.width*.07)));
   const height=Math.max(1,mix(from.height,to.height,phase,Math.min(12,to.height*.09)));
   const cx=mix(from.left+from.width/2,to.left+to.width/2,phase,18);
