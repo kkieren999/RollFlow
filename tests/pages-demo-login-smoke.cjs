@@ -86,6 +86,34 @@ async function test() {
         'Each full timetable weekday needs one preparation period');
     }
 
+    // The full five-day grid and six-session day fit ordinary laptop and desktop viewports.
+    // Turn motion off for geometry measurements so transient transforms do not affect overflow.
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    for (const size of [{ width: 1440, height: 900 }, { width: 1280, height: 720 }]) {
+      await page.setViewportSize(size);
+      for (const mode of ['week', 'day']) {
+        await page.locator('[data-timetable-view="' + mode + '"]').click();
+        const geometry = await page.locator('.rf-timetable-workspace').evaluate(workspace => {
+          const main = workspace.closest('main');
+          const scroll = workspace.querySelector('.rf-week-scroll');
+          const bounds = main.getBoundingClientRect();
+          const cards = [...workspace.querySelectorAll('.rf-timetable-card')];
+          return {
+            cardCount: cards.length,
+            verticalOverflow: main.scrollHeight - main.clientHeight,
+            horizontalOverflow: scroll ? scroll.scrollWidth - scroll.clientWidth : 0,
+            bottomOverflow: Math.max(...cards.map(card => card.getBoundingClientRect().bottom)) - bounds.bottom
+          };
+        });
+        assert.equal(geometry.cardCount, mode === 'week' ? 30 : 6);
+        assert(geometry.verticalOverflow <= 3 && geometry.bottomOverflow <= 3,
+          mode + ' must fit vertically at ' + JSON.stringify(size) + ': ' + JSON.stringify(geometry));
+        assert(geometry.horizontalOverflow <= 3,
+          mode + ' must fit horizontally at ' + JSON.stringify(size) + ': ' + JSON.stringify(geometry));
+      }
+    }
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+
     // Term starts in January and historical dates remain navigable.
     await page.locator('[data-timetable-view="day"]').first().click();
     async function viewDate(iso) {
