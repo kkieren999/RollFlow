@@ -2915,12 +2915,12 @@ function rfAttendanceCharts(rows,start,end){
  const trend='<svg viewBox="0 0 650 225" class="rf-attendance-trend" role="img" aria-label="Monthly attendance trend">'+grid+'<line x1="52" x2="602" y1="'+y(90)+'" y2="'+y(90)+'" stroke="#dc8a19" stroke-dasharray="5 4"/>'+segments+points.map(v=>'<text x="'+x(v.i)+'" y="211" text-anchor="middle" font-size="11" fill="currentColor">'+esc(new Date(v.m+'-01T12:00:00Z').toLocaleDateString('en-AU',{month:'short',timeZone:'UTC'}))+'</text>').join('')+'</svg><p class="rf-student-source">Monthly attendance · dashed line: 90% target · gaps indicate no submitted marks.</p>';
  return '<div class="rf-attendance-charts"><section class="rf-chart-panel"><h3>Attendance breakdown</h3>'+donut+'</section><section class="rf-chart-panel"><h3>Attendance over time</h3>'+trend+'</section></div>';
 }
-let rfOverviewFilter='concerns',rfOverviewQuery='',rfOverviewPeriod='semester';
-function rfOpenClassDisplay(){
+let rfOverviewFilter='concerns',rfOverviewQuery='';
+function rfOpenClassDisplay(classCode=rfModuleFilters.classCode){
  if(demoRole!=='teacher'||state.page!=='attendance-overview')return;
- const cls=rfModuleClasses().find(c=>c.code===rfModuleFilters.classCode);
+ const cls=rfModuleClasses().find(c=>c.code===classCode);
  if(!cls){showToast('Select one of your classes first');return}
- const today=brisbaneToday(),period=rfOverviewPeriod,sem=period==='history'?{name:'Last 8 months',start:rfAttendanceStart(today)}:rfStudentSemester(today),codes=new Set([cls.code]),sources=rfAttendanceSources(codes);
+ const today=brisbaneToday(),period='semester',sem=rfStudentSemester(today),codes=new Set([cls.code]),sources=rfAttendanceSources(codes);
  const rows=rfModuleRoster(cls.code).map(p=>rfStudentAttendance(p.id,today,sources,period,codes).rows.find(r=>r.code===cls.code)).filter(Boolean);
  const minimum=10,marked=rows.filter(r=>r.total>0),enough=marked.length>=minimum;
  const totals={P:0,L:0,A:0};for(const r of marked)for(const k of Object.keys(totals))totals[k]+=r[k];
@@ -2950,18 +2950,18 @@ function rfOpenClassDisplay(){
 }
 
 function rfModuleAttendancePage(){
- const classes=rfModuleClasses(),codes=new Set(classes.map(c=>c.code)),code=codes.has(rfModuleFilters.classCode)?rfModuleFilters.classCode:'',threshold=90,sources=rfAttendanceSources(codes),today=brisbaneToday(),sem=rfOverviewPeriod==='history'?{name:'Last 8 months'}:rfStudentSemester(today),rows=[];
- const cache=new Map();for(const c of classes)for(const p of rfModuleRoster(c.code)){if(!cache.has(p.id))cache.set(p.id,rfStudentAttendance(p.id,today,sources,rfOverviewPeriod,codes));const r=cache.get(p.id).rows.find(x=>x.code===c.code);if(r)rows.push({...r,student:p})}
- const selected=rows.filter(r=>!code||r.code===code),marked=selected.filter(r=>r.total),below=marked.filter(r=>r.percent<threshold),late=marked.filter(r=>r.L>=2),charts=rfAttendanceCharts(selected,rfOverviewPeriod==='history'?rfAttendanceStart(today):rfStudentSemester(today).start,today);
+ const classes=rfModuleClasses(),codes=new Set(classes.map(c=>c.code)),code=codes.has(rfModuleFilters.classCode)?rfModuleFilters.classCode:'',threshold=90,sources=rfAttendanceSources(codes),today=brisbaneToday(),sem=rfStudentSemester(today),rows=[];
+ const cache=new Map();for(const c of classes)for(const p of rfModuleRoster(c.code)){if(!cache.has(p.id))cache.set(p.id,rfStudentAttendance(p.id,today,sources,'semester',codes));const r=cache.get(p.id).rows.find(x=>x.code===c.code);if(r)rows.push({...r,student:p})}
+ const selected=rows.filter(r=>!code||r.code===code),marked=selected.filter(r=>r.total),below=marked.filter(r=>r.percent<threshold),late=marked.filter(r=>r.L>=2),charts=rfAttendanceCharts(selected,sem.start,today);
  const unique=rs=>new Set(rs.map(r=>r.student.id)).size;
  const rate=rs=>{const total=rs.reduce((n,r)=>n+r.total,0);return total?100*rs.reduce((n,r)=>n+r.P+r.L,0)/total:null};
  const fmt=p=>p===null?'—':p.toFixed(1)+'%';
  const query=rfOverviewQuery.trim().toLowerCase(),visible=selected.filter(r=>(rfOverviewFilter==='all'||rfOverviewFilter==='concerns'&&r.total&&r.percent<threshold||rfOverviewFilter==='late'&&r.L>=2||rfOverviewFilter==='missing'&&!r.total)&&(!query||(r.student.name+' '+r.student.id).toLowerCase().includes(query))).sort((a,b)=>(a.percent??101)-(b.percent??101)||b.L-a.L);
- const period='<div class="rf-module-controls"><label>Reporting period<select id="rf-overview-period">'+rfModuleOptions([['semester','Current semester'],['history','Last 8 months']],rfOverviewPeriod)+'</select></label><button type="button" class="btn rf-modern-primary" data-rf-class-display '+(classes.some(c=>c.code===code)?'':'disabled title="Select a class first"')+'>Class Display</button><small class="rf-project-hint">'+(code?'Project class totals only.':'Select a teaching class to enable Class Display.')+'</small></div>';
- const classCards=classes.map(c=>{const rs=rows.filter(r=>r.code===c.code),p=rate(rs);return '<button type="button" class="rf-overview-class-card" data-rf-overview-class="'+esc(c.code)+'" aria-pressed="'+(code===c.code)+'"><span><strong>'+esc(c.code)+'</strong><small>'+esc(c.name)+'</small></span><span><strong>'+fmt(p)+'</strong>'+rfModernAttendanceBar(p)+'</span></button>'}).join('');
+
+ const classCards=classes.map(c=>{const rs=rows.filter(r=>r.code===c.code),p=rate(rs);return '<article class="rf-overview-class-tile"><button type="button" class="rf-overview-class-card" data-rf-overview-class="'+esc(c.code)+'" aria-pressed="'+(code===c.code)+'"><span><strong>'+esc(c.code)+'</strong><small>'+esc(c.name)+'</small></span><span><strong>'+fmt(p)+'</strong>'+rfModernAttendanceBar(p)+'</span></button><button type="button" class="btn small rf-overview-project-button" data-rf-class-display="'+esc(c.code)+'" aria-label="Class Display for '+esc(c.code)+'">Class Display</button></article>'}).join('');
  const filters='<div class="rf-module-controls">'+rfModuleClassSelect('rf-overview-class',code,true)+'<label>Show<select id="rf-overview-category">'+rfModuleOptions([['concerns','Below 90%'],['late','Repeated lateness (2+)'],['all','All students'],['missing','No submitted marks']],rfOverviewFilter)+'</select></label><label>Student name or ID<input type="search" id="rf-overview-query" value="'+esc(rfOverviewQuery)+'" placeholder="Search students"></label><button type="button" class="btn small" data-rf-overview-reset>Clear filters</button></div>';
  const table=visible.length?rfModuleTable(['Student','Class','Attendance','Present','Late','Absent','Submitted lessons',''],visible.map(r=>'<tr><td><strong>'+esc(r.student.name)+'</strong></td><td>'+esc(r.code)+'</td><td><strong>'+fmt(r.percent)+'</strong>'+rfModernAttendanceBar(r.percent)+'</td><td>'+r.P+'</td><td>'+r.L+'</td><td>'+r.A+'</td><td>'+r.total+'</td><td><button class="btn small rf-modern-primary" data-rf-overview-student="'+esc(r.student.id)+'">Details</button></td></tr>')):rfModuleEmpty('No matching attendance records.');
- return shell('<div class="rf-module-root">'+rfModulePanel('Attendance monitoring · Fictional demo data',period+'<p class="rf-student-source">Assigned classes only. Late arrivals count as attendance. Summary reflects the selected class and reporting period.</p>')+'<div class="rf-overview-metrics">'+rfModuleMetrics([[fmt(rate(marked)),'Overall lesson attendance'],[unique(selected),'Unique students'],[unique(below),'Students below 90%'],[unique(late),'Students with repeated lateness']])+'</div>'+charts+rfModulePanel('Attendance by class','<div class="rf-overview-class-grid">'+(classCards||rfModuleEmpty('No assigned classes.'))+'</div>')+rfModulePanel('Student attendance',filters+'<div id="rf-overview-results"><p class="rf-student-source">'+visible.length+' matching student-class records · lowest attendance first</p>'+table+'</div>')+'</div>','Attendance Overview',sem.name,'');
+ return shell('<div class="rf-module-root"><div class="rf-overview-metrics">'+rfModuleMetrics([[fmt(rate(marked)),'Overall lesson attendance'],[unique(selected),'Unique students'],[unique(below),'Students below 90%'],[unique(late),'Students with repeated lateness']])+'</div>'+charts+rfModulePanel('Attendance by class','<div class="rf-overview-class-grid">'+(classCards||rfModuleEmpty('No assigned classes.'))+'</div>')+rfModulePanel('Student attendance',filters+'<div id="rf-overview-results"><p class="rf-student-source">'+visible.length+' matching student-class records · lowest attendance first</p>'+table+'</div>')+'</div>','Attendance Overview',sem.name,'');
 }
 function rfModuleFollowups(){
  const all=rfModuleData().filter(r=>r.kind==='followup'),today=brisbaneToday(),open=all.filter(r=>!r.done),due=open.filter(r=>r.due<=today);
@@ -3036,8 +3036,7 @@ document.addEventListener('click',e=>{
 },true);
 document.addEventListener('change',e=>{
  if(demoRole!=='teacher')return;const el=e.target,id=el.id,v=el.value;
- if(id==='rf-overview-period')rfOverviewPeriod=v;
- else if(id==='rf-overview-category')rfOverviewFilter=v;
+ if(id==='rf-overview-category')rfOverviewFilter=v;
  else if(id==='rf-overview-class')rfModuleFilters.classCode=v;
  else if(id==='rf-overview-threshold')rfModuleFilters.threshold=Math.min(100,Math.max(0,Number(v)||0));
  else if(id==='rf-overview-filter')rfModuleFilters.status=v;
@@ -3062,7 +3061,7 @@ document.addEventListener('click',e=>{
  if(demoRole!=='teacher'||state.page!=='attendance-overview')return;
  const b=e.target.closest('[data-rf-overview-class],[data-rf-overview-reset],[data-rf-class-display]');if(!b)return;
  e.preventDefault();e.stopImmediatePropagation();
- if(b.hasAttribute('data-rf-class-display')){rfOpenClassDisplay();return}
+ if(b.hasAttribute('data-rf-class-display')){rfOpenClassDisplay(b.dataset.rfClassDisplay);return}
  if(b.hasAttribute('data-rf-overview-reset')){rfModuleFilters.classCode='';rfOverviewFilter='concerns';rfOverviewQuery=''}else{rfModuleFilters.classCode=b.dataset.rfOverviewClass;rfOverviewFilter='all'}render();
 },true);
 document.addEventListener('input',e=>{
@@ -3070,7 +3069,7 @@ document.addEventListener('input',e=>{
  rfOverviewQuery=e.target.value;const pos=e.target.selectionStart;render();const input=document.getElementById('rf-overview-query');input?.focus();if(input&&pos!==null)input.setSelectionRange(pos,pos);
 },true);
 const rfModuleOriginalNav=nav;
-nav=function(page){if(page==='attendance-overview'&&state.page!==page){rfOverviewFilter='concerns';rfOverviewQuery='';rfOverviewPeriod='semester'}if(page==='finder'&&state.page!=='finder'&&state.page!=='class-detail')state.finder={query:'',year:'all',subject:'all',day:'all',period:'all'};if(page==='search'&&state.page!=='search')state.studentQuery='';rfSupportQuery='';rfSupportStudent='';rfSupportAction='';rfSupportType='';rfModuleStudentId='';rfClassroomActionId='';if(page!==state.page){rfModuleFilters.status='all';rfModuleFilters.query='';rfModuleFilters.classCode=''}if(rfModuleDefs.some(x=>x[0]===page)&&!rfModuleVisible(page))page='timetable';rfModuleOriginalNav(page)};
+nav=function(page){if(page==='attendance-overview'&&state.page!==page){rfOverviewFilter='concerns';rfOverviewQuery=''}if(page==='finder'&&state.page!=='finder'&&state.page!=='class-detail')state.finder={query:'',year:'all',subject:'all',day:'all',period:'all'};if(page==='search'&&state.page!=='search')state.studentQuery='';rfSupportQuery='';rfSupportStudent='';rfSupportAction='';rfSupportType='';rfModuleStudentId='';rfClassroomActionId='';if(page!==state.page){rfModuleFilters.status='all';rfModuleFilters.query='';rfModuleFilters.classCode=''}if(rfModuleDefs.some(x=>x[0]===page)&&!rfModuleVisible(page))page='timetable';rfModuleOriginalNav(page)};
 
 // Shared teacher workspace design, preserving all existing data handlers.
 studentRows=function(){
@@ -3119,7 +3118,7 @@ rfModernStyle.textContent=`
 #rf-class-display .rf-student-source,.rf-project-note{color:#c2d4e0;font-size:13px;line-height:1.5;margin:0}
 .rf-project-empty{text-align:center;background:#223d4f;padding:35px;border-radius:12px}
 .rf-project-wrap footer{text-align:center;color:#d7e8f0;font-size:clamp(15px,1.6vw,23px);font-weight:700;padding:8px;border-top:1px solid #41616f}
-.rf-project-hint{font-size:12px;align-self:center;color:inherit}
+.rf-overview-class-tile{display:grid;gap:7px;min-width:0}.rf-overview-class-tile .rf-overview-class-card{width:100%}.rf-overview-project-button{justify-self:end}
 @media(max-width:760px){.rf-project-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}#rf-class-display .rf-attendance-charts{grid-template-columns:1fr}}
 .rf-attendance-charts{display:grid;grid-template-columns:minmax(220px,1fr) minmax(0,2fr);gap:14px;margin:12px 0}
 .rf-chart-panel{border:1px solid #d4e0e7;border-radius:12px;padding:16px;background:transparent;min-width:0}
