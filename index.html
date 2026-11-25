@@ -1704,7 +1704,7 @@ const demoStaffSeed=[
 ];
 let previewStaff=demoStaffSeed.map(x=>({...x})),previewAudit=[],adminPage='dashboard',adminQuery='',adminFilter='all',adminFaculty='',adminEdit=null,adminMessage='';
 try{const saved=JSON.parse(localStorage.getItem(ADMIN_PREVIEW_KEY)||'null');if(Array.isArray(saved?.staff)&&Array.isArray(saved?.audit)){previewStaff=saved.staff;previewAudit=saved.audit}}catch{}
-const adminSections=[['SCHOOL MANAGEMENT',[['dashboard','Dashboard','house'],['staff','Staff Management','users'],['students','Student Management','users'],['classes','Class Management','clipboard-check'],['timetable','Timetable Management','calendar-days'],['master','Master Timetable','calendar-days']]],['OPERATIONS',[['attendance','Attendance Overview','clipboard-check'],['movements','Student Movements','arrow-left-right'],['student-actions','Student Actions','clipboard-check'],['teacher-modules','Teacher Modules & Calendar','settings']]],['SYSTEM',[['roles','Roles & Permissions','settings'],['accounts','Account Management','users'],['security','Security Audit','clipboard-check'],['data','Data Management','list-filter'],['oneschool','OneSchool Import Centre','list-filter'],['audit','Activity History','clipboard-check']]]];
+const adminSections=[['SCHOOL MANAGEMENT',[['dashboard','Dashboard','house'],['staff','Staff Management','users'],['students','Student Management','users'],['classes','Class Management','clipboard-check'],['timetable','Timetable Management','calendar-days'],['master','Master Timetable','calendar-days']]],['OPERATIONS',[['attendance','Attendance Overview','clipboard-check'],['movements','Student Movements','arrow-left-right'],['student-actions','Student Actions','clipboard-check'],['teacher-modules','Teacher Modules','settings']]],['SYSTEM',[['roles','Roles & Permissions','settings'],['accounts','Account Management','users'],['security','Security Audit','clipboard-check'],['data','Data Management','list-filter'],['oneschool','OneSchool Import Centre','list-filter'],['audit','Activity History','clipboard-check']]]];
 function savePreview(action,subject){
  const event={at:new Date().toISOString(),action,subject};
  previewAudit.unshift(event);previewAudit=previewAudit.slice(0,250);
@@ -3077,7 +3077,7 @@ function rfModuleRecordsPage(support=false){
  const rows=all.filter(r=>(!q||[r.studentName,r.actionName,r.classCode,r.type,r.response].join(' ').toLowerCase().includes(q))&&(status==='all'||rfModuleStatus(r)===status)).sort((a,b)=>b.recordedAt.localeCompare(a.recordedAt));
  const metrics=rfModuleMetrics([[all.filter(r=>r.date===today).length,'Today'],[all.filter(r=>r.refer&&!r.resolved).length,'Awaiting support'],[all.filter(r=>r.refer&&r.resolved).length,'Resolved']]);
  const picker='<div class="rf-module-controls"><label>Student<select id="rf-module-student">'+rfModuleOptions([['','Select student'],...rfModulePeople().map(p=>[p.id,p.name+' · Year '+p.year])],rfModuleFilters.student)+'</select></label><button type="button" class="btn green" data-rf-module-record="'+(support?'support':'action')+'">'+(support?'Request support':'Classroom action')+'</button></div>';
- const filters='<form id="rf-module-filter" class="rf-module-controls"><label>Search<input name="query" type="search" value="'+esc(rfModuleFilters.query)+'" placeholder="Student, class or action"></label><label>Status<select name="status">'+rfModuleOptions([['all','All statuses'],['Recorded','Recorded'],['Awaiting support','Awaiting support'],['Resolved','Resolved']],status)+'</select></label><button class="btn small">Filter</button></form>';
+ const filters='<form id="rf-module-filter" class="rf-module-controls"><label>Search<input name="query" type="search" value="'+esc(rfModuleFilters.query)+'" placeholder="Student, class or action"></label><label>Status<select name="status">'+rfModuleOptions([['all','All statuses'],['Recorded','Recorded'],['Awaiting support','Awaiting support'],['Reviewed','Reviewed'],['Resolved','Resolved']],status)+'</select></label><button class="btn small">Filter</button></form>';
  return shell('<div class="rf-module-root">'+metrics+'<div class="rf-wiz rf-move-wiz">'+rfSupportWizard()+'</div>'+rfModulePanel(support?'Support requests':'Classroom action history',filters+(rows.length?rfModuleTable(['Date / time','Student / class','Action','Response','Status'],rows.map(r=>'<tr><td>'+esc(r.date+(r.time?' · '+r.time:''))+'</td><td><strong>'+esc(r.studentName)+'</strong><small>'+esc(r.classCode||'—')+'</small></td><td>'+esc(r.actionName)+'<small>'+esc(r.type)+'</small></td><td>'+esc(r.response)+'<small>'+esc(r.notes||'')+'</small></td><td><span class="rf-module-status">'+esc(rfModuleStatus(r))+'</span></td></tr>')):rfModuleEmpty('No matching records.')))+'<p class="rf-student-source">Local classroom workflow only. Official behaviour reporting remains in OneSchool. No external alerts are sent.</p></div>',support?'Student Support':'Classroom Management','','');
 }
 function rfAttendanceCharts(rows,start,end){
@@ -3233,7 +3233,7 @@ document.addEventListener('submit',e=>{
  if(id==='rf-calendar-admin'&&demoRole==='admin'){
   e.preventDefault();e.stopImmediatePropagation();const title=rfModuleValue(f,'title'),date=rfModuleValue(f,'date'),time=rfModuleValue(f,'time'),category=rfModuleValue(f,'category'),notes=rfModuleValue(f,'notes');
   if(!title||title.length>100||!date||!studentDateValid(date)||notes.length>500||time&&!/^\d{2}:\d{2}$/.test(time)||!['Assembly','Excursion','Assessment','School event','Closure','Other'].includes(category))return;
-  if(rfWriteStudentLocal(RF_CALENDAR_KEY,[...rfCalendarEvents(),{id:rfModuleId(),title,date,time,category,notes}]))rfuAudit('Added calendar event',title);render();return
+  if(rfWriteStudentLocal(RF_CALENDAR_KEY,[...rfCalendarEvents(),{id:rfModuleId(),title,date,time,category,notes}])){rfStaffMonth=date.slice(0,7);rfuAudit('Added calendar event',title);adminMessage='Calendar event saved.'}render();return
  }
  if(demoRole!=='teacher')return;
  if(id==='rf-module-filter'){e.preventDefault();e.stopImmediatePropagation();rfModuleFilters.query=rfModuleValue(f,'query');rfModuleFilters.status=rfModuleValue(f,'status');render();return}
@@ -3571,7 +3571,7 @@ function rfuRecordAllowed(module,r,id=rfuActor,actions=null){
  })
 }
 function rfuRows(module){return rfuRecords().filter(r=>r.module===module&&rfuRecordAllowed(module,r))}
-function rfuCanChange(module,r){return !r.readOnly&&rfuRecordAllowed(module,r,rfuActor,['manage','approve','review','complete'])}
+function rfuCanChange(module,r){return !!r&&!r.readOnly&&(rfuAdminReferralAccess(module,r)||rfuRecordAllowed(module,r,rfuActor,['manage','approve','review','complete']))}
 const rfuPanel=(title,body,sub='')=>'<section class="v31-panel"><h2>'+esc(title)+'</h2>'+(sub?'<p>'+esc(sub)+'</p>':'')+body+'</section>';
 const rfuEmpty=label=>'<div class="rfa-directory-empty">'+esc(label)+'</div>';
 function rfuTable(head,rows){return '<div class="v31-table-wrap"><table class="v31-table"><thead><tr>'+head.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr></thead><tbody>'+rows.map(row=>'<tr>'+row.map(c=>'<td>'+c+'</td>').join('')+'</tr>').join('')+(rows.length?'':'<tr><td colspan="'+head.length+'">No matching records.</td></tr>')+'</tbody></table></div>'}
@@ -3661,7 +3661,7 @@ document.addEventListener('submit',e=>{
  const f=e.target;if(demoRole==='admin'&&adminPage==='accounts'&&f.id==='rfu-account-form'){e.preventDefault();e.stopImmediatePropagation();const p=rfuIdentity(rfuEditAccount);if(!p||['admin','teacher','swilliams'].includes(p.id))return;const d=new FormData(f),roles=d.getAll('role').filter(k=>RFU_ROLES[k]&&!['system','teacher'].includes(k)),disabled=d.getAll('deny').filter(k=>RFU_MODULES.some(m=>m[0]===k)),expires=String(d.get('expires')||'');if(expires&&!osDateValid(expires))return;const cfg={roles,disabled,expires,faculty:String(d.get('faculty')||'Mathematics'),year:String(d.get('year')||'8'),...(d.has('useAssignments')?{assignedClasses:d.getAll('assignedClass').filter(code=>rfuActiveClasses().some(c=>c.code===code))}:{})};if(rfuWrite(RFU_ACCOUNT_KEY,{...rfuRead(RFU_ACCOUNT_KEY,{}),[p.id]:cfg})){rfuAudit('Changed demo access',p.id);adminMessage='Demo account access saved.'}render();return}
  if((demoRole!=='staff'&&!(demoRole==='teacher'&&rfuTeacherExtra))||!['rfu-search','rfu-record-form','rfu-calendar-form'].includes(f.id))return;e.preventDefault();e.stopImmediatePropagation();if(!rfuCan(rfuPage))return;const d=new FormData(f);
  if(f.id==='rfu-search'){rfuQuery=String(d.get('q')||'').slice(0,150);render();return}
- if(f.id==='rfu-calendar-form'){if(rfuPage!=='calendar'||!rfuCan('calendar',['manage']))return;const title=String(d.get('title')||'').trim().slice(0,100),date=String(d.get('date')||''),time=String(d.get('time')||''),category=String(d.get('category')||'');if(!title||!osDateValid(date)||time&&!/^\d{2}:\d{2}$/.test(time)||!['Assembly','Excursion','Assessment','School event','Closure','Other'].includes(category))return;if(rfuWrite(RF_CALENDAR_KEY,[...rfCalendarEvents(),{id:'rfu-cal-'+Date.now(),title,date,time,category,notes:String(d.get('notes')||'').trim().slice(0,500)}])){rfuAudit('Added calendar event',title);rfuMessage='Calendar event saved.'}render();return}
+ if(f.id==='rfu-calendar-form'){if(rfuPage!=='calendar'||!rfuCan('calendar',['manage']))return;const title=String(d.get('title')||'').trim().slice(0,100),date=String(d.get('date')||''),time=String(d.get('time')||''),category=String(d.get('category')||'');if(!title||!osDateValid(date)||time&&!/^\d{2}:\d{2}$/.test(time)||!['Assembly','Excursion','Assessment','School event','Closure','Other'].includes(category))return;if(rfuWrite(RF_CALENDAR_KEY,[...rfCalendarEvents(),{id:'rfu-cal-'+Date.now(),title,date,time,category,notes:String(d.get('notes')||'').trim().slice(0,500)}])){rfStaffMonth=date.slice(0,7);rfuAudit('Added calendar event',title);rfuMessage='Calendar event saved.'}render();return}
  if(!rfuCan(rfuPage,['create','manage','approve','review']))return;
  const module=rfuPage,studentId=String(d.get('student')||''),classCode=String(d.get('class')||''),owner=String(d.get('owner')||rfuActor),title=String(d.get('title')||'').trim().slice(0,100),detail=String(d.get('detail')||'').trim().slice(0,300),date=String(d.get('date')||'');
  if(!title||!detail||!osDateValid(date)||studentId&&!rfuStudents(module).some(p=>p.id===studentId)||classCode&&!rfuClasses(module).some(c=>c.code===classCode)||owner!==rfuActor&&!(['workforce','relief','availability','supervision'].includes(module)&&rfuStaff(module).some(p=>p.username===owner)))return;
@@ -3904,6 +3904,7 @@ function rfuLegacyRows(){
  return rows;
 }
 function rfuRecords(){return [...rfuBaseRecords(),...rfuLegacyRows(),...rfuLegacyCoverRows()]}
+function rfuAdminReferralAccess(module,r){return demoRole==='admin'&&rfuActor==='admin'&&adminPage==='student-actions'&&!rfPersonalPage&&module==='referrals'&&r?.module==='referrals'&&!r.legacyStore&&!r.readOnly}
 function rfuNextStatus(module,r){
  const status=r.status;
  if(module==='approvals'){
@@ -3913,7 +3914,7 @@ function rfuNextStatus(module,r){
  }
  if(module==='referrals'){
   if(status==='Resolved')return '';
-  if(status==='Reviewed')return rfuRecordAllowed(module,r,rfuActor,['manage'])?'Resolved':'';
+  if(status==='Reviewed')return rfuAdminReferralAccess(module,r)||rfuRecordAllowed(module,r,rfuActor,['manage'])?'Resolved':'';
   return 'Reviewed';
  }
  if(module==='relief')return status==='Complete'?'':status==='Allocated'?(rfuRecordAllowed(module,r,rfuActor,['manage'])?'Complete':''):'Allocated';
@@ -3933,7 +3934,8 @@ function rfuUpdateRecord(r,status){
   const rows=rfuRead(r.legacyStore,[]);if(!Array.isArray(rows)||!rows.some(x=>x.id===r.legacyId&&x.kind==='followup'))return false;
   return rfuWrite(r.legacyStore,rows.map(x=>x.kind==='followup'&&x.id===r.legacyId?{...x,done:status==='Complete'}:x));
  }
- return rfuWrite(RFU_DATA_KEY,rfuBaseRecords().map(x=>x.id===r.id?{...x,status}:x));
+ const rows=rfuBaseRecords();if(!rows.some(x=>x.id===r.id&&x.module===r.module&&x.status===r.status))return false;
+ return rfuWrite(RFU_DATA_KEY,rows.map(x=>x.id===r.id&&x.module===r.module?{...x,status,updatedAt:new Date().toISOString(),updatedBy:rfuActor}:x));
 }
 const rfLegacyFollowupPage=rfModuleFollowups;
 rfModuleFollowups=function(){
@@ -3941,6 +3943,8 @@ rfModuleFollowups=function(){
  const shared=rows.map(r=>'<article class="rf-module-task"><div><strong>'+esc(r.title)+'</strong><small>'+esc((r.studentId?rfuStudentName(r.studentId):'General task')+' · Due '+r.date)+'</small><small>'+esc(r.detail||'')+'</small><small>'+esc(r.status)+'</small></div>'+(rfuCanChange('followups',r)?'<button type="button" class="btn small" data-rf-shared-followup="'+esc(r.id)+'">'+(r.status==='Complete'?'Reopen':'Complete')+'</button>':'')+'</article>').join('');
  return html.replace('</main>',rfModulePanel('Shared register tasks',shared||rfModuleEmpty('No additional shared tasks.'))+'</main>');
 };
+const rfPhase5SupportPage=rfModuleRecordsPage;
+rfModuleRecordsPage=function(support=false){const html=rfPhase5SupportPage(support);if(!support||!rfModuleVisible('student-support'))return html;const rows=rfuBaseRecords().filter(r=>r.module==='referrals'&&r.owner===rfuActor&&rfuRecordAllowed('referrals',r));return html.replace('</main>',rfModulePanel('Shared referral records',rows.length?rfModuleTable(['Date','Student','Referral','Status'],rows.map(r=>'<tr><td>'+esc(r.date)+'</td><td>'+esc(rfuStudentName(r.studentId))+'</td><td>'+esc(r.title)+'<small>'+esc(r.detail||'')+'</small></td><td>'+esc(r.status)+'</td></tr>')):rfModuleEmpty('No additional shared referrals.'))+'</main>')};
 const rfPhase2Status=rfModuleStatus;
 rfModuleStatus=function(r){return r.refer&&r.reviewedAt&&!r.resolved?'Reviewed':rfPhase2Status(r)};
 const rfPhase2Admin=demoAdminContent;
@@ -3948,9 +3952,10 @@ demoAdminContent=function(){
  const html=rfPhase2Admin();
  if(adminPage!=='student-actions')return html;
  const rows=rfuBaseRecords().filter(r=>r.module==='referrals');
- return html+rfuPanel('Shared referral register',rfuTable(['Student','Referral','Submitted by','Date','Status'],rows.map(r=>[esc(rfuStudentName(r.studentId)),esc(r.title),esc(rfuStaffName(r.owner)),esc(r.date),esc(r.status)])),'Shared workflow records. Classroom support requests remain in the support queue above.');
+ return html+rfuPanel('Shared referral register',rfuTable(['Student','Referral','Submitted by','Date','Status','Action'],rows.map(r=>{const next=rfuCanChange('referrals',r)&&rfuNextStatus('referrals',r);return [esc(rfuStudentName(r.studentId)),esc(r.title)+'<small>'+esc(r.detail||'')+'</small>',esc(rfuStaffName(r.owner)),esc(r.date),esc(r.status),next?'<button type="button" class="v31-btn" data-rf-admin-referral="'+esc(r.id)+'">'+esc(rfuStatusAction(next,'referrals'))+'</button>':'']})),'Shared workflow records. Classroom support requests remain in the support queue above.');
 };
 document.addEventListener('click',e=>{
+ const adminReferral=e.target.closest('[data-rf-admin-referral]');if(adminReferral){e.preventDefault();e.stopImmediatePropagation();const r=rfuBaseRecords().find(x=>x.module==='referrals'&&x.id===adminReferral.dataset.rfAdminReferral);if(!r||!rfuAdminReferralAccess('referrals',r))return;const next=rfuNextStatus('referrals',r);if(next&&rfuUpdateRecord(r,next)){rfuAudit('Updated shared referral',r.id);adminMessage='Shared referral '+next.toLowerCase()+'.'}render();return}
  const followup=e.target.closest('[data-rf-shared-followup]');
  if(followup&&demoRole==='teacher'&&state.page==='follow-ups'){
   e.preventDefault();e.stopImmediatePropagation();const r=rfuBaseRecords().find(x=>x.module==='followups'&&x.id===followup.dataset.rfSharedFollowup&&x.owner===rfuActor);
@@ -4052,15 +4057,16 @@ document.addEventListener('click',e=>{
  if(!b||!rfMasterTilesVisible()||demoRole==='admin')return;
  e.preventDefault();e.stopImmediatePropagation();rfSharedMasterMode=b.dataset.rfSharedMasterMode==='grid'?'grid':'tiles';masterSelected='';render();
 },true);
+function rfuOwnDutyVisible(r){if(!r||r.owner!==rfuActor||!['supervision','relief'].includes(r.module))return false;if(rfuRecordAllowed(r.module,r))return true;return !r.readOnly&&r.module==='relief'&&['Allocated','Complete'].includes(r.status)&&rfuCan('schedule')&&!!r.classCode&&rfuAssignedClasses().includes(r.classCode)}
 const rfPhase3Schedule=rfuSchedule;
 rfuSchedule=function(){
  const date=rfStaffDate,start=rfStaffWeek?polishShift(date,-((new Date(date+'T12:00:00Z').getUTCDay()+6)%7)):date,dates=rfStaffWeek?Array.from({length:5},(_,i)=>polishShift(start,i)):[date];
- const rows=rfuRecords().filter(r=>['supervision','relief'].includes(r.module)&&r.owner===rfuActor&&dates.includes(r.date)&&rfuRecordAllowed(r.module,r));
+ const rows=rfuRecords().filter(r=>dates.includes(r.date)&&rfuOwnDutyVisible(r));
  return rfPhase3Schedule()+rfuPanel('Supervision & relief',rfuTable(['Date','Time / period','Duty','Class','Status'],rows.map(r=>[esc(r.date),esc(r.time||'—'),esc(r.title),esc(r.classCode||'—'),esc(r.status)])),'Assigned duties only. A personal cover note does not confer roll-marking authority.');
 };
 const rfPhase3TeacherSchedule=timetable;
 timetable=function(){
- const html=rfPhase3TeacherSchedule(),rows=rfuRecords().filter(r=>['supervision','relief'].includes(r.module)&&!r.readOnly&&r.owner===rfuActor&&r.date===state.date&&rfuRecordAllowed(r.module,r));
+ const html=rfPhase3TeacherSchedule(),rows=rfuRecords().filter(r=>!r.readOnly&&r.date===state.date&&rfuOwnDutyVisible(r));
  const body=rows.map(r=>'<article class="simple-row"><div><strong>'+esc(r.title)+'</strong><span>'+esc([r.time,r.classCode,r.status].filter(Boolean).join(' · '))+'</span></div></article>').join('');
  return rows.length?html.replace('</main>',rfModulePanel('Assigned supervision & relief',body)+'</main>'):html;
 };
