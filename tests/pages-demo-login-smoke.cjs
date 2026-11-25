@@ -139,6 +139,34 @@ async function test() {
       assert.match(await sharedPage.locator('tr').filter({hasText:'Cross-role referral smoke'}).innerText(),/Resolved/);
       assert.deepEqual(sharedErrors,[],'Cross-role referral runtime errors');
       console.log('PASS: shared teacher referral reviewed and resolved by admin; status returned to teacher.');
+
+      // A pass issued by one teacher must block duplicate live passes by another.
+      async function preparePass(p){
+        await p.locator('.nav-primary [data-nav="movements"]').click();
+        const date=p.locator('#rf-movements-date');
+        const now=await p.evaluate(()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Australia/Brisbane',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()));
+        await date.fill(now);await date.dispatchEvent('change');
+        await p.locator('#movementStudentSearch').fill('S7001');
+        await p.locator('[data-movement-choice="S7001"]').click();
+        await p.locator('[data-rf-move-dest="Library"]').click();
+      }
+      await preparePass(sharedPage);
+      await sharedPage.locator('#movementIssueButton').click();
+      assert.equal(await sharedPage.locator('.rf-movement-stat-out strong').innerText(),'1');
+      await sharedPage.locator('[data-demo-signout]').first().click();
+      await logIn(sharedPage,'swilliams','swilliams');
+      await preparePass(sharedPage);
+      await sharedPage.locator('#movementIssueButton').click();
+      const duplicate=await sharedPage.evaluate(()=>JSON.parse(localStorage.getItem('rollflow_teacher_swilliams_2026_v1')||'{}').movements||[]);
+      assert.equal(duplicate.filter(x=>x.studentId==='S7001'&&!x.returnedAt).length,0,'Second teacher must not create duplicate live pass');
+      await sharedPage.locator('[data-demo-signout]').first().click();
+      await logIn(sharedPage,'teacher','teacher');
+      await sharedPage.locator('.nav-primary [data-nav="movements"]').click();
+      await sharedPage.locator('.rf-movement-return-button').click();
+      assert.equal(await sharedPage.locator('.rf-movement-stat-out strong').innerText(),'0');
+      assert.deepEqual(sharedErrors,[],'Shared referral and movement runtime errors');
+      console.log('PASS: cross-teacher duplicate live movement pass blocked and original pass returned.');
+
     } finally {await sharedPage.close()}
 
     const page = await browser.newPage();
