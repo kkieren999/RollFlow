@@ -66,7 +66,7 @@ async function test() {
         const personal=rolePage.locator('.nav-utility .nav-item');
         assert.deepEqual((await personal.allInnerTexts()).map(x=>x.trim()),['My Profile','My Preferences','Help & Support','Dark mode','Sign out'],account+' personal navigation');
         for(const [route,title] of [['profile','My Profile'],['preferences','My Preferences'],['help','Help & Support']]){
-          await rolePage.locator('[data-rf-personal="'+route+'"]').click();
+          await rolePage.locator('.nav-utility [data-rf-personal="'+route+'"]').click();
           assert.equal((await rolePage.locator('.page-bar h1').innerText()).trim(),title,account+' '+route);
         }
         await rolePage.locator('[data-rf-personal="theme"]').click();
