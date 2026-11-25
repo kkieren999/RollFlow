@@ -160,7 +160,7 @@ async function test() {
     await page.locator('#overlay [data-action="closeDrawer"]').click();
     await page.locator('[data-demo-signout]').first().click();
     await logIn(page,'admin','admin','.v31-admin');
-    await page.locator('[data-admin-page="student-actions"]').click();
+    await page.locator('.nav-primary [data-admin-page="student-actions"]').click();
     assert.match(await page.locator('.v31-content main').innerText(),/Awaiting support/);
     await page.locator('.rf-admin-action-list article').filter({hasText:'Smoke test referral from teacher workspace'}).locator('[data-rf-resolve-referral]').click();
     assert.match(await page.locator('.v31-content main').innerText(),/Resolved/);
@@ -182,7 +182,7 @@ async function test() {
     assert.deepEqual(await page.locator('#rf-student-incident-form [name="response"] option').allTextContents(),['Select response','Discussed','Record only']);
     await page.locator('#review-dialog [data-review-close]').first().click();
     await page.locator('#overlay [data-action="closeDrawer"]').first().click();
-    console.log('PASS: student profiles, semester attendance action, incidents, admin referrals and configurable choices.');
+    console.log('PASS: student profiles, attendance report, incidents, admin referrals and configurable choices.');
 
     // Newly approved classroom modules and local teacher tools.
     for(const route of ['attendance-overview','classroom-management','student-support','follow-ups','school-calendar']){
@@ -200,9 +200,9 @@ async function test() {
     assert.equal(await page.locator('[data-nav="seating-plans"],[data-nav="class-lists"]').count(),0);
     await page.locator('[data-demo-signout]').first().click();
     await logIn(page,'admin','admin','.v31-admin');
-    await page.locator('[data-admin-page="teacher-modules"]').click();
+    await page.locator('.nav-primary [data-admin-page="teacher-modules"]').click();
     await page.locator('[data-rf-module-toggle="classroom-management"]').click();
-    await page.locator('[data-admin-page="calendar"]').click();
+    await page.locator('.nav-primary [data-admin-page="calendar"]').click();
     await page.locator('#rf-calendar-admin [name="title"]').fill('Fictional assembly');
     await page.locator('#rf-calendar-admin button').click();
     await page.locator('[data-demo-signout]').first().click();
@@ -213,7 +213,7 @@ async function test() {
     console.log('PASS: teacher modules, follow-up completion, admin visibility and calendar.');
     await page.locator('[data-demo-signout]').first().click();
     await logIn(page,'admin','admin','.v31-admin');
-    await page.locator('[data-admin-page="teacher-modules"]').click();
+    await page.locator('.nav-primary [data-admin-page="teacher-modules"]').click();
     await page.locator('[data-rf-module-toggle="classroom-management"]').click();
     await page.locator('[data-demo-signout]').first().click();
     await logIn(page,'swilliams','swilliams');
