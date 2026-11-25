@@ -441,7 +441,7 @@ try{
  else if(rfuActor)demoRole='staff';
 }catch{}
 applyDemoClasses(demoTeacherUsername);
-function checkDemoCredentials(mode,username,password){const name=String(username||'').trim().toLowerCase(),pass=String(password||'').trim();return rfuIdentity(name)&&pass===name?name:null}
+function checkDemoCredentials(mode,username,password){const name=String(username||'').trim().toLowerCase(),pass=String(password||'').trim();return rfuIdentity(name)&&pass===name&&rfuAccountActive(name)?name:null}
 // Demo credentials are public labels, not secure accounts or authorisation.
 let KEY=demoTeacherUsername==='swilliams'?'rollflow_teacher_swilliams_2026_v1':'rollflow_teacher_2026_v1';let persisted={};try{persisted=JSON.parse(localStorage.getItem(KEY)||'{}')}catch(e){};
 const state={movementQuery:'',movementStudentId:'',movementHighlight:0,page:'home',classId:demoTeacherUsername==='swilliams'?(classes[0]?.id||'MAF102A'):'MAF102A',date:brisbaneToday(),marks:persisted.marks||{},submitted:persisted.submitted||{},notes:persisted.notes||{},pictures:{},passes:persisted.passes||{},movements:persisted.movements||[],readNotices:persisted.readNotices||[],prefs:persisted.prefs||{showPortraits:true,showHints:true},pins:persisted.pins?.date===brisbaneToday()?persisted.pins:{date:brisbaneToday(),ids:[]},sidebarCollapsed:false,rollSidebarExpanded:true,profileOpen:false,studentQuery:'',finder:{query:'',year:'all',subject:'all',day:'all',period:'all'},finderSelected:null,finderTab:'students',rollOrigin:'timetable',dirty:false,history:[],drawer:null,modal:null,mobileNav:false,search:'',toast:''};
@@ -1726,7 +1726,7 @@ function previewImport(raw){
 function demoAdminStaffForm(){
  const adding=adminEdit==='new',p=adding?{id:'',username:'',first:'',last:'',faculty:'',campus:'',role:'Teacher',active:true,classes:''}:previewStaff.find(x=>x.id===adminEdit);
  if(!p)return '';
- const fixed=['teacher','admin','swilliams'].includes(p.username),field=(key,label,max=100)=>`<label>${label}<input name="${key}" maxlength="${max}" value="${esc(p[key]||'')}" ${['id','username','first','last'].includes(key)?'required':''} ${!adding&&key==='id'||fixed&&key==='username'?'readonly':''}></label>`;
+ const fixed=['teacher','admin','swilliams'].includes(p.username),field=(key,label,max=100)=>`<label>${label}<input name="${key}" maxlength="${max}" value="${esc(p[key]||'')}" ${['id','username','first','last'].includes(key)?'required':''} ${!adding&&key==='id'||(fixed||rfuIdentity(p.username))&&key==='username'?'readonly':''}></label>`;
  return `<section class="v31-panel"><div class="v31-title"><div><h2>${adding?'Add staff member':'Edit staff member'}</h2><p>Staff directory records only. Changes do not create sign-in credentials.</p></div><button class="v31-btn" data-admin-cancel>Cancel</button></div><form id="v31-preview-staff" class="v31-form">${field('id','Staff ID',40)}${field('username','Username',150)}${field('first','First name')}${field('last','Last name')}${field('faculty','Faculty')}${field('campus','Campus')}<label>Role<select name="role" ${fixed?'disabled':''}>${[...new Set(['Teacher','Administrator',...Object.values(RFU_ROLES).map(r=>r.label),p.role])].map(role=>`<option ${role===p.role?'selected':''}>${role}</option>`).join('')}</select></label><label>Class allocation<input name="classes" maxlength="300" value="${esc(p.classes)}" placeholder="e.g. MAF102A"></label><label class="v31-check"><input type="checkbox" name="active" ${p.active?'checked':''} ${fixed?'disabled':''}> Active staff record</label><div class="v31-form-actions"><button class="v31-btn" type="button" data-admin-cancel>Cancel</button><button class="v31-btn primary" type="submit">Save staff details</button></div></form></section>`;
 }
 function demoAdminStaff(){
@@ -2503,7 +2503,7 @@ document.addEventListener('submit',async e=>{
  v.role=fixed?p.role:String(d.get('role')||'Teacher');v.active=fixed?p.active:d.has('active');
  if(!v.id||!v.first||!v.last||!/^[-a-zA-Z0-9_.@+]+$/.test(v.username)||v.id.length>40||v.username.length>150||!['Teacher','Administrator',...Object.values(RFU_ROLES).map(r=>r.label)].includes(v.role))throw Error('Enter valid staff details.');
  if(previewStaff.some(x=>x!==p&&(x.id.toLowerCase()===v.id.toLowerCase()||x.username.toLowerCase()===v.username.toLowerCase())))throw Error('Staff ID and username must be unique.');
- if(p){v.id=p.id;if(fixed)v.username=p.username;Object.assign(p,v)}else previewStaff.push(v);
+ if(p){v.id=p.id;if(fixed||rfuIdentity(p.username))v.username=p.username;Object.assign(p,v)}else previewStaff.push(v);
  savePreview(p?'Staff updated':'Staff added',v.username);adminEdit=null;
  }
  }catch(err){adminMessage=String(err.message||err)}
@@ -3492,22 +3492,23 @@ function rfuWrite(key,value){try{localStorage.setItem(key,JSON.stringify(value))
 function rfuAudit(action,subject){const log=rfuRead(RFU_AUDIT_KEY,[]);rfuWrite(RFU_AUDIT_KEY,[{date:new Date().toISOString(),actor:rfuActor,action,subject},...log].slice(0,300))}
 function rfuConfig(id=rfuActor){const p=rfuIdentity(id),saved=rfuRead(RFU_ACCOUNT_KEY,{})[id];return {roles:p?[p.role]:[],disabled:[],expires:'',faculty:'Mathematics',year:'8',...saved}}
 function rfuGrants(id,module,today=brisbaneToday()){
- const cfg=rfuConfig(id);if(cfg.expires&&cfg.expires<today||cfg.disabled.includes(module))return [];
+ const cfg=rfuConfig(id);if(!rfuAccountActive(id)||cfg.expires&&cfg.expires<today||cfg.disabled.includes(module))return [];
  return cfg.roles.flatMap(role=>{const g=RFU_ROLES[role]?.grants[module];return g?[{role,scope:g.split(':')[0],action:g.split(':')[1]}]:[]})
 }
 function rfuCan(module,actions=null,id=rfuActor){return rfuGrants(id,module).some(g=>!actions||actions.includes(g.action))}
 function rfuRoleText(id=rfuActor){return rfuConfig(id).roles.map(k=>RFU_ROLES[k]?.label).filter(Boolean).join(' · ')||'No assigned role'}
-function rfuStaffName(id){const p=rfuIdentity(id);return p?.name||planTeacherName(id)}
+function rfuStaffName(id){const p=previewStaff.find(x=>x.username===id);return p?p.first+' '+p.last:rfuIdentity(id)?.name||planTeacherName(id)}
 function rfuActiveClasses(){return planning.classes.filter(c=>c.active)}
 function rfuAssignedClasses(id=rfuActor){
  const list=rfuActiveClasses(),today=brisbaneToday(),activeIds=new Set(previewStudents.filter(p=>p.status==='active').map(p=>p.id)),enrolledCodes=new Set(planning.enrolments.filter(e=>activeIds.has(e.studentId)&&e.start<=today&&(!e.end||e.end>=today)).map(e=>e.classCode)),withStudents=list.filter(c=>enrolledCodes.has(c.code)),y=withStudents.filter(c=>String(c.year)==='8'),pool=y.length?y:withStudents;
  if(id==='teacher'||id==='swilliams')return list.filter(c=>c.teacher===id||planning.slots.some(s=>s.active&&s.classCode===c.code&&s.teacher===id)).map(c=>c.code);
+ const configured=rfuConfig(id).assignedClasses;if(Array.isArray(configured))return list.filter(c=>configured.includes(c.code)).map(c=>c.code);
  if(id==='relief')return (pool.length>=4?pool.slice(2,4):pool.slice(0,2)).map(c=>c.code);
  return pool.slice(0,3).map(c=>c.code);
 }
 function rfuAssignedStudents(id=rfuActor){
  const codes=new Set(rfuAssignedClasses(id)),today=brisbaneToday(),ids=new Set(planning.enrolments.filter(e=>codes.has(e.classCode)&&e.start<=today&&(!e.end||e.end>=today)).map(e=>e.studentId));
- const pool=previewStudents.filter(p=>p.status==='active'&&ids.has(p.id));return (['relief','teacher','swilliams'].includes(id)?pool:pool.slice(0,8)).map(p=>p.id);
+ const pool=previewStudents.filter(p=>p.status==='active'&&ids.has(p.id));return (['relief','teacher','swilliams'].includes(id)||Array.isArray(rfuConfig(id).assignedClasses)?pool:pool.slice(0,8)).map(p=>p.id);
 }
 function rfuReferredStudents(){
  const saved=rfuRead(RFU_DATA_KEY,null);
@@ -3559,7 +3560,7 @@ function rfuRecordAllowed(module,r,id=rfuActor,actions=null){
  const assigned=new Set(rfuAssignedStudents(id)),referred=new Set(rfuReferredStudents()),cfg=rfuConfig(id),facultyCodes=new Set(rfuActiveClasses().filter(c=>String(c.subject||'').toLowerCase()===cfg.faculty.toLowerCase()).map(c=>c.code)),today=brisbaneToday();
  const studentInScope=g=>!student||g.scope==='school'||g.scope==='assigned'&&assigned.has(student.id)||g.scope==='referred'&&referred.has(student.id)||g.scope==='year'&&String(student.year)===cfg.year||g.scope==='faculty'&&planning.enrolments.some(e=>e.studentId===student.id&&facultyCodes.has(e.classCode)&&e.start<=today&&(!e.end||e.end>=today));
  return grants.some(g=>{
-  if(!studentInScope(g)||klass&&!rfuClassAllowed(klass,g,id))return false;
+  if(!studentInScope(g)||klass&&!(g.scope==='referred'&&student&&referred.has(student.id))&&!rfuClassAllowed(klass,g,id))return false;
   if(g.scope==='school')return true;
   if(g.scope==='assigned')return r.owner===id||module==='tasks'&&g.role==='learning'&&!!student;
   if(g.scope==='referred')return !!student;
@@ -3655,7 +3656,7 @@ document.addEventListener('click',e=>{
 },true);
 document.addEventListener('change',e=>{if(demoRole==='admin'&&adminPage==='roles'&&e.target.id==='rfu-role-preview'){rfuRolePreview=e.target.value;render()}});
 document.addEventListener('submit',e=>{
- const f=e.target;if(demoRole==='admin'&&adminPage==='accounts'&&f.id==='rfu-account-form'){e.preventDefault();e.stopImmediatePropagation();const p=rfuIdentity(rfuEditAccount);if(!p||['admin','teacher','swilliams'].includes(p.id))return;const d=new FormData(f),roles=d.getAll('role').filter(k=>RFU_ROLES[k]&&!['system','teacher'].includes(k)),disabled=d.getAll('deny').filter(k=>RFU_MODULES.some(m=>m[0]===k)),expires=String(d.get('expires')||'');if(expires&&!osDateValid(expires))return;const cfg={roles,disabled,expires,faculty:String(d.get('faculty')||'Mathematics'),year:String(d.get('year')||'8')};if(rfuWrite(RFU_ACCOUNT_KEY,{...rfuRead(RFU_ACCOUNT_KEY,{}),[p.id]:cfg})){rfuAudit('Changed demo access',p.id);adminMessage='Demo account access saved.'}render();return}
+ const f=e.target;if(demoRole==='admin'&&adminPage==='accounts'&&f.id==='rfu-account-form'){e.preventDefault();e.stopImmediatePropagation();const p=rfuIdentity(rfuEditAccount);if(!p||['admin','teacher','swilliams'].includes(p.id))return;const d=new FormData(f),roles=d.getAll('role').filter(k=>RFU_ROLES[k]&&!['system','teacher'].includes(k)),disabled=d.getAll('deny').filter(k=>RFU_MODULES.some(m=>m[0]===k)),expires=String(d.get('expires')||'');if(expires&&!osDateValid(expires))return;const cfg={roles,disabled,expires,faculty:String(d.get('faculty')||'Mathematics'),year:String(d.get('year')||'8'),...(d.has('useAssignments')?{assignedClasses:d.getAll('assignedClass').filter(code=>rfuActiveClasses().some(c=>c.code===code))}:{})};if(rfuWrite(RFU_ACCOUNT_KEY,{...rfuRead(RFU_ACCOUNT_KEY,{}),[p.id]:cfg})){rfuAudit('Changed demo access',p.id);adminMessage='Demo account access saved.'}render();return}
  if((demoRole!=='staff'&&!(demoRole==='teacher'&&rfuTeacherExtra))||!['rfu-search','rfu-record-form','rfu-calendar-form'].includes(f.id))return;e.preventDefault();e.stopImmediatePropagation();if(!rfuCan(rfuPage))return;const d=new FormData(f);
  if(f.id==='rfu-search'){rfuQuery=String(d.get('q')||'').slice(0,150);render();return}
  if(f.id==='rfu-calendar-form'){if(rfuPage!=='calendar'||!rfuCan('calendar',['manage']))return;const title=String(d.get('title')||'').trim().slice(0,100),date=String(d.get('date')||''),time=String(d.get('time')||''),category=String(d.get('category')||'');if(!title||!osDateValid(date)||time&&!/^\d{2}:\d{2}$/.test(time)||!['Assembly','Excursion','Assessment','School event','Closure','Other'].includes(category))return;if(rfuWrite(RF_CALENDAR_KEY,[...rfCalendarEvents(),{id:'rfu-cal-'+Date.now(),title,date,time,category,notes:String(d.get('notes')||'').trim().slice(0,500)}])){rfuAudit('Added calendar event',title);rfuMessage='Calendar event saved.'}render();return}
@@ -3797,13 +3798,14 @@ rfuDirectory=function(module){
  const staff=module==='staff',student=module==='students',rows=staff?rfuStaff(module):student?rfuStudents(module):rfuClasses(module);
  const requiresSearch=student&&rfuGrants(rfuActor,module).some(g=>g.scope==='school'),filtered=requiresSearch&&!rfuQuery.trim()?[]:rows.filter(p=>rfuMatch(...Object.values(p)));
  const label=staff?'Staff directory':student?'Student directory':'Class directory';
- const name=p=>student||staff?p.first+' '+p.last:p.code;
+ const name=p=>student?p.last+', '+p.first:staff?p.first+' '+p.last:p.code;
  const meta=p=>student?p.id+' · '+rfMasterYearLabel(String(p.year)):staff?p.role+' · '+p.faculty:p.name;
  const detail=p=>student?'Home group · '+(p.group||'—'):staff?'Campus · '+(p.campus||'Rivergum'):'Teacher · '+planTeacherName(p.teacher);
- const cards=filtered.slice(0,rfStaffDirectoryLimit).map(p=>'<article class="rfa-directory-card"><div class="rfa-directory-person">'+(student?previewPortrait(p):'<span class="v31-avatar">'+esc(staff?(p.first[0]||'')+(p.last[0]||''):String(p.year))+'</span>')+'<div><h3>'+esc(name(p))+'</h3><small>'+esc(meta(p))+'</small></div></div><div class="rfa-directory-meta">'+esc(detail(p))+'</div></article>').join('');
+ const view=p=>'<button type="button" class="v31-btn primary" data-rf-directory-detail="'+esc(student||staff?p.id:p.code)+'">'+(student||staff?'View profile':'View class')+'</button>';
+ const cards=filtered.slice(0,rfStaffDirectoryLimit).map(p=>'<article class="rfa-directory-card"><div class="rfa-directory-person">'+(student?previewPortrait(p):'<span class="v31-avatar">'+esc(staff?(p.first[0]||'')+(p.last[0]||''):String(p.year))+'</span>')+'<div><h3>'+esc(name(p))+'</h3><small>'+esc(meta(p))+'</small></div></div><div class="rfa-directory-meta">'+esc(detail(p))+'</div><div class="rfa-directory-actions">'+view(p)+'</div></article>').join('');
  const empty=rfuEmpty(requiresSearch&&!rfuQuery.trim()?'Enter a student name or ID to display authorised records.':'No matching authorised records.');
  const tools='<div class="rfa-directory-toolbar"><span>'+filtered.length+' matching records</span><div class="v31-actions">'+['cards','table'].map(m=>'<button type="button" class="v31-btn" data-rf-directory-mode="'+m+'" aria-pressed="'+(rfStaffDirectoryMode===m)+'">'+(m==='cards'?'Cards':'Table')+'</button>').join('')+'</div></div>';
- return rfuPanel(label,rfuSearch()+tools+(!filtered.length?empty:rfStaffDirectoryMode==='table'?rfuTable([student?'Student':staff?'Staff member':'Class','Details','Information'],filtered.map(p=>[esc(name(p)),esc(meta(p)),esc(detail(p))])):'<div class="rfa-directory-grid">'+cards+'</div>'+(filtered.length>rfStaffDirectoryLimit?'<button type="button" class="v31-btn rfa-directory-more" data-rf-directory-more>Show more ('+(filtered.length-rfStaffDirectoryLimit)+' remaining)</button>':'')),'Read-only directory · scope follows the current role.');
+ return rfuPanel(label,rfuSearch()+tools+(!filtered.length?empty:rfStaffDirectoryMode==='table'?rfuTable([student?'Student':staff?'Staff member':'Class','Details','Information','Action'],filtered.map(p=>[esc(name(p)),esc(meta(p)),esc(detail(p)),view(p)])):'<div class="rfa-directory-grid">'+cards+'</div>'+(filtered.length>rfStaffDirectoryLimit?'<button type="button" class="v31-btn rfa-directory-more" data-rf-directory-more>Show more ('+(filtered.length-rfStaffDirectoryLimit)+' remaining)</button>':'')),'Read-only directory · scope follows the current role.');
 };
 rfuSchedule=function(){
  const codes=new Set(rfuClasses('schedule').map(c=>c.code)),date=rfStaffDate;
@@ -3952,6 +3954,41 @@ document.addEventListener('click',e=>{
   if(!r||!rfuCanChange('followups',r))return;const next=rfuNextStatus('followups',r);if(next&&rfuUpdateRecord(r,next))rfuAudit('Updated follow-up',r.id);render();
  }
 },true);
+
+
+/* Account allocation and directory scope controls. */
+function rfuAccountActive(id){const p=previewStaff.find(p=>p.username===id);return !!rfuIdentity(id)&&(!p||p.active!==false)}
+const rfAllocationAdmin=demoAdminContent;
+demoAdminContent=function(){
+ const html=rfAllocationAdmin();
+ if(adminPage!=='accounts'||!rfuEditAccount||['admin','teacher','swilliams'].includes(rfuEditAccount))return html;
+ const p=rfuIdentity(rfuEditAccount);if(!p)return html;
+ const cfg=rfuConfig(p.id),configured=Array.isArray(cfg.assignedClasses),classes=rfuActiveClasses().slice().sort((a,b)=>a.code.localeCompare(b.code));
+ const field='<fieldset><legend>Assigned class scope</legend><label class="v31-check"><input type="checkbox" name="useAssignments" '+(configured?'checked':'')+'> Use explicitly selected classes (none means no assigned classes)</label><div class="rf-assignment-list">'+classes.map(c=>'<label class="v31-check"><input type="checkbox" name="assignedClass" value="'+esc(c.code)+'" '+(configured&&cfg.assignedClasses.includes(c.code)?'checked':'')+'> '+esc(c.code+' · '+c.name)+'</label>').join('')+'</div><small>Without explicit allocations, existing fictional demo assignments are retained.</small></fieldset>';
+ return html.replace('<label>Access expiry (optional)',field+'<label>Access expiry (optional)');
+};
+function rfuDirectoryDetail(module,id){
+ if(!rfuCan(module))return null;
+ const rows=module==='staff'?rfuStaff(module):module==='students'?rfuStudents(module):module==='classes'?rfuClasses(module):[];
+ const p=rows.find(x=>String(module==='classes'?x.code:x.id)===id);if(!p)return null;
+ const entries=module==='students'?[['Student ID',p.id],['Year level',rfMasterYearLabel(String(p.year))],['Home group',p.group||'—']]:module==='staff'?[['Staff ID',p.id],['Role',p.role],['Faculty',p.faculty],['Campus',p.campus||'—']]:[['Class code',p.code],['Class name',p.name],['Year level',rfMasterYearLabel(String(p.year))],['Subject',p.subject],['Teacher',planTeacherName(p.teacher)]];
+ return {title:module==='classes'?p.code:p.first+' '+p.last,body:rfuTable(['Field','Details'],entries.map(([a,b])=>[esc(a),esc(b||'—')]))};
+}
+document.addEventListener('click',e=>{
+ const detail=e.target.closest('[data-rf-directory-detail]');
+ if(detail&&demoRole==='staff'&&!rfPersonalPage){
+  e.preventDefault();e.stopImmediatePropagation();const p=rfuDirectoryDetail(rfuPage,detail.dataset.rfDirectoryDetail);if(p)showReviewDialog(p.title,p.body);
+ }
+},true);
+const rfAllocationStyle=document.createElement('style');rfAllocationStyle.textContent='.rf-assignment-list{max-height:230px;overflow:auto;display:grid;gap:6px;padding:8px;border:1px solid var(--rf-border,#cbd7de);border-radius:6px}';document.head.appendChild(rfAllocationStyle);
+const rfAllocationRender=render;
+render=function(){
+ if(demoRole&&rfuActor&&!rfuAccountActive(rfuActor)){
+  try{sessionStorage.removeItem(DEMO_AUTH_KEY)}catch{}
+  demoRole=null;rfuActor='';rfPersonalPage='';rfPersonalActor='';rfuTeacherExtra=false;
+ }
+ rfAllocationRender();if(demoRole==='staff'||demoRole==='admin')polishAfterRender();
+};
 
 window.visualViewport?.addEventListener('resize',()=>requestAnimationFrame(fitGrid));
 window.addEventListener('resize',rfClearTimetableMorph);
