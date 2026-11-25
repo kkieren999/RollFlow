@@ -736,15 +736,24 @@ async function test() {
     await logIn(page, 'admin', 'admin', '.v31-admin');
     assert(await page.locator('.v31-admin').count(), 'Admin demo login broke');
 
+    console.log('PASS: movement wizard issue/return, historical review, session template, and teacher account switching.');
     // Admin-managed destinations must persist in this browser, be shared
     // between demo roles, and never mutate historical movement records.
-    assert.match(await page.locator('.v31-disclaimer').innerText(), /Training workspace.*Do not enter real student or staff records/);
+    assert.match(await page.locator('.rf-training-notice[role="note"]').innerText(), /Training workspace.*Do not enter real student or staff records/);
     for (const id of ['dashboard','staff','students','classes','calendar','accounts']) {
       assert.equal(await page.locator('.nav-primary [data-admin-page="' + id + '"]').count(),1,'Required administrator navigation: '+id);
     }
     await page.locator('[data-admin-page="staff"]').first().click();
     assert.equal(await page.locator('[data-admin-reset]').count(), 0, 'No simulated password reset control');
-    assert.equal(await page.getByText('Built-in training access', { exact: true }).count(), 3, 'All three public access identities must be protected');
+    assert.equal(await page.getByText('Built-in training access', { exact: true }).count(), 3, 'All three protected training identities must be labelled in cards');
+    for(const username of ['teacher','admin','swilliams']){
+      const card=page.locator('.rfa-directory-card').filter({has:page.locator('.rfa-directory-person small').filter({hasText:new RegExp('^'+username+' · ')})});
+      assert.equal(await card.count(),1,username+' staff card');
+      assert.equal(await card.locator('[data-admin-toggle]').count(),0,username+' cannot be deactivated');
+    }
+    await page.locator('[data-rfa-id="staff:table"]').click();
+    assert.equal(await page.getByText('Built-in training access',{exact:true}).count(),3,'Protected training identities labelled in table');
+    await page.locator('[data-rfa-id="staff:cards"]').click();
     await page.locator('[data-admin-page="movements"]').first().click();
     assert.equal((await page.locator('#rf-admin-destinations-title').innerText()).trim(),
       'Manage movement destinations');
@@ -825,6 +834,7 @@ async function test() {
     assert.equal(await page.locator('.rf-movement-stat-total strong').innerText(), beforeInvalid,
       'A stale/forged removed destination should not create a pass');
 
+    console.log('PASS: administrator destinations persist, reject duplicates and forged removed values, and preserve historical records.');
     // Exercise visible teacher/admin navigation across representative desktop and iPad sizes.
     async function assertWorkspaceFits(label, selector) {
       const result = await page.locator(selector).first().evaluate(main => {
