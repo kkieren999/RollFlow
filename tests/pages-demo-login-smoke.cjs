@@ -54,6 +54,44 @@ async function test() {
       headless: true,
       args: ['--no-sandbox', '--disable-dev-shm-usage']
     });
+
+    // Current cross-portal contract: exercise every fictional identity in an isolated browser context.
+    const accounts=['admin','principal','deputy','hod','ylc','business','office','teacher','swilliams','learning','aide','relief','guidance'];
+    for(const account of accounts){
+      const rolePage=await browser.newPage({viewport:{width:1440,height:1000}});
+      const errors=[];rolePage.on('pageerror',error=>errors.push(error.message));
+      try{
+        await rolePage.goto(url,{waitUntil:'load'});
+        await logIn(rolePage,account,account);
+        const personal=rolePage.locator('.nav-utility .nav-item');
+        assert.deepEqual((await personal.allInnerTexts()).map(x=>x.trim()),['My Profile','My Preferences','Help & Support','Dark mode','Sign out'],account+' personal navigation');
+        for(const [route,title] of [['profile','My Profile'],['preferences','My Preferences'],['help','Help & Support']]){
+          await rolePage.locator('[data-rf-personal="'+route+'"]').click();
+          assert.equal((await rolePage.locator('.page-bar h1').innerText()).trim(),title,account+' '+route);
+        }
+        await rolePage.locator('[data-rf-personal="theme"]').click();
+        assert.equal(await rolePage.locator('body').getAttribute('data-theme'),'Dark',account+' theme');
+        await rolePage.locator('[data-rf-personal="theme"]').click();
+        assert.equal(await rolePage.locator('body').getAttribute('data-theme'),'Light',account+' theme reset');
+        const master=rolePage.locator('.side-nav [data-nav="master"],.side-nav [data-rfu-page="master"],.side-nav [data-admin-page="master"]');
+        if(await master.count()){
+          await master.first().click();
+          const switcher=rolePage.locator('[data-rf-shared-master-mode="grid"]');
+          if(account!=='admin'){
+            await switcher.click();
+            assert.equal(await switcher.getAttribute('aria-pressed'),'true',account+' grid');
+            assert(await rolePage.locator('.rf-master-root').isVisible(),account+' grid root');
+            assert.equal(await rolePage.locator('[data-master-action="edit-class"],[data-master-action="edit-slot"]').count(),0,account+' no editing in shared grid');
+            await rolePage.locator('[data-rf-shared-master-mode="tiles"]').click();
+          }
+        }
+        await rolePage.setViewportSize({width:390,height:844});
+        assert.equal(await rolePage.locator('.nav-utility .nav-item').count(),5,account+' mobile personal navigation');
+        assert.deepEqual(errors,[],account+' uncaught browser errors');
+        console.log('PASS: '+account+' shared personal navigation, theme, and authorised timetable.');
+      } finally {await rolePage.close()}
+    }
+
     const page = await browser.newPage();
     page.on('pageerror', error => { console.error('Browser error:', error); });
     await page.goto(url, { waitUntil: 'load' });
@@ -74,7 +112,8 @@ async function test() {
     await page.locator('[data-nav="finder"]').first().click();
     assert.equal(await page.locator('[data-teacher-scope]').count(), 0, 'Class Finder must not show the scope selector');
     assert.equal(await page.locator('.page-right .tag').count(),0,'Class count badge removed');
-    const englishClasses = await page.locator('.finder-table tbody tr').filter({hasText:'My class'}).allInnerTexts().then(rows=>rows.join(' '));
+    await page.locator('#finderQuery').fill('Williams');
+    const englishClasses = await page.locator('#finderResults .finder-card').filter({hasNot:page.locator('[data-pin-class]')}).allInnerTexts().then(rows=>rows.join(' '));
     for (const code of ['ENG071A', 'ENG091B', 'ENG101B', '10BH']) {
       assert(englishClasses.includes(code), 'Missing assigned English class ' + code);
     }
@@ -85,6 +124,7 @@ async function test() {
 
     // Student timetable uses the selected weekday, including recurring Sarah classes.
     await page.locator('[data-nav="search"]').first().click();
+    await page.locator('#studentQuery').fill('S7001');
     await page.locator('[data-open-student]').first().click();
     await page.locator('[data-action="showTimetable"]').click();
     assert.equal(await page.locator('[data-rf-student-day]').count(),5);
@@ -98,6 +138,7 @@ async function test() {
 
     // Student action controls and cross-role local referral flow.
     await page.locator('[data-nav="search"]').first().click();
+    await page.locator('#studentQuery').fill('S7001');
     await page.locator('[data-open-student]').first().click();
     await page.locator('[data-rf-student-action="details"]').click();
     assert.equal(await page.locator('.rf-student-profile-grid dt').count(),28);
@@ -129,6 +170,7 @@ async function test() {
     await page.locator('[data-demo-signout]').first().click();
     await logIn(page,'swilliams','swilliams');
     await page.locator('[data-nav="search"]').first().click();
+    await page.locator('#studentQuery').fill('S7001');
     await page.locator('[data-open-student]').first().click();
     await page.locator('[data-rf-classroom-picker]').click();
     assert.equal(await page.locator('#review-dialog [data-rf-student-action="uniform"]').count(),0);
@@ -146,7 +188,7 @@ async function test() {
     await page.locator('[data-nav="follow-ups"]').click();
     await page.locator('#rf-followup-form [name="title"]').fill('Fictional follow-up');
     await page.locator('#rf-followup-form button[type="submit"],#rf-followup-form button').first().click();
-    assert.match(await page.locator('.rf-module-task').innerText(),/Fictional follow-up/);
+    assert.match(await page.locator('.rf-module-task').filter({hasText:'Fictional follow-up'}).first().innerText(),/Fictional follow-up/);
     await page.locator('[data-rf-followup-toggle]').first().click();
     assert.match(await page.locator('[data-rf-followup-toggle]').first().innerText(),/Reopen/);
     await page.locator('[data-nav="seating-plans"]').click();
@@ -595,7 +637,8 @@ async function test() {
     await page.locator('[data-nav="finder"]').first().click();
     assert.equal(await page.locator('[data-teacher-scope]').count(), 0, 'Class Finder must not show the scope selector');
     assert.equal(await page.locator('.page-right .tag').count(),0,'Class count badge removed');
-    const mathsClasses = await page.locator('.finder-table tbody tr').filter({hasText:'My class'}).allInnerTexts().then(rows=>rows.join(' '));
+    await page.locator('#finderQuery').fill('Alex Morgan');
+    const mathsClasses = await page.locator('#finderResults .finder-card').filter({hasNot:page.locator('[data-pin-class]')}).allInnerTexts().then(rows=>rows.join(' '));
     assert(mathsClasses.includes('MAF102A'), 'Default teacher class missing');
     assert(!mathsClasses.includes('ENG071A'), 'Default teacher inherited Sarah class');
 
