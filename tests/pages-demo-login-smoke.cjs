@@ -74,6 +74,7 @@ async function test() {
         await rolePage.locator('[data-rf-personal="theme"]').click();
         assert.equal(await rolePage.locator('body').getAttribute('data-theme'),'Light',account+' theme reset');
         const master=rolePage.locator('.side-nav [data-nav="master"],.side-nav [data-rfu-page="master"],.side-nav [data-admin-page="master"]');
+        if(!['aide','relief','guidance'].includes(account))assert.equal(await master.count(),1,account+' expected master navigation');
         if(await master.count()){
           await master.first().click();
           const switcher=rolePage.locator('[data-rf-shared-master-mode="grid"]');
@@ -86,6 +87,7 @@ async function test() {
           }
         }
         await rolePage.setViewportSize({width:390,height:844});
+        await rolePage.locator('main').first().waitFor();
         assert.equal(await rolePage.locator('.nav-utility .nav-item').count(),5,account+' mobile personal navigation');
         assert.deepEqual(errors,[],account+' uncaught browser errors');
         console.log('PASS: '+account+' shared personal navigation, theme, and authorised timetable.');
@@ -149,11 +151,10 @@ async function test() {
     assert.match(await page.locator('#review-dialog').innerText(),/Attendance breakdown/);
     assert(await page.locator('#review-dialog .rf-student-attendance-row').count()>0,'Attendance report must contain class records');
     await page.locator('#review-dialog [data-review-close]').first().click();
-    await page.locator('[data-rf-classroom-picker]').click();
-    await page.locator('#review-dialog [data-rf-student-action="late"]').click();
-    assert(await page.locator('#rf-student-incident-form [name="time"]').isVisible());
-    await page.locator('#rf-student-incident-form [name="type"]').selectOption('Late arrival');
-    await page.locator('#rf-student-incident-form [name="response"]').selectOption('Refer to admin support');
+    await page.locator('[data-rf-student-action="support"]').click();
+    await page.locator('#rf-student-incident-form [name="type"]').selectOption('Attendance concern');
+    await page.locator('#rf-student-incident-form [name="response"]').selectOption('Request admin follow-up');
+    await page.locator('#rf-student-incident-form [name="notes"]').fill('Smoke test referral from teacher workspace');
     await page.locator('#rf-student-incident-form button[type="submit"]').click();
     assert.equal(await page.locator('#review-dialog').count(),0);
     await page.locator('#overlay [data-action="closeDrawer"]').click();
@@ -161,7 +162,7 @@ async function test() {
     await logIn(page,'admin','admin','.v31-admin');
     await page.locator('[data-admin-page="student-actions"]').click();
     assert.match(await page.locator('.v31-content main').innerText(),/Awaiting support/);
-    await page.locator('[data-rf-resolve-referral]').first().click();
+    await page.locator('.rf-admin-action-list article').filter({hasText:'Smoke test referral from teacher workspace'}).locator('[data-rf-resolve-referral]').click();
     assert.match(await page.locator('.v31-content main').innerText(),/Resolved/);
     await page.locator('[data-rf-action-config="new"]').click();
     await page.locator('#rf-action-config-form [name="name"]').fill('Classroom follow-up');
@@ -178,6 +179,7 @@ async function test() {
     assert.equal(await page.locator('#review-dialog [data-rf-student-action="uniform"]').count(),0);
     await page.getByRole('button',{name:'Classroom follow-up',exact:false}).click();
     assert.deepEqual(await page.locator('#rf-student-incident-form [name="type"] option').allTextContents(),['Select type','Learning concern','Equipment concern']);
+    assert.deepEqual(await page.locator('#rf-student-incident-form [name="response"] option').allTextContents(),['Select response','Discussed','Record only']);
     await page.locator('#review-dialog [data-review-close]').first().click();
     await page.locator('#overlay [data-action="closeDrawer"]').first().click();
     console.log('PASS: student profiles, semester attendance action, incidents, admin referrals and configurable choices.');
@@ -191,8 +193,9 @@ async function test() {
     await page.locator('#rf-followup-form [name="title"]').fill('Fictional follow-up');
     await page.locator('#rf-followup-form button[type="submit"],#rf-followup-form button').first().click();
     assert.match(await page.locator('.rf-module-task').filter({hasText:'Fictional follow-up'}).first().innerText(),/Fictional follow-up/);
-    await page.locator('[data-rf-followup-toggle]').first().click();
-    assert.match(await page.locator('[data-rf-followup-toggle]').first().innerText(),/Reopen/);
+    const savedFollowup=page.locator('.rf-module-task').filter({hasText:'Fictional follow-up'}).first();
+    await savedFollowup.locator('[data-rf-followup-toggle]').click();
+    assert.match(await savedFollowup.locator('[data-rf-followup-toggle]').innerText(),/Reopen/);
     // Seating plans and class lists are no longer offered as top-level routes.
     assert.equal(await page.locator('[data-nav="seating-plans"],[data-nav="class-lists"]').count(),0);
     await page.locator('[data-demo-signout]').first().click();
