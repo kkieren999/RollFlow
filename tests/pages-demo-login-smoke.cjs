@@ -45,6 +45,17 @@ async function logIn(page, username, password, destination = '.top-user > span')
   await page.locator(destination).waitFor();
 }
 
+// At compact widths navigation is deliberately hidden until the menu opens.
+async function clickSidebar(page,selector) {
+  const target=page.locator(selector).first();
+  if(!(await target.isVisible())){
+    const menu=page.locator('[data-rf-portal-menu]').first();
+    assert(await menu.isVisible(),'Sidebar target hidden without an accessible menu: '+selector);
+    await menu.click();
+  }
+  await target.click();
+}
+
 async function test() {
   const { server, url } = await startServer();
   let browser;
@@ -88,6 +99,8 @@ async function test() {
         }
         await rolePage.setViewportSize({width:390,height:844});
         await rolePage.locator('main').first().waitFor();
+        await clickSidebar(rolePage,'.nav-utility [data-rf-personal="profile"]');
+        assert.equal((await rolePage.locator('.page-bar h1').innerText()).trim(),'My Profile',account+' mobile profile route');
         assert.equal(await rolePage.locator('.nav-utility .nav-item').count(),5,account+' mobile personal navigation');
         assert.deepEqual(errors,[],account+' uncaught browser errors');
         console.log('PASS: '+account+' shared personal navigation, theme, and authorised timetable.');
@@ -343,7 +356,9 @@ async function test() {
           mode + ' must fit horizontally at ' + JSON.stringify(size) + ': ' + JSON.stringify(geometry));
       }
     }
+    await page.setViewportSize({width:1440,height:900});
     await page.emulateMedia({ reducedMotion: 'no-preference' });
+    console.log('PASS: day/week timetable fits seven desktop and tablet viewports.');
 
     // Term starts in January and historical dates remain navigable.
     await page.locator('[data-timetable-view="day"]').first().click();
@@ -784,20 +799,20 @@ async function test() {
         label+' workspace exceeds viewport: '+JSON.stringify(result));
       assert(result.xOverflow <= 3, label+' page has horizontal overflow: '+JSON.stringify(result));
     }
-    const deviceSizes = [{width:1920,height:1200},{width:1024,height:768},{width:768,height:1024},{width:820,height:1180}];
+    const deviceSizes = [{width:1920,height:1200},{width:1024,height:768},{width:768,height:1024},{width:820,height:1180},{width:390,height:844}];
     for (const size of deviceSizes) {
       await page.setViewportSize(size);
       for (const route of ['timetable','master','finder','search','movements','alerts','profile','preferences','help','attendance-overview','classroom-management','student-support','follow-ups','school-calendar']) {
-        await page.locator('.permanent-sidebar [data-nav="'+route+'"],.permanent-sidebar .nav-utility [data-rf-personal="'+route+'"]').first().click();
+        await clickSidebar(page,'.permanent-sidebar [data-nav="'+route+'"],.permanent-sidebar .nav-utility [data-rf-personal="'+route+'"]');
         await assertWorkspaceFits('Teacher '+route+' '+JSON.stringify(size), '.content-shell>.main');
       }
     }
-    await page.locator('[data-demo-signout]').first().click();
+    await clickSidebar(page,'.nav-utility [data-demo-signout]');
     await logIn(page, 'admin', 'admin', '.v31-admin');
     for (const size of deviceSizes) {
       await page.setViewportSize(size);
-      for (const route of ['dashboard','staff','students','classes','timetable','master','movements','student-actions','teacher-modules','roles','data','oneschool','audit']) {
-        await page.locator('.nav-primary [data-admin-page="'+route+'"]').click();
+      for (const route of ['dashboard','staff','students','classes','timetable','master','attendance','movements','student-actions','teacher-modules','calendar','accounts','roles','data','oneschool','audit']) {
+        await clickSidebar(page,'.nav-primary [data-admin-page="'+route+'"]');
         await assertWorkspaceFits('Admin '+route+' '+JSON.stringify(size), '.v31-content>main');
       }
     }
