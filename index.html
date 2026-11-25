@@ -1981,8 +1981,13 @@ function rfMasterTable(rows,find=false,imported=false){
 }
 function rfMasterGroups(rows,imported){
  const groups=new Map();for(const r of rows){const y=String(r.year??'unknown');if(!groups.has(y))groups.set(y,[]);groups.get(y).push(r)}
- const sorted=[...groups].sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true}));
- return sorted.map(([year,items])=>{const open=rfMasterOpen===year||!!rfMasterQuery.trim();const list=items.sort((a,b)=>String(a.code).localeCompare(String(b.code))),visible=list.slice(0,rfMasterLimit);return '<section class="rf-master-year"><button type="button" class="rf-master-year-toggle" data-rf-master-action="year" data-rf-master-id="'+esc(year)+'" aria-expanded="'+open+'"><span class="rf-master-year-icon" aria-hidden="true">'+esc(year==='0'?'P':year==='unknown'?'—':year)+'</span><strong>'+esc(rfMasterYearLabel(year))+'</strong><small>'+items.length+' '+(items.length===1?'class':'classes')+'</small><span class="rf-master-chevron" aria-hidden="true"></span></button>'+(open?rfMasterTable(visible,false,imported)+(list.length>visible.length?'<button type="button" class="mt-button rf-master-more" data-rf-master-action="more">Show more ('+(list.length-visible.length)+' remaining)</button>':''):'')+'</section>'}).join('')||'<div class="rf-master-empty">No matching classes in this period.</div>';
+ const sorted=[...groups].sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true})),searching=!!rfMasterQuery.trim();
+ if(!sorted.length)return '<div class="rf-master-empty">No matching classes in this period.</div>';
+ const selected=groups.has(rfMasterOpen)?rfMasterOpen:null;
+ const tiles='<div class="rf-master-section-label">Year levels</div><div class="rf-master-year-grid" role="group" aria-label="Select year level">'+sorted.map(([year,items])=>'<button type="button" class="rf-master-tile" data-rf-master-action="year" data-rf-master-id="'+esc(year)+'" aria-pressed="'+(selected===year)+'" aria-controls="rf-master-year-results"><span class="rf-master-tile-number" aria-hidden="true">'+esc(year==='0'?'P':year==='unknown'?'—':year)+'</span><strong>'+esc(rfMasterYearLabel(year))+'</strong><small>'+items.length+' '+(items.length===1?'class':'classes')+'</small><span class="rf-master-tile-arrow" aria-hidden="true">›</span></button>').join('')+'</div>';
+ const results=selected!==null?sorted.filter(([year])=>year===selected):searching?sorted:[];
+ const detail=results.map(([year,items])=>{const list=items.slice().sort((a,b)=>String(a.code).localeCompare(String(b.code))),visible=list.slice(0,rfMasterLimit);return '<section class="rf-master-year"><div class="rf-master-results-head"><h3>'+esc(rfMasterYearLabel(year))+' classes</h3><small>'+items.length+' '+(items.length===1?'class':'classes')+'</small></div>'+rfMasterTable(visible,false,imported)+(list.length>visible.length?'<button type="button" class="mt-button rf-master-more" data-rf-master-action="more">Show more ('+(list.length-visible.length)+' remaining)</button>':'')+'</section>'}).join('');
+ return tiles+'<div id="rf-master-year-results" class="rf-master-year-results">'+(detail||'<div class="rf-master-empty rf-master-select-hint">Select a year level to view its classes.</div>')+'</div>';
 }
 function rfMasterTeacherContent(){
  const imported=!!osPublished(),today=brisbaneToday(),q=rfMasterQuery.trim().toLowerCase(),day=masterDay,date=imported?osDate:'',monday=imported?polishShift(osDate,-((new Date(osDate+'T12:00:00Z').getUTCDay()+6)%7)):'',data=rfMasterDayData(imported,day,date);
@@ -1991,12 +1996,12 @@ function rfMasterTeacherContent(){
  const dates=imported?'<div class="rf-master-datebar"><button type="button" class="mt-button" data-rf-master-action="prev">← Previous week</button><label class="rf-master-date-label">Date <input type="date" id="rf-master-date" value="'+esc(date)+'"></label><button type="button" class="mt-button" data-rf-master-action="next">Next week →</button></div>':'';
  const periods=data.periods.filter(p=>!p.break),current=(imported?date===today:planDays[Number(day)-1]===weekdayFor(today)),now=polishClock();
  if(!periods.some(p=>p.key===rfMasterPeriod)){rfMasterPeriod=(current?(periods.find(p=>p.start<=now&&now<p.end)||periods.find(p=>p.start>now)||periods.at(-1)):periods[0])?.key||''}
- const periodButtons='<div class="rf-master-periods" role="group" aria-label="School period">'+periods.map(p=>'<button type="button" data-rf-master-action="period" data-rf-master-id="'+esc(p.key)+'" aria-pressed="'+(rfMasterPeriod===p.key)+'"><strong>'+esc(p.label)+'</strong><small>'+esc(p.start)+'–'+esc(p.end)+'</small></button>').join('')+'</div>';
+ const periodPicker='<label class="rf-master-period-picker"><span>Change period</span><select id="rf-master-period-select" aria-label="Change teaching period" '+(periods.length?'':'disabled')+'>'+ (periods.length?periods.map(p=>'<option value="'+esc(p.key)+'" '+(rfMasterPeriod===p.key?'selected':'')+'>'+esc(p.label+' · '+p.start+'–'+p.end)+'</option>').join(''):'<option>No periods</option>')+'</select></label>';
  const search='<div class="rf-master-search"><label class="mt-sr" for="rf-master-query">Search timetable</label><span class="rf-master-search-icon" aria-hidden="true"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/></svg></span><input type="search" id="rf-master-query" value="'+esc(rfMasterQuery)+'" placeholder="Search class, teacher or room…" maxlength="150">'+(q?'<button type="button" class="mt-button" data-rf-master-action="clear">Clear</button>':'')+'</div>';
  const rows=data.rows.filter(r=>r.period===rfMasterPeriod&&rfMasterMatches(r,q)),p=periods.find(p=>p.key===rfMasterPeriod);
  const dayName=imported?weekdayFor(date):planDays[Number(day)-1]||'',groupCount=new Set(rows.map(r=>String(r.year??'unknown'))).size;
- const body='<section class="rf-master-summary" aria-label="Selected timetable period"><div class="rf-master-summary-main"><span class="rf-master-eyebrow">'+esc(dayName)+'</span><strong>'+esc(p?.label||'No scheduled periods')+'</strong>'+(p?'<span class="rf-master-summary-time">'+esc(p.start)+' – '+esc(p.end)+'</span>':'')+'</div><div class="rf-master-summary-stats"><div><strong>'+rows.length+'</strong><span>'+(q?'Matching classes':'Classes')+'</span></div><div><strong>'+groupCount+'</strong><span>Year levels</span></div></div></section>'+search+(!imported?masterDetail(masterData()):'')+(periods.length?rfMasterGroups(rows,imported):'<div class="rf-master-empty">No timetable available for this day.</div>');
- return '<section class="sheet mt-root rf-master-root rf-master-unified"><section class="rf-master-navigation">'+dates+'<div class="rf-master-section-label">School day</div>'+days+'<div class="rf-master-section-label">Teaching period</div>'+periodButtons+'</section>'+body+(imported?osCoverageNotice(osPublished())+'<p class="mt-caption">Masked imported timetable · not live attendance or staff availability.</p>':'<p class="mt-caption">Recurring demo timetable · not live attendance or staff availability.</p>')+'</section>';
+ const body='<section class="rf-master-summary" aria-label="Selected timetable period"><div class="rf-master-summary-main"><span class="rf-master-eyebrow">'+esc(dayName)+'</span><strong>'+esc(p?.label||'No scheduled periods')+'</strong>'+(p?'<span class="rf-master-summary-time">'+esc(p.start)+' – '+esc(p.end)+'</span>':'')+'</div><div class="rf-master-summary-controls">'+periodPicker+'<div class="rf-master-summary-stats"><div><strong>'+rows.length+'</strong><span>'+(q?'Matching classes':'Classes')+'</span></div><div><strong>'+groupCount+'</strong><span>Year levels</span></div></div></div></section>'+search+(!imported?masterDetail(masterData()):'')+(periods.length?rfMasterGroups(rows,imported):'<div class="rf-master-empty">No timetable available for this day.</div>');
+ return '<section class="sheet mt-root rf-master-root rf-master-unified"><section class="rf-master-navigation">'+dates+'<div class="rf-master-section-label">School day</div>'+days+'</section>'+body+(imported?osCoverageNotice(osPublished())+'<p class="mt-caption">Masked imported timetable · not live attendance or staff availability.</p>':'<p class="mt-caption">Recurring demo timetable · not live attendance or staff availability.</p>')+'</section>';
 }
 function masterTeacherPage(){return shell(rfMasterTeacherContent(),'Master Timetable','School-wide timetable');}
 document.addEventListener('click',e=>{
@@ -2005,7 +2010,7 @@ document.addEventListener('click',e=>{
  if(a==='day'){if(imported){if(!osDateValid(id))return;osDate=id}else{if(!['1','2','3','4','5'].includes(id))return;masterDay=id}masterSelected='';rfMasterLimit=50}
  else if(a==='prev'||a==='next'){if(!imported)return;osDate=polishShift(osDate,a==='prev'?-7:7);masterSelected=''}
  else if(a==='period'){rfMasterPeriod=id;masterSelected='';rfMasterLimit=50}
- else if(a==='year'){rfMasterOpen=rfMasterOpen===id?null:id;rfMasterLimit=50}
+ else if(a==='year'){rfMasterOpen=rfMasterOpen===id?null:id;rfMasterLimit=50;masterSelected=''}
  else if(a==='clear'){rfMasterQuery='';rfMasterLimit=50;masterSelected=''}
  else if(a==='more'){rfMasterLimit+=50}
  else if(a==='detail'&&!imported){masterDay=b.dataset.rfMasterDay;rfMasterPeriod=b.dataset.rfMasterPeriod;rfMasterOpen=b.dataset.rfMasterYear;rfMasterQuery='';masterSelected=id;masterQuery='';masterYear=''}
@@ -2014,12 +2019,12 @@ document.addEventListener('click',e=>{
 },true);
 document.addEventListener('input',e=>{
  if(demoRole!=='teacher'||state.page!=='master'||e.target.id!=='rf-master-query')return;
- rfMasterQuery=e.target.value.slice(0,150);rfMasterLimit=50;masterSelected='';const pos=e.target.selectionStart;refreshMaster();const input=document.getElementById('rf-master-query');input?.focus({preventScroll:true});if(input&&pos!==null)input.setSelectionRange(pos,pos);
+ rfMasterQuery=e.target.value.slice(0,150);rfMasterOpen=null;rfMasterLimit=50;masterSelected='';const pos=e.target.selectionStart;refreshMaster();const input=document.getElementById('rf-master-query');input?.focus({preventScroll:true});if(input&&pos!==null)input.setSelectionRange(pos,pos);
 },true);
-document.addEventListener('change',e=>{if(demoRole==='teacher'&&state.page==='master'&&e.target.id==='rf-master-date'&&osDateValid(e.target.value)){osDate=e.target.value;masterSelected='';refreshMaster()}},true);
+document.addEventListener('change',e=>{if(demoRole!=='teacher'||state.page!=='master')return;if(e.target.id==='rf-master-period-select'){rfMasterPeriod=e.target.value;masterSelected='';rfMasterLimit=50;refreshMaster();document.getElementById('rf-master-period-select')?.focus({preventScroll:true})}else if(e.target.id==='rf-master-date'&&osDateValid(e.target.value)){osDate=e.target.value;masterSelected='';rfMasterLimit=50;refreshMaster()}},true);
 const rfMasterStyle=document.createElement('style');rfMasterStyle.textContent=`
 .rf-master-root{--mt-ink:#203c4d;--mt-muted:#526c7b;--mt-line:#d7e3e8;--mt-surface:#fff;--mt-soft:#eef5f7;--mt-accent:#007b97;display:grid;gap:12px;width:100%;min-width:0;font-size:14px}
-.rf-master-root.rf-master-unified{background:var(--mt-surface);color:var(--mt-ink);border:1px solid var(--mt-line);border-radius:12px;box-shadow:0 3px 12px #1837490b;padding:22px;max-width:1400px;margin:0;gap:16px;overflow:hidden}
+.rf-master-root.rf-master-unified{background:var(--mt-surface);color:var(--mt-ink);border:1px solid var(--mt-line);border-radius:12px;box-shadow:0 3px 12px #1837490b;padding:22px;max-width:1060px;margin:0;gap:16px;overflow:hidden;container-type:inline-size}
 .rf-master-navigation{display:grid;gap:9px;background:transparent;color:var(--mt-ink);padding:0;border:0;border-radius:0;box-shadow:none}
 .rf-master-section-label{font-weight:700;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--mt-muted)}
 .rf-master-days,.rf-master-periods{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(min(100%,112px),1fr))}
@@ -2047,6 +2052,26 @@ body[data-theme="Dark"] .rf-master-root,[data-theme="dark"] .rf-master-root{--mt
 body[data-theme="Dark"] .rf-master-year-icon,[data-theme="dark"] .rf-master-year-icon{background:#325c6b;color:#d0f3fa}
 @media(max-width:650px){.rf-master-root.rf-master-unified{padding:12px;gap:12px}.rf-master-navigation{padding:0}.rf-master-days{grid-template-columns:repeat(auto-fit,minmax(82px,1fr))}.rf-master-periods{grid-template-columns:repeat(auto-fit,minmax(100px,1fr))}.rf-master-days button,.rf-master-periods button{padding:9px}.rf-master-summary{padding:15px;gap:14px}.rf-master-summary-stats{gap:15px}.rf-master-summary-stats>div{padding-left:12px}.rf-master-year-toggle{padding:10px 12px;gap:10px}.rf-master-table th,.rf-master-table td{padding:9px 8px}.rf-master-detail-btn{padding:4px 6px}}
 @media print{.rf-master-navigation,.rf-master-search,.rf-master-detail-btn,.rf-master-more{display:none!important}.rf-master-summary{background:white;color:#203c4d;border:1px solid #d7e3e8}.rf-master-summary span{color:#526c7b}.rf-master-year{break-inside:avoid}}
+
+.rf-master-summary-controls{display:flex;flex-wrap:wrap;align-items:center;gap:20px;min-width:0}
+.rf-master-period-picker{display:grid;gap:5px;max-width:100%;font-size:11px;font-weight:600;color:#d5e8ed}
+.rf-master-period-picker select{width:100%;max-width:265px;min-height:38px;padding:8px 10px;border-radius:8px;border:1px solid #ffffff55;background:#27576a;color:#fff;font:inherit;font-size:13px;cursor:pointer}
+.rf-master-period-picker select option{background:#fff;color:#203c4d}
+.rf-master-year-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.rf-master-tile{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-height:111px;min-width:0;padding:14px 16px;border:1px solid var(--mt-line);border-radius:12px;background:var(--mt-surface);color:var(--mt-ink);text-align:left;font:inherit;cursor:pointer;transition:border-color .15s,background .15s,box-shadow .15s}
+.rf-master-tile:hover{border-color:var(--mt-accent);background:var(--mt-soft)}
+.rf-master-tile[aria-pressed="true"]{background:var(--mt-soft);border-color:var(--mt-accent);box-shadow:inset 0 0 0 1px var(--mt-accent)}
+.rf-master-tile-number{font-size:27px;font-weight:800;line-height:1.1;color:var(--mt-accent)}
+.rf-master-tile>strong{font-size:14px;overflow-wrap:anywhere}.rf-master-tile small{color:var(--mt-muted);font-size:12px}
+.rf-master-tile-arrow{position:absolute;right:13px;top:13px;font-size:22px;line-height:1;color:var(--mt-muted)}
+.rf-master-tile[aria-pressed="true"] .rf-master-tile-arrow{color:var(--mt-accent);transform:rotate(90deg)}
+.rf-master-year-results{display:grid;gap:12px;min-width:0}
+.rf-master-results-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 16px;border-bottom:1px solid var(--mt-line)}
+.rf-master-results-head h3{font-size:16px;margin:0;color:var(--mt-ink)}.rf-master-results-head small{color:var(--mt-muted);white-space:nowrap}
+.rf-master-select-hint{padding:19px 12px;border-style:dashed}
+@container (max-width:520px){.rf-master-year-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.rf-master-tile{padding:12px;min-height:100px}.rf-master-summary-controls{gap:12px;width:100%}}
+@media(max-width:400px){.rf-master-year-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.rf-master-tile{padding:10px}}
+@media print{.rf-master-period-picker,.rf-master-year-grid{display:none!important}}
 `;document.head.appendChild(rfMasterStyle);
 function refreshMaster(focusAction='',id=''){
  const root=document.querySelector('.mt-scroll'),left=root?.scrollLeft||0,top=root?.scrollTop||0,main=document.querySelector('main'),scroll=main?.scrollTop||0,appTop=app.scrollTop||0;
