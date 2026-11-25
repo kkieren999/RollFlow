@@ -2949,7 +2949,7 @@ const rfModuleDefs=[
 const RF_MODULE_VISIBILITY='rollflow_module_visibility_v1',RF_CALENDAR_KEY='rollflow_calendar_v1';
 const rfModuleActor=()=>demoTeacherUsername;
 const rfModuleStore=()=> 'rollflow_teacher_modules_v1_'+rfModuleActor();
-const rfModuleVisible=id=>!rfReadStudentLocal(RF_MODULE_VISIBILITY,[]).includes(id);
+const rfModuleVisible=id=>!rfReadStudentLocal(RF_MODULE_VISIBILITY,[]).includes(id)&&rfuLegacyTeacherModuleAllowed(id);
 navPrimary.push(...rfModuleDefs);
 let rfSupportQuery='',rfSupportStudent='',rfSupportAction='',rfSupportType='',rfClassroomActionId='',rfModuleStudentId='',rfModuleFilters={classCode:'',student:'',status:'all',threshold:90,month:'',query:''},rfSeatClass='',rfSeatSelected='',rfSeatColumns=5,rfListClass='';
 function rfModuleData(){return rfReadStudentLocal(rfModuleStore(),rfModulePeople().slice(0,3).map((p,i)=>({id:'demo-task-'+i,kind:'followup',student:p.id,title:['Check assessment progress','Discuss learning goals','Review homework routine'][i],due:dateOffset(brisbaneToday(),i-1),notes:'Fictional demo task',done:i===2})))}
@@ -3561,6 +3561,7 @@ function rfuRecordAllowed(module,r,id=rfuActor,actions=null){
  const studentInScope=g=>!student||g.scope==='school'||g.scope==='assigned'&&assigned.has(student.id)||g.scope==='referred'&&referred.has(student.id)||g.scope==='year'&&String(student.year)===cfg.year||g.scope==='faculty'&&planning.enrolments.some(e=>e.studentId===student.id&&facultyCodes.has(e.classCode)&&e.start<=today&&(!e.end||e.end>=today));
  return grants.some(g=>{
   if(!studentInScope(g)||klass&&!(g.scope==='referred'&&student&&referred.has(student.id))&&!rfuClassAllowed(klass,g,id))return false;
+   if(r.readOnly&&r.owner!==id&&g.scope!=='school')return false;
   if(g.scope==='school')return true;
   if(g.scope==='assigned')return r.owner===id||module==='tasks'&&g.role==='learning'&&!!student;
   if(g.scope==='referred')return !!student;
@@ -3569,7 +3570,7 @@ function rfuRecordAllowed(module,r,id=rfuActor,actions=null){
  })
 }
 function rfuRows(module){return rfuRecords().filter(r=>r.module===module&&rfuRecordAllowed(module,r))}
-function rfuCanChange(module,r){return rfuRecordAllowed(module,r,rfuActor,['manage','approve','review','complete'])}
+function rfuCanChange(module,r){return !r.readOnly&&rfuRecordAllowed(module,r,rfuActor,['manage','approve','review','complete'])}
 const rfuPanel=(title,body,sub='')=>'<section class="v31-panel"><h2>'+esc(title)+'</h2>'+(sub?'<p>'+esc(sub)+'</p>':'')+body+'</section>';
 const rfuEmpty=label=>'<div class="rfa-directory-empty">'+esc(label)+'</div>';
 function rfuTable(head,rows){return '<div class="v31-table-wrap"><table class="v31-table"><thead><tr>'+head.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr></thead><tbody>'+rows.map(row=>'<tr>'+row.map(c=>'<td>'+c+'</td>').join('')+'</tr>').join('')+(rows.length?'':'<tr><td colspan="'+head.length+'">No matching records.</td></tr>')+'</tbody></table></div>'}
@@ -3901,7 +3902,7 @@ function rfuLegacyRows(){
  }
  return rows;
 }
-function rfuRecords(){return [...rfuBaseRecords(),...rfuLegacyRows()]}
+function rfuRecords(){return [...rfuBaseRecords(),...rfuLegacyRows(),...rfuLegacyCoverRows()]}
 function rfuNextStatus(module,r){
  const status=r.status;
  if(module==='approvals'){
@@ -3914,7 +3915,7 @@ function rfuNextStatus(module,r){
   if(status==='Reviewed')return rfuRecordAllowed(module,r,rfuActor,['manage'])?'Resolved':'';
   return 'Reviewed';
  }
- if(module==='relief')return status==='Allocated'?'Complete':status==='Complete'?'':'Allocated';
+ if(module==='relief')return status==='Complete'?'':status==='Allocated'?(rfuRecordAllowed(module,r,rfuActor,['manage'])?'Complete':''):'Allocated';
  if(module==='availability')return status==='Available'?'Unavailable':'Available';
  if(module==='observations')return '';
  if(module==='followups'&&status==='Complete')return 'Open';
@@ -3922,6 +3923,7 @@ function rfuNextStatus(module,r){
 }
 function rfuStatusAction(next,module){return ({Approved:'Approve demo draft',Reviewed:module==='approvals'?'Review draft':'Mark reviewed',Resolved:'Resolve referral',Allocated:'Allocate cover',Available:'Mark available',Unavailable:'Mark unavailable',Open:'Reopen',Complete:'Mark complete'})[next]||'Update'}
 function rfuUpdateRecord(r,status){
+ if(r.readOnly)return false;
  if(r.legacyStore===RF_STUDENT_INCIDENT_KEY){
   const rows=rfuRead(r.legacyStore,[]);if(!Array.isArray(rows)||!rows.some(x=>x.id===r.legacyId&&x.refer))return false;
   return rfuWrite(r.legacyStore,rows.map(x=>x.id===r.legacyId?{...x,reviewedAt:x.reviewedAt||new Date().toISOString(),...(status==='Resolved'?{resolved:true,resolvedAt:new Date().toISOString()}:{})}:x));
@@ -3988,6 +3990,77 @@ render=function(){
   demoRole=null;rfuActor='';rfPersonalPage='';rfPersonalActor='';rfuTeacherExtra=false;
  }
  rfAllocationRender();if(demoRole==='staff'||demoRole==='admin')polishAfterRender();
+};
+
+
+/* Phase 3: shared timetable views, duty register and optional module controls. */
+const RF_TEACHER_OPTIONAL_MODULES={'attendance-overview':'attendance','classroom-management':'observations','student-support':'referrals','follow-ups':'followups','school-calendar':'calendar'};
+function rfuLegacyTeacherModuleAllowed(route,id=demoTeacherUsername){
+ const module=RF_TEACHER_OPTIONAL_MODULES[route];return !module||rfuCan(module,null,id);
+}
+const rfPhase3Admin=demoAdminContent;
+demoAdminContent=function(){
+ const html=rfPhase3Admin();
+ if(adminPage!=='accounts'||!['teacher','swilliams'].includes(rfuEditAccount))return html;
+ const id=rfuEditAccount,cfg=rfuConfig(id),modules=[...new Set([...Object.values(RF_TEACHER_OPTIONAL_MODULES),'supervision'])];
+ return html+rfuPanel('Optional teacher module access','<form id="rf-teacher-access" class="v31-form"><fieldset><legend>Restrict optional modules</legend>'+modules.map(m=>'<label class="v31-check"><input type="checkbox" name="deny" value="'+esc(m)+'" '+(cfg.disabled.includes(m)?'checked':'')+'> '+esc(RFU_MODULES.find(x=>x[0]===m)?.[1]||m)+'</label>').join('')+'</fieldset><div class="v31-form-actions"><button class="v31-btn primary">Save module access</button></div></form>','Existing core teaching and attendance authority is retained; these controls restrict optional workspace modules only.');
+};
+document.addEventListener('submit',e=>{
+ if(e.target.id!=='rf-teacher-access'||demoRole!=='admin'||adminPage!=='accounts'||!['teacher','swilliams'].includes(rfuEditAccount))return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const id=rfuEditAccount,all=rfuRead(RFU_ACCOUNT_KEY,{}),cfg=rfuConfig(id),modules=[...new Set([...Object.values(RF_TEACHER_OPTIONAL_MODULES),'supervision'])],d=new FormData(e.target),disabled=[...new Set([...cfg.disabled.filter(m=>!modules.includes(m)),...d.getAll('deny').filter(m=>modules.includes(m))])];
+ if(rfuWrite(RFU_ACCOUNT_KEY,{...all,[id]:{...cfg,disabled}})){rfuAudit('Changed teacher optional module access',id);adminMessage='Optional module access saved.'}render();
+},true);
+function rfuLegacyCoverRows(){
+ const rows=[];
+ for(const owner of ['teacher','swilliams']){
+  const ws=rfuRead(owner==='teacher'?'rollflow_workspace_v2':'rollflow_workspace_swilliams_v2',{});
+  if(!Array.isArray(ws?.coverPlans))continue;
+  for(const p of ws.coverPlans){
+   if(!p?.id||!p.classId||!p.date)continue;
+   const module=p.type==='Supervision'?'supervision':p.type==='Relief allocation'?'relief':'';
+   if(!module)continue;
+   rows.push({module,id:'legacy-cover:'+owner+':'+p.id,owner,title:(p.type||'Cover')+' · '+p.classId,date:p.date,time:p.period||'',classCode:p.classId,detail:[p.room?'Room '+p.room:'','Personal cover note (not an approved allocation)'].filter(Boolean).join(' · '),status:'Personal note',readOnly:true});
+  }
+ }
+ return rows;
+}
+let rfSharedMasterMode='tiles';
+function rfSharedMasterGrid(periods,rows){
+ const years=[...new Set(rows.map(r=>String(r.year??'unknown')))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
+ if(!periods.length||!years.length)return '<div class="rf-master-empty">No matching classes for this day.</div>';
+ return '<div class="mt-scroll" tabindex="0" aria-label="Read-only master timetable grid"><table class="mt-table"><thead><tr><th scope="col">Year level</th>'+periods.map(p=>'<th scope="col"><strong>'+esc(p.label)+'</strong><small>'+esc(p.start+'–'+p.end)+'</small></th>').join('')+'</tr></thead><tbody>'+years.map(y=>'<tr><th scope="row">'+esc(rfMasterYearLabel(y))+'</th>'+periods.map(p=>'<td>'+rows.filter(r=>String(r.year??'unknown')===y&&r.period===p.key).sort((a,b)=>a.code.localeCompare(b.code)).map(r=>'<div class="mt-slot"><strong>'+esc(r.code)+'</strong><span>'+esc(r.teacher||'—')+'</span><span>'+esc(r.room||'—')+'</span></div>').join('')+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>';
+}
+const rfPhase3Master=rfMasterTeacherContent;
+rfMasterTeacherContent=function(){
+ const html=rfPhase3Master();
+ if(demoRole==='admin')return html;
+ const toolbar='<div class="rfa-master-switch"><button type="button" class="mt-button" data-rf-shared-master-mode="tiles" aria-pressed="'+(rfSharedMasterMode==='tiles')+'">Year-level tiles</button><button type="button" class="mt-button" data-rf-shared-master-mode="grid" aria-pressed="'+(rfSharedMasterMode==='grid')+'">Full timetable grid</button></div>';
+ if(rfSharedMasterMode==='tiles')return toolbar+html;
+ const imported=!!osPublished(),data=rfMasterDayData(imported,masterDay,imported?osDate:''),periods=data.periods.filter(p=>!p.break),rows=data.rows.filter(r=>periods.some(p=>p.key===r.period)&&rfMasterMatches(r,rfMasterQuery.trim().toLowerCase()));
+ const split=html.indexOf('<section class="rf-master-summary"');
+ if(split<0)return toolbar+html;
+ const search='<label>Search timetable<input id="rf-master-query" type="search" value="'+esc(rfMasterQuery)+'" placeholder="Class, teacher or room" maxlength="150"></label>';
+ return toolbar+html.slice(0,split)+search+rfSharedMasterGrid(periods,rows)+'<p class="mt-caption">Read-only school timetable · not a live attendance or staff availability register.</p></section>';
+};
+const rfSharedMasterReset=rfMasterReset;
+rfMasterReset=function(){rfSharedMasterMode='tiles';rfSharedMasterReset()};
+document.addEventListener('click',e=>{
+ const b=e.target.closest('[data-rf-shared-master-mode]');
+ if(!b||!rfMasterTilesVisible()||demoRole==='admin')return;
+ e.preventDefault();e.stopImmediatePropagation();rfSharedMasterMode=b.dataset.rfSharedMasterMode==='grid'?'grid':'tiles';masterSelected='';render();
+},true);
+const rfPhase3Schedule=rfuSchedule;
+rfuSchedule=function(){
+ const date=rfStaffDate,start=rfStaffWeek?polishShift(date,-((new Date(date+'T12:00:00Z').getUTCDay()+6)%7)):date,dates=rfStaffWeek?Array.from({length:5},(_,i)=>polishShift(start,i)):[date];
+ const rows=rfuRecords().filter(r=>['supervision','relief'].includes(r.module)&&r.owner===rfuActor&&dates.includes(r.date)&&rfuRecordAllowed(r.module,r));
+ return rfPhase3Schedule()+rfuPanel('Supervision & relief',rfuTable(['Date','Time / period','Duty','Class','Status'],rows.map(r=>[esc(r.date),esc(r.time||'—'),esc(r.title),esc(r.classCode||'—'),esc(r.status)])),'Assigned duties only. A personal cover note does not confer roll-marking authority.');
+};
+const rfPhase3TeacherSchedule=timetable;
+timetable=function(){
+ const html=rfPhase3TeacherSchedule(),rows=rfuRecords().filter(r=>['supervision','relief'].includes(r.module)&&!r.readOnly&&r.owner===rfuActor&&r.date===state.date&&rfuRecordAllowed(r.module,r));
+ const body=rows.map(r=>'<article class="simple-row"><div><strong>'+esc(r.title)+'</strong><span>'+esc([r.time,r.classCode,r.status].filter(Boolean).join(' · '))+'</span></div></article>').join('');
+ return rows.length?html.replace('</main>',rfModulePanel('Assigned supervision & relief',body)+'</main>'):html;
 };
 
 window.visualViewport?.addEventListener('resize',()=>requestAnimationFrame(fitGrid));
