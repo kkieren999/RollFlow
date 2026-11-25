@@ -1962,9 +1962,9 @@ function masterContent(){
  const summaries=(label,key,clash=false)=>`<tr class="mt-summary"><th scope="row">${label}</th>${cols.map(p=>{const n=data.stats[p.code][key];return `<td class="${clash&&n?'mt-warning':''}">${n}</td>`}).join('')}</tr>`;
  return `<div class="mt-root"><div class="mt-tabs" role="group" aria-label="Weekday">${tab}</div><div class="mt-toolbar"><form id="mt-search"><label><span class="mt-sr">Search timetable</span><input name="q" value="${esc(masterQuery)}" placeholder="Search class, teacher or room" maxlength="150"></label><label><span class="mt-sr">Year level</span><select name="year">${planOpt([['','All years'],...[7,8,9,10,11,12].map(y=>[y,'Year '+y])],masterYear)}</select></label><button class="mt-button">Search</button>${masterQuery||masterYear?'<button type="button" class="mt-button" data-master-action="clear">Clear</button>':''}</form><div class="mt-controls"><button type="button" class="mt-button" data-master-action="breaks" aria-pressed="${masterHideBreaks}">${masterHideBreaks?'Show breaks':'Hide breaks'}</button><button type="button" class="mt-button" data-master-action="expand">Expand all</button><button type="button" class="mt-button" data-master-action="collapse">Collapse all</button><button type="button" class="mt-button" data-master-action="print">Print</button></div></div>${masterDetail(data)}${cols.length?`<div class="mt-scroll" tabindex="0" aria-label="Master timetable grid"><table class="mt-table"><thead><tr><th scope="col" class="mt-rowlabel">Year</th>${head}</tr></thead><tbody>${rows}<tr class="mt-band"><th colspan="${totalCols}">Clashes</th></tr>${summaries('Staff clashes','teacherClashes',true)}${summaries('Room clashes','roomClashes',true)}<tr class="mt-band"><th colspan="${totalCols}">Free resources</th></tr>${summaries('Staff resources','freeTeachers')}${summaries('Room resources','freeRooms')}</tbody></table></div>`:'<div class="mt-detail">No visible school periods. Add periods in Timetable Management or show breaks.</div>'}</div>`;
 }
-let rfMasterPeriod='',rfMasterOpen=null,rfMasterQuery='',rfMasterLimit=50;
+let rfMasterPeriod='',rfMasterOpen=new Set(),rfMasterAnchor=null,rfMasterQuery='',rfMasterLimit=50;
 function rfMasterReset(){
- rfMasterPeriod='';rfMasterOpen=null;rfMasterQuery='';rfMasterLimit=50;masterSelected='';masterQuery='';masterYear='';masterDay=String(Math.max(1,planDays.indexOf(weekdayFor(brisbaneToday()))+1));osDate=brisbaneToday();osResetFilters();osHideBreaks=true;masterHideBreaks=true;
+ rfMasterPeriod='';rfMasterOpen=new Set();rfMasterAnchor=null;rfMasterQuery='';rfMasterLimit=50;masterSelected='';masterQuery='';masterYear='';masterDay=String(Math.max(1,planDays.indexOf(weekdayFor(brisbaneToday()))+1));osDate=brisbaneToday();osResetFilters();osHideBreaks=true;masterHideBreaks=true;
 }
 function rfMasterDayData(imported,day,date){
  if(imported){
@@ -1979,13 +1979,23 @@ function rfMasterYearLabel(year){return year==='0'?'Prep':year==='unknown'?'Othe
 function rfMasterTable(rows,find=false,imported=false){
  return '<div class="rf-master-table-wrap"><table class="rf-master-table"><thead><tr>'+(find?'<th>Day / period</th>':'')+'<th>Class</th><th>Teacher</th><th>Room</th>'+(!imported?'<th><span class="mt-sr">Details</span></th>':'')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+(find?'<td>'+esc(r.date||planDays[Number(r.day)-1])+'<small>'+esc(r.label+' · '+r.start)+'</small></td>':'')+'<td><strong>'+esc(r.code)+'</strong>'+(r.subject?'<small>'+esc(r.subject)+'</small>':'')+'</td><td>'+esc(r.teacher||'—')+'</td><td>'+esc(r.room||'—')+'</td>'+(!imported?'<td><button type="button" class="mt-button rf-master-detail-btn" data-rf-master-action="detail" data-rf-master-id="'+esc(r.id)+'" data-rf-master-day="'+esc(r.day)+'" data-rf-master-period="'+esc(r.period)+'" data-rf-master-year="'+esc(String(r.year??'unknown'))+'">Details</button></td>':'')+'</tr>').join('')+'</tbody></table></div>';
 }
+function rfMasterSelectYears(selected,anchor,id,ordered,range=false,add=false){
+ const next=new Set(selected);
+ if(range){
+  const from=ordered.indexOf(anchor),to=ordered.indexOf(id);
+  const span=from>=0&&to>=0?ordered.slice(Math.min(from,to),Math.max(from,to)+1):[id];
+  return {selected:new Set(add?[...next,...span]:span),anchor:from>=0?anchor:id};
+ }
+ if(add){if(next.has(id))next.delete(id);else next.add(id);return {selected:next,anchor:id}}
+ return {selected:new Set(next.size===1&&next.has(id)?[]:[id]),anchor:id};
+}
 function rfMasterGroups(rows,imported){
  const groups=new Map();for(const r of rows){const y=String(r.year??'unknown');if(!groups.has(y))groups.set(y,[]);groups.get(y).push(r)}
  const sorted=[...groups].sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true})),searching=!!rfMasterQuery.trim();
  if(!sorted.length)return '<div class="rf-master-empty">No matching classes in this period.</div>';
- const selected=groups.has(rfMasterOpen)?rfMasterOpen:null;
- const tiles='<div class="rf-master-section-label">Year levels</div><div class="rf-master-year-grid" role="group" aria-label="Select year level">'+sorted.map(([year,items])=>'<button type="button" class="rf-master-tile" data-rf-master-action="year" data-rf-master-id="'+esc(year)+'" aria-pressed="'+(selected===year)+'" aria-controls="rf-master-year-results"><span class="rf-master-tile-number" aria-hidden="true">'+esc(year==='0'?'P':year==='unknown'?'—':year)+'</span><strong>'+esc(rfMasterYearLabel(year))+'</strong><small>'+items.length+' '+(items.length===1?'class':'classes')+'</small><span class="rf-master-tile-arrow" aria-hidden="true">›</span></button>').join('')+'</div>';
- const results=selected!==null?sorted.filter(([year])=>year===selected):searching?sorted:[];
+ const selected=new Set([...rfMasterOpen].filter(y=>groups.has(y)));
+ const tiles='<div class="rf-master-year-heading"><div><div class="rf-master-section-label">Year levels</div><small>Ctrl / Cmd-click to select multiple · Shift-click to select a range</small></div><div class="rf-master-year-tools"><span aria-live="polite">'+selected.size+' selected</span><button type="button" class="mt-button" data-rf-master-action="all-years">Select all</button><button type="button" class="mt-button" data-rf-master-action="clear-years" '+(selected.size?'':'disabled')+'>Clear</button></div></div><div class="rf-master-year-grid" role="group" aria-label="Select year levels">'+sorted.map(([year,items])=>'<button type="button" class="rf-master-tile" data-rf-master-action="year" data-rf-master-id="'+esc(year)+'" aria-pressed="'+selected.has(year)+'" aria-controls="rf-master-year-results"><span class="rf-master-tile-number" aria-hidden="true">'+esc(year==='0'?'P':year==='unknown'?'—':year)+'</span><strong>'+esc(rfMasterYearLabel(year))+'</strong><small>'+items.length+' '+(items.length===1?'class':'classes')+'</small><span class="rf-master-tile-arrow" aria-hidden="true">›</span></button>').join('')+'</div>';
+ const results=selected.size?sorted.filter(([year])=>selected.has(year)):searching?sorted:[];
  const detail=results.map(([year,items])=>{const list=items.slice().sort((a,b)=>String(a.code).localeCompare(String(b.code))),visible=list.slice(0,rfMasterLimit);return '<section class="rf-master-year"><div class="rf-master-results-head"><h3>'+esc(rfMasterYearLabel(year))+' classes</h3><small>'+items.length+' '+(items.length===1?'class':'classes')+'</small></div>'+rfMasterTable(visible,false,imported)+(list.length>visible.length?'<button type="button" class="mt-button rf-master-more" data-rf-master-action="more">Show more ('+(list.length-visible.length)+' remaining)</button>':'')+'</section>'}).join('');
  return tiles+'<div id="rf-master-year-results" class="rf-master-year-results">'+(detail||'<div class="rf-master-empty rf-master-select-hint">Select a year level to view its classes.</div>')+'</div>';
 }
@@ -2010,16 +2020,22 @@ document.addEventListener('click',e=>{
  if(a==='day'){if(imported){if(!osDateValid(id))return;osDate=id}else{if(!['1','2','3','4','5'].includes(id))return;masterDay=id}masterSelected='';rfMasterLimit=50}
  else if(a==='prev'||a==='next'){if(!imported)return;osDate=polishShift(osDate,a==='prev'?-7:7);masterSelected=''}
  else if(a==='period'){rfMasterPeriod=id;masterSelected='';rfMasterLimit=50}
- else if(a==='year'){rfMasterOpen=rfMasterOpen===id?null:id;rfMasterLimit=50;masterSelected=''}
+ else if(a==='year'){
+ const ordered=[...document.querySelectorAll('.rf-master-year-grid [data-rf-master-action="year"]')].map(el=>el.dataset.rfMasterId);
+ const result=rfMasterSelectYears(new Set([...rfMasterOpen].filter(y=>ordered.includes(y))),rfMasterAnchor,id,ordered,e.shiftKey,e.ctrlKey||e.metaKey);
+ rfMasterOpen=result.selected;rfMasterAnchor=result.anchor;rfMasterLimit=50;masterSelected=''
+ }
+ else if(a==='all-years'){rfMasterOpen=new Set([...document.querySelectorAll('.rf-master-year-grid [data-rf-master-action="year"]')].map(el=>el.dataset.rfMasterId));rfMasterAnchor=[...rfMasterOpen][0]||null;rfMasterLimit=50;masterSelected=''}
+ else if(a==='clear-years'){rfMasterOpen=new Set();rfMasterAnchor=null;rfMasterLimit=50;masterSelected=''}
  else if(a==='clear'){rfMasterQuery='';rfMasterLimit=50;masterSelected=''}
  else if(a==='more'){rfMasterLimit+=50}
- else if(a==='detail'&&!imported){masterDay=b.dataset.rfMasterDay;rfMasterPeriod=b.dataset.rfMasterPeriod;rfMasterOpen=b.dataset.rfMasterYear;rfMasterQuery='';masterSelected=id;masterQuery='';masterYear=''}
+ else if(a==='detail'&&!imported){masterDay=b.dataset.rfMasterDay;rfMasterPeriod=b.dataset.rfMasterPeriod;rfMasterOpen=new Set([...rfMasterOpen,b.dataset.rfMasterYear]);rfMasterAnchor=b.dataset.rfMasterYear;rfMasterQuery='';masterSelected=id;masterQuery='';masterYear=''}
  else return;
  refreshMaster();[...document.querySelectorAll('[data-rf-master-action]')].find(x=>x.dataset.rfMasterAction===a&&(!id||x.dataset.rfMasterId===id))?.focus({preventScroll:true});
 },true);
 document.addEventListener('input',e=>{
  if(demoRole!=='teacher'||state.page!=='master'||e.target.id!=='rf-master-query')return;
- rfMasterQuery=e.target.value.slice(0,150);rfMasterOpen=null;rfMasterLimit=50;masterSelected='';const pos=e.target.selectionStart;refreshMaster();const input=document.getElementById('rf-master-query');input?.focus({preventScroll:true});if(input&&pos!==null)input.setSelectionRange(pos,pos);
+ rfMasterQuery=e.target.value.slice(0,150);rfMasterOpen=new Set();rfMasterAnchor=null;rfMasterLimit=50;masterSelected='';const pos=e.target.selectionStart;refreshMaster();const input=document.getElementById('rf-master-query');input?.focus({preventScroll:true});if(input&&pos!==null)input.setSelectionRange(pos,pos);
 },true);
 document.addEventListener('change',e=>{if(demoRole!=='teacher'||state.page!=='master')return;if(e.target.id==='rf-master-period-select'){rfMasterPeriod=e.target.value;masterSelected='';rfMasterLimit=50;refreshMaster();document.getElementById('rf-master-period-select')?.focus({preventScroll:true})}else if(e.target.id==='rf-master-date'&&osDateValid(e.target.value)){osDate=e.target.value;masterSelected='';rfMasterLimit=50;refreshMaster()}},true);
 const rfMasterStyle=document.createElement('style');rfMasterStyle.textContent=`
@@ -2072,6 +2088,16 @@ body[data-theme="Dark"] .rf-master-year-icon,[data-theme="dark"] .rf-master-year
 @container (max-width:520px){.rf-master-year-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.rf-master-tile{padding:12px;min-height:100px}.rf-master-summary-controls{gap:12px;width:100%}}
 @media(max-width:400px){.rf-master-year-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.rf-master-tile{padding:10px}}
 @media print{.rf-master-period-picker,.rf-master-year-grid{display:none!important}}
+
+.rf-master-year-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.rf-master-year-heading small{display:block;margin-top:4px;font-size:11px;color:var(--mt-muted)}
+.rf-master-year-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rf-master-year-tools>span{font-size:12px;color:var(--mt-muted)}
+.rf-master-year-tools .mt-button{min-height:32px;padding:5px 10px;font-size:12px}
+.rf-master-tile{user-select:none}
+.rf-master-tile[aria-pressed="true"] .rf-master-tile-arrow{transform:none;font-size:0;width:19px;height:19px;background:var(--mt-accent);border-radius:50%;display:grid;place-items:center}
+.rf-master-tile[aria-pressed="true"] .rf-master-tile-arrow::after{content:'✓';color:#fff;font-size:13px;line-height:1;font-weight:700}
+@media print{.rf-master-year-tools,.rf-master-year-heading small{display:none!important}}
 `;document.head.appendChild(rfMasterStyle);
 function refreshMaster(focusAction='',id=''){
  const root=document.querySelector('.mt-scroll'),left=root?.scrollLeft||0,top=root?.scrollTop||0,main=document.querySelector('main'),scroll=main?.scrollTop||0,appTop=app.scrollTop||0;
