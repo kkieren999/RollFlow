@@ -145,7 +145,9 @@ async function test() {
     assert.match(await page.locator('.rf-student-profile-grid').innerText(),/PIN #\s+Restricted/);
     await page.locator('#review-dialog [data-review-close]').first().click();
     await page.locator('[data-rf-student-action="attendance"]').click();
-    assert.match(await page.locator('#review-dialog').innerText(),/Semester [12]/);
+    assert.match(await page.locator('#review-dialog').innerText(),/Last 8 months/);
+    assert.match(await page.locator('#review-dialog').innerText(),/Attendance breakdown/);
+    assert(await page.locator('#review-dialog .rf-student-attendance-row').count()>0,'Attendance report must contain class records');
     await page.locator('#review-dialog [data-review-close]').first().click();
     await page.locator('[data-rf-classroom-picker]').click();
     await page.locator('#review-dialog [data-rf-student-action="late"]').click();
@@ -181,7 +183,7 @@ async function test() {
     console.log('PASS: student profiles, semester attendance action, incidents, admin referrals and configurable choices.');
 
     // Newly approved classroom modules and local teacher tools.
-    for(const route of ['attendance-overview','classroom-management','student-support','follow-ups','seating-plans','class-lists','school-calendar']){
+    for(const route of ['attendance-overview','classroom-management','student-support','follow-ups','school-calendar']){
       await page.locator('[data-nav="'+route+'"]').first().click();
       assert(await page.locator('.rf-module-root').isVisible(),'Module failed to render: '+route);
     }
@@ -191,30 +193,25 @@ async function test() {
     assert.match(await page.locator('.rf-module-task').filter({hasText:'Fictional follow-up'}).first().innerText(),/Fictional follow-up/);
     await page.locator('[data-rf-followup-toggle]').first().click();
     assert.match(await page.locator('[data-rf-followup-toggle]').first().innerText(),/Reopen/);
-    await page.locator('[data-nav="seating-plans"]').click();
-    const seats=page.locator('[data-rf-seat-id]');
-    if(await seats.count()>1){
-      const first=await seats.nth(0).getAttribute('data-rf-seat-id'),second=await seats.nth(1).getAttribute('data-rf-seat-id');
-      await seats.nth(0).click();await seats.nth(1).click();
-      assert.equal(await seats.nth(0).getAttribute('data-rf-seat-id'),second);
-      assert.equal(await seats.nth(1).getAttribute('data-rf-seat-id'),first);
-    }
+    // Seating plans and class lists are no longer offered as top-level routes.
+    assert.equal(await page.locator('[data-nav="seating-plans"],[data-nav="class-lists"]').count(),0);
     await page.locator('[data-demo-signout]').first().click();
     await logIn(page,'admin','admin','.v31-admin');
     await page.locator('[data-admin-page="teacher-modules"]').click();
-    await page.locator('[data-rf-module-toggle="class-lists"]').click();
+    await page.locator('[data-rf-module-toggle="classroom-management"]').click();
+    await page.locator('[data-admin-page="calendar"]').click();
     await page.locator('#rf-calendar-admin [name="title"]').fill('Fictional assembly');
     await page.locator('#rf-calendar-admin button').click();
     await page.locator('[data-demo-signout]').first().click();
     await logIn(page,'swilliams','swilliams');
-    assert.equal(await page.locator('[data-nav="class-lists"]').count(),0);
+    assert.equal(await page.locator('[data-nav="classroom-management"]').count(),0);
     await page.locator('[data-nav="school-calendar"]').click();
     assert.match(await page.locator('.rf-module-root').innerText(),/Fictional assembly/);
-    console.log('PASS: teacher modules, follow-up completion, seating swaps, admin visibility and calendar.');
+    console.log('PASS: teacher modules, follow-up completion, admin visibility and calendar.');
     await page.locator('[data-demo-signout]').first().click();
     await logIn(page,'admin','admin','.v31-admin');
     await page.locator('[data-admin-page="teacher-modules"]').click();
-    await page.locator('[data-rf-module-toggle="class-lists"]').click();
+    await page.locator('[data-rf-module-toggle="classroom-management"]').click();
     await page.locator('[data-demo-signout]').first().click();
     await logIn(page,'swilliams','swilliams');
 
@@ -650,8 +647,8 @@ async function test() {
     // Admin-managed destinations must persist in this browser, be shared
     // between demo roles, and never mutate historical movement records.
     assert.match(await page.locator('.v31-disclaimer').innerText(), /Training workspace.*Do not enter real student or staff records/);
-    for (const id of ['relief', 'attendance', 'notices', 'reports', 'settings']) {
-      assert.equal(await page.locator('.v31-nav [data-admin-page="' + id + '"]').count(), 0, 'Unimplemented menu item must not be offered: ' + id);
+    for (const id of ['dashboard','staff','students','classes','calendar','accounts']) {
+      assert.equal(await page.locator('.nav-primary [data-admin-page="' + id + '"]').count(),1,'Required administrator navigation: '+id);
     }
     await page.locator('[data-admin-page="staff"]').first().click();
     assert.equal(await page.locator('[data-admin-reset]').count(), 0, 'No simulated password reset control');
@@ -753,8 +750,8 @@ async function test() {
     const deviceSizes = [{width:1920,height:1200},{width:1024,height:768},{width:768,height:1024},{width:820,height:1180}];
     for (const size of deviceSizes) {
       await page.setViewportSize(size);
-      for (const route of ['home','timetable','master','finder','search','movements','alerts','profile','preferences','help','attendance-overview','classroom-management','student-support','follow-ups','seating-plans','class-lists','school-calendar']) {
-        await page.locator('.permanent-sidebar [data-nav="'+route+'"]').first().click();
+      for (const route of ['timetable','master','finder','search','movements','alerts','profile','preferences','help','attendance-overview','classroom-management','student-support','follow-ups','school-calendar']) {
+        await page.locator('.permanent-sidebar [data-nav="'+route+'"],.permanent-sidebar .nav-utility [data-rf-personal="'+route+'"]').first().click();
         await assertWorkspaceFits('Teacher '+route+' '+JSON.stringify(size), '.content-shell>.main');
       }
     }
@@ -763,7 +760,7 @@ async function test() {
     for (const size of deviceSizes) {
       await page.setViewportSize(size);
       for (const route of ['dashboard','staff','students','classes','timetable','master','movements','student-actions','teacher-modules','roles','data','oneschool','audit']) {
-        await page.locator('.v31-nav [data-admin-page="'+route+'"]').click();
+        await page.locator('.nav-primary [data-admin-page="'+route+'"]').click();
         await assertWorkspaceFits('Admin '+route+' '+JSON.stringify(size), '.v31-content>main');
       }
     }
