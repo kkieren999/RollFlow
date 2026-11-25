@@ -2851,7 +2851,7 @@ function rfLateClassField(p,date,time){
  const rows=rfLateClassChoices(p,date,time);
  return '<option value="">'+(rows.length?'Select scheduled class':'No class scheduled at this time')+'</option>'+rows.map(row=>'<option value="'+esc(row.id)+'" '+(rows.length===1?'selected':'')+'>'+esc(row.id+' · '+row.name+' · '+row.period)+'</option>').join('');
 }
-function rfQuickIncident(a){return !!a&&!a.refer&&a.kind==='incident'}
+function rfQuickIncident(a){return !!a&&!a.refer&&a.kind==='incident'&&['late','uniform','left','truant'].includes(a.id)}
 function rfQuickNeedsClass(a){return ['late','left','truant'].includes(a.id)}
 function rfQuickClassChoices(p,date,time,a){
  const current=rfLateClassChoices(p,date,time);
