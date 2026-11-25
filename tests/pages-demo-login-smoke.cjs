@@ -45,6 +45,17 @@ async function logIn(page, username, password, destination = '.top-user > span')
   await page.locator(destination).waitFor();
 }
 
+// At compact widths navigation is deliberately hidden until the menu opens.
+async function clickSidebar(page,selector) {
+  const target=page.locator(selector).first();
+  if(!(await target.isVisible())){
+    const menu=page.locator('[data-rf-portal-menu]').first();
+    assert(await menu.isVisible(),'Sidebar target hidden without an accessible menu: '+selector);
+    await menu.click();
+  }
+  await target.click();
+}
+
 async function test() {
   const { server, url } = await startServer();
   let browser;
@@ -54,6 +65,110 @@ async function test() {
       headless: true,
       args: ['--no-sandbox', '--disable-dev-shm-usage']
     });
+
+    // Current cross-portal contract: exercise every fictional identity in an isolated browser context.
+    const accounts=['admin','principal','deputy','hod','ylc','business','office','teacher','swilliams','learning','aide','relief','guidance'];
+    for(const account of accounts){
+      const rolePage=await browser.newPage({viewport:{width:1440,height:1000}});
+      const errors=[];rolePage.on('pageerror',error=>errors.push(error.message));
+      try{
+        await rolePage.goto(url,{waitUntil:'load'});
+        await logIn(rolePage,account,account);
+        const personal=rolePage.locator('.nav-utility .nav-item');
+        assert.deepEqual((await personal.allInnerTexts()).map(x=>x.trim()),['My Profile','My Preferences','Help & Support','Dark mode','Sign out'],account+' personal navigation');
+        for(const [route,title] of [['profile','My Profile'],['preferences','My Preferences'],['help','Help & Support']]){
+          await rolePage.locator('.nav-utility [data-rf-personal="'+route+'"]').click();
+          assert.equal((await rolePage.locator('.page-bar h1').innerText()).trim(),title,account+' '+route);
+        }
+        await rolePage.locator('[data-rf-personal="theme"]').click();
+        assert.equal(await rolePage.locator('body').getAttribute('data-theme'),'Dark',account+' theme');
+        await rolePage.locator('[data-rf-personal="theme"]').click();
+        assert.equal(await rolePage.locator('body').getAttribute('data-theme'),'Light',account+' theme reset');
+        const master=rolePage.locator('.side-nav [data-nav="master"],.side-nav [data-rfu-page="master"],.side-nav [data-admin-page="master"]');
+        if(!['aide','relief','guidance'].includes(account))assert.equal(await master.count(),1,account+' expected master navigation');
+        if(await master.count()){
+          await master.first().click();
+          const switcher=rolePage.locator('[data-rf-shared-master-mode="grid"]');
+          if(account!=='admin'){
+            await switcher.click();
+            assert.equal(await switcher.getAttribute('aria-pressed'),'true',account+' grid');
+            assert(await rolePage.locator('.rf-master-root').isVisible(),account+' grid root');
+            assert.equal(await rolePage.locator('[data-master-action="edit-class"],[data-master-action="edit-slot"]').count(),0,account+' no editing in shared grid');
+            await rolePage.locator('[data-rf-shared-master-mode="tiles"]').click();
+          }
+        }
+        await rolePage.setViewportSize({width:390,height:844});
+        await rolePage.locator('main').first().waitFor();
+        await clickSidebar(rolePage,'.nav-utility [data-rf-personal="profile"]');
+        assert.equal((await rolePage.locator('.page-bar h1').innerText()).trim(),'My Profile',account+' mobile profile route');
+        assert.equal(await rolePage.locator('.nav-utility .nav-item').count(),5,account+' mobile personal navigation');
+        assert.deepEqual(errors,[],account+' uncaught browser errors');
+        console.log('PASS: '+account+' shared personal navigation, theme, and authorised timetable.');
+      } finally {await rolePage.close()}
+    }
+
+
+    // Isolated cross-role writes: one referral travels from the teacher's
+    // shared register to the existing administrator support queue and back.
+    const sharedPage=await browser.newPage({viewport:{width:1440,height:1000}});
+    const sharedErrors=[];sharedPage.on('pageerror',error=>sharedErrors.push(error.message));
+    try{
+      await sharedPage.goto(url,{waitUntil:'load'});
+      await logIn(sharedPage,'teacher','teacher');
+      await sharedPage.locator('.nav-primary [data-rfu-page="referrals"]').click();
+      await sharedPage.locator('.rfu-create summary').click();
+      const form=sharedPage.locator('#rfu-record-form');
+      await form.locator('[name="title"]').fill('Cross-role referral smoke');
+      await form.locator('[name="student"]').selectOption({index:0});
+      await form.locator('[name="detail"]').fill('Fictional shared referral');
+      await form.locator('button[type="submit"],button.primary').click();
+      const row=sharedPage.locator('tr').filter({hasText:'Cross-role referral smoke'});
+      assert.match(await row.innerText(),/Open/);
+      await sharedPage.locator('[data-demo-signout]').first().click();
+      await logIn(sharedPage,'admin','admin');
+      await sharedPage.locator('.nav-primary [data-admin-page="student-actions"]').click();
+      const adminRow=sharedPage.locator('tr').filter({hasText:'Cross-role referral smoke'});
+      await adminRow.getByRole('button',{name:'Mark reviewed'}).click();
+      assert.match(await adminRow.innerText(),/Reviewed/);
+      await adminRow.getByRole('button',{name:'Resolve referral'}).click();
+      assert.match(await adminRow.innerText(),/Resolved/);
+      assert.equal(await adminRow.locator('button').count(),0);
+      await sharedPage.locator('[data-demo-signout]').first().click();
+      await logIn(sharedPage,'teacher','teacher');
+      await sharedPage.locator('.nav-primary [data-nav="student-support"]').click();
+      assert.match(await sharedPage.locator('tr').filter({hasText:'Cross-role referral smoke'}).innerText(),/Resolved/);
+      assert.deepEqual(sharedErrors,[],'Cross-role referral runtime errors');
+      console.log('PASS: shared teacher referral reviewed and resolved by admin; status returned to teacher.');
+
+      // A pass issued by one teacher must block duplicate live passes by another.
+      async function preparePass(p){
+        await p.locator('.nav-primary [data-nav="movements"]').click();
+        const date=p.locator('#rf-movements-date');
+        const now=await p.evaluate(()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Australia/Brisbane',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()));
+        await date.fill(now);await date.dispatchEvent('change');
+        await p.locator('#movementStudentSearch').fill('S7001');
+        await p.locator('[data-movement-choice="S7001"]').click();
+        await p.locator('[data-rf-move-dest="Library"]').click();
+      }
+      await preparePass(sharedPage);
+      await sharedPage.locator('#movementIssueButton').click();
+      assert.equal(await sharedPage.locator('.rf-movement-stat-out strong').innerText(),'1');
+      await sharedPage.locator('[data-demo-signout]').first().click();
+      await logIn(sharedPage,'swilliams','swilliams');
+      await preparePass(sharedPage);
+      await sharedPage.locator('#movementIssueButton').click();
+      const duplicate=await sharedPage.evaluate(()=>JSON.parse(localStorage.getItem('rollflow_teacher_swilliams_2026_v1')||'{}').movements||[]);
+      assert.equal(duplicate.filter(x=>x.studentId==='S7001'&&!x.returnedAt).length,0,'Second teacher must not create duplicate live pass');
+      await sharedPage.locator('[data-demo-signout]').first().click();
+      await logIn(sharedPage,'teacher','teacher');
+      await sharedPage.locator('.nav-primary [data-nav="movements"]').click();
+      await sharedPage.locator('.rf-movement-return-button').click();
+      assert.equal(await sharedPage.locator('.rf-movement-stat-out strong').innerText(),'0');
+      assert.deepEqual(sharedErrors,[],'Shared referral and movement runtime errors');
+      console.log('PASS: cross-teacher duplicate live movement pass blocked and original pass returned.');
+
+    } finally {await sharedPage.close()}
+
     const page = await browser.newPage();
     page.on('pageerror', error => { console.error('Browser error:', error); });
     await page.goto(url, { waitUntil: 'load' });
@@ -74,7 +189,8 @@ async function test() {
     await page.locator('[data-nav="finder"]').first().click();
     assert.equal(await page.locator('[data-teacher-scope]').count(), 0, 'Class Finder must not show the scope selector');
     assert.equal(await page.locator('.page-right .tag').count(),0,'Class count badge removed');
-    const englishClasses = await page.locator('.finder-table tbody tr').filter({hasText:'My class'}).allInnerTexts().then(rows=>rows.join(' '));
+    await page.locator('#finderQuery').fill('Williams');
+    const englishClasses = await page.locator('#finderResults .finder-card').filter({hasNot:page.locator('[data-pin-class]')}).allInnerTexts().then(rows=>rows.join(' '));
     for (const code of ['ENG071A', 'ENG091B', 'ENG101B', '10BH']) {
       assert(englishClasses.includes(code), 'Missing assigned English class ' + code);
     }
@@ -85,6 +201,7 @@ async function test() {
 
     // Student timetable uses the selected weekday, including recurring Sarah classes.
     await page.locator('[data-nav="search"]').first().click();
+    await page.locator('#studentQuery').fill('S7001');
     await page.locator('[data-open-student]').first().click();
     await page.locator('[data-action="showTimetable"]').click();
     assert.equal(await page.locator('[data-rf-student-day]').count(),5);
@@ -98,27 +215,29 @@ async function test() {
 
     // Student action controls and cross-role local referral flow.
     await page.locator('[data-nav="search"]').first().click();
+    await page.locator('#studentQuery').fill('S7001');
     await page.locator('[data-open-student]').first().click();
     await page.locator('[data-rf-student-action="details"]').click();
     assert.equal(await page.locator('.rf-student-profile-grid dt').count(),28);
     assert.match(await page.locator('.rf-student-profile-grid').innerText(),/PIN #\s+Restricted/);
     await page.locator('#review-dialog [data-review-close]').first().click();
     await page.locator('[data-rf-student-action="attendance"]').click();
-    assert.match(await page.locator('#review-dialog').innerText(),/Semester [12]/);
+    assert.match(await page.locator('#review-dialog').innerText(),/Last 8 months/);
+    assert.match(await page.locator('#review-dialog').innerText(),/Attendance breakdown/);
+    assert(await page.locator('#review-dialog .rf-student-attendance-row').count()>0,'Attendance report must contain class records');
     await page.locator('#review-dialog [data-review-close]').first().click();
-    await page.locator('[data-rf-classroom-picker]').click();
-    await page.locator('#review-dialog [data-rf-student-action="late"]').click();
-    assert(await page.locator('#rf-student-incident-form [name="time"]').isVisible());
-    await page.locator('#rf-student-incident-form [name="type"]').selectOption('Late arrival');
-    await page.locator('#rf-student-incident-form [name="response"]').selectOption('Refer to admin support');
+    await page.locator('[data-rf-student-action="support"]').click();
+    await page.locator('#rf-student-incident-form [name="type"]').selectOption('Attendance concern');
+    await page.locator('#rf-student-incident-form [name="response"]').selectOption('Request admin follow-up');
+    await page.locator('#rf-student-incident-form [name="notes"]').fill('Smoke test referral from teacher workspace');
     await page.locator('#rf-student-incident-form button[type="submit"]').click();
     assert.equal(await page.locator('#review-dialog').count(),0);
     await page.locator('#overlay [data-action="closeDrawer"]').click();
     await page.locator('[data-demo-signout]').first().click();
     await logIn(page,'admin','admin','.v31-admin');
-    await page.locator('[data-admin-page="student-actions"]').click();
+    await page.locator('.nav-primary [data-admin-page="student-actions"]').click();
     assert.match(await page.locator('.v31-content main').innerText(),/Awaiting support/);
-    await page.locator('[data-rf-resolve-referral]').first().click();
+    await page.locator('.rf-admin-action-list article').filter({hasText:'Smoke test referral from teacher workspace'}).locator('[data-rf-resolve-referral]').click();
     assert.match(await page.locator('.v31-content main').innerText(),/Resolved/);
     await page.locator('[data-rf-action-config="new"]').click();
     await page.locator('#rf-action-config-form [name="name"]').fill('Classroom follow-up');
@@ -129,50 +248,48 @@ async function test() {
     await page.locator('[data-demo-signout]').first().click();
     await logIn(page,'swilliams','swilliams');
     await page.locator('[data-nav="search"]').first().click();
+    await page.locator('#studentQuery').fill('S7001');
     await page.locator('[data-open-student]').first().click();
     await page.locator('[data-rf-classroom-picker]').click();
     assert.equal(await page.locator('#review-dialog [data-rf-student-action="uniform"]').count(),0);
     await page.getByRole('button',{name:'Classroom follow-up',exact:false}).click();
     assert.deepEqual(await page.locator('#rf-student-incident-form [name="type"] option').allTextContents(),['Select type','Learning concern','Equipment concern']);
+    assert.deepEqual(await page.locator('#rf-student-incident-form [name="response"] option').allTextContents(),['Select response','Discussed','Record only']);
     await page.locator('#review-dialog [data-review-close]').first().click();
     await page.locator('#overlay [data-action="closeDrawer"]').first().click();
-    console.log('PASS: student profiles, semester attendance action, incidents, admin referrals and configurable choices.');
+    console.log('PASS: student profiles, attendance report, incidents, admin referrals and configurable choices.');
 
     // Newly approved classroom modules and local teacher tools.
-    for(const route of ['attendance-overview','classroom-management','student-support','follow-ups','seating-plans','class-lists','school-calendar']){
+    for(const route of ['attendance-overview','classroom-management','student-support','follow-ups','school-calendar']){
       await page.locator('[data-nav="'+route+'"]').first().click();
       assert(await page.locator('.rf-module-root').isVisible(),'Module failed to render: '+route);
     }
     await page.locator('[data-nav="follow-ups"]').click();
     await page.locator('#rf-followup-form [name="title"]').fill('Fictional follow-up');
     await page.locator('#rf-followup-form button[type="submit"],#rf-followup-form button').first().click();
-    assert.match(await page.locator('.rf-module-task').innerText(),/Fictional follow-up/);
-    await page.locator('[data-rf-followup-toggle]').first().click();
-    assert.match(await page.locator('[data-rf-followup-toggle]').first().innerText(),/Reopen/);
-    await page.locator('[data-nav="seating-plans"]').click();
-    const seats=page.locator('[data-rf-seat-id]');
-    if(await seats.count()>1){
-      const first=await seats.nth(0).getAttribute('data-rf-seat-id'),second=await seats.nth(1).getAttribute('data-rf-seat-id');
-      await seats.nth(0).click();await seats.nth(1).click();
-      assert.equal(await seats.nth(0).getAttribute('data-rf-seat-id'),second);
-      assert.equal(await seats.nth(1).getAttribute('data-rf-seat-id'),first);
-    }
+    assert.match(await page.locator('.rf-module-task').filter({hasText:'Fictional follow-up'}).first().innerText(),/Fictional follow-up/);
+    const savedFollowup=page.locator('.rf-module-task').filter({hasText:'Fictional follow-up'}).first();
+    await savedFollowup.locator('[data-rf-followup-toggle]').click();
+    assert.match(await savedFollowup.locator('[data-rf-followup-toggle]').innerText(),/Reopen/);
+    // Seating plans and class lists are no longer offered as top-level routes.
+    assert.equal(await page.locator('[data-nav="seating-plans"],[data-nav="class-lists"]').count(),0);
     await page.locator('[data-demo-signout]').first().click();
     await logIn(page,'admin','admin','.v31-admin');
-    await page.locator('[data-admin-page="teacher-modules"]').click();
-    await page.locator('[data-rf-module-toggle="class-lists"]').click();
+    await page.locator('.nav-primary [data-admin-page="teacher-modules"]').click();
+    await page.locator('[data-rf-module-toggle="classroom-management"]').click();
+    await page.locator('.nav-primary [data-admin-page="calendar"]').click();
     await page.locator('#rf-calendar-admin [name="title"]').fill('Fictional assembly');
     await page.locator('#rf-calendar-admin button').click();
     await page.locator('[data-demo-signout]').first().click();
     await logIn(page,'swilliams','swilliams');
-    assert.equal(await page.locator('[data-nav="class-lists"]').count(),0);
+    assert.equal(await page.locator('[data-nav="classroom-management"]').count(),0);
     await page.locator('[data-nav="school-calendar"]').click();
     assert.match(await page.locator('.rf-module-root').innerText(),/Fictional assembly/);
-    console.log('PASS: teacher modules, follow-up completion, seating swaps, admin visibility and calendar.');
+    console.log('PASS: teacher modules, follow-up completion, admin visibility and calendar.');
     await page.locator('[data-demo-signout]').first().click();
     await logIn(page,'admin','admin','.v31-admin');
-    await page.locator('[data-admin-page="teacher-modules"]').click();
-    await page.locator('[data-rf-module-toggle="class-lists"]').click();
+    await page.locator('.nav-primary [data-admin-page="teacher-modules"]').click();
+    await page.locator('[data-rf-module-toggle="classroom-management"]').click();
     await page.locator('[data-demo-signout]').first().click();
     await logIn(page,'swilliams','swilliams');
 
@@ -267,7 +384,9 @@ async function test() {
           mode + ' must fit horizontally at ' + JSON.stringify(size) + ': ' + JSON.stringify(geometry));
       }
     }
+    await page.setViewportSize({width:1440,height:900});
     await page.emulateMedia({ reducedMotion: 'no-preference' });
+    console.log('PASS: day/week timetable fits seven desktop and tablet viewports.');
 
     // Term starts in January and historical dates remain navigable.
     await page.locator('[data-timetable-view="day"]').first().click();
@@ -380,8 +499,19 @@ async function test() {
       'Currently out, Returned and Total passes summaries are required');
     assert.equal(await page.locator('#movementStudentSearch').count(), 1,
       'Existing student autocomplete must remain on the new page');
-    assert.equal(await page.locator('#movementDestination').count(), 1);
-    assert.equal(await page.locator('#movementIssueButton').count(), 1);
+    assert.equal(await page.locator('#movementDestination').count(), 0,'Destination is selected after choosing a student');
+    assert.equal(await page.locator('#movementIssueButton').count(), 0,'Issue requires the confirmation step');
+    async function selectPassStudent(id){
+      const reset=page.locator('[data-rf-move-clear]');
+      if(await reset.count())await reset.click();
+      await page.locator('#movementStudentSearch').fill(id);
+      await page.locator('[data-movement-choice="'+id+'"]').click();
+      assert.match(await page.locator('.rf-move-wiz .rf-wiz-student').first().innerText(),new RegExp(id));
+    }
+    async function selectPassDestination(name){
+      await page.locator('[data-rf-move-dest]').filter({hasText:name}).click();
+      assert.equal(await page.locator('#movementDestination').inputValue(),name);
+    }
     assert.equal(await page.locator('#rfMovementView').count(), 1,
       'Movement status filter must remain usable');
 
@@ -431,10 +561,9 @@ async function test() {
     await page.locator('#rf-movements-date').fill(today);
     await page.locator('#rf-movements-date').dispatchEvent('change');
 
-    await page.locator('#movementStudentSearch').fill('S7001');
-    await page.locator('[data-movement-choice="S7001"]').click();
+    await selectPassStudent('S7001');
+    await selectPassDestination('Library');
     assert(await page.locator('#movementIssueButton').isEnabled());
-    await page.locator('#movementDestination').selectOption('Library');
     await page.locator('#movementIssueButton').click();
     assert.equal(await page.locator('.rf-movement-stat-out strong').innerText(), '1');
     assert.equal(Number(await page.locator('.rf-movement-stat-total strong').innerText()), initialTotal + 1);
@@ -480,11 +609,13 @@ async function test() {
 
     await page.locator('#rf-movements-date').fill('2026-03-09');
     await page.locator('#rf-movements-date').dispatchEvent('change');
-    await page.locator('#movementStudentSearch').fill('S7001');
-    await page.locator('[data-movement-choice="S7001"]').click();
+    await selectPassStudent('S7001');
+    await selectPassDestination('Library');
     assert(await page.locator('#movementIssueButton').isDisabled(),
       'Historical dates must not allow new live movement passes');
-    assert.match(await page.locator('#movementFeedback').innerText(), /selected/);
+    await page.locator('[data-rf-move-clear]').click();
+    const clearDay=page.locator('[data-rf-day-clear]');
+    if(await clearDay.count())await clearDay.click();
 
     // A read-only student day template sits below the main movement log.
     const studentDaySection = page.locator('.rf-day-review');
@@ -595,7 +726,8 @@ async function test() {
     await page.locator('[data-nav="finder"]').first().click();
     assert.equal(await page.locator('[data-teacher-scope]').count(), 0, 'Class Finder must not show the scope selector');
     assert.equal(await page.locator('.page-right .tag').count(),0,'Class count badge removed');
-    const mathsClasses = await page.locator('.finder-table tbody tr').filter({hasText:'My class'}).allInnerTexts().then(rows=>rows.join(' '));
+    await page.locator('#finderQuery').fill('Alex Morgan');
+    const mathsClasses = await page.locator('#finderResults .finder-card').filter({hasNot:page.locator('[data-pin-class]')}).allInnerTexts().then(rows=>rows.join(' '));
     assert(mathsClasses.includes('MAF102A'), 'Default teacher class missing');
     assert(!mathsClasses.includes('ENG071A'), 'Default teacher inherited Sarah class');
 
@@ -604,15 +736,24 @@ async function test() {
     await logIn(page, 'admin', 'admin', '.v31-admin');
     assert(await page.locator('.v31-admin').count(), 'Admin demo login broke');
 
+    console.log('PASS: movement wizard issue/return, historical review, session template, and teacher account switching.');
     // Admin-managed destinations must persist in this browser, be shared
     // between demo roles, and never mutate historical movement records.
-    assert.match(await page.locator('.v31-disclaimer').innerText(), /Training workspace.*Do not enter real student or staff records/);
-    for (const id of ['relief', 'attendance', 'notices', 'reports', 'settings']) {
-      assert.equal(await page.locator('.v31-nav [data-admin-page="' + id + '"]').count(), 0, 'Unimplemented menu item must not be offered: ' + id);
+    assert.match(await page.locator('.rf-training-notice[role="note"]').innerText(), /Training workspace.*Do not enter real student or staff records/);
+    for (const id of ['dashboard','staff','students','classes','calendar','accounts']) {
+      assert.equal(await page.locator('.nav-primary [data-admin-page="' + id + '"]').count(),1,'Required administrator navigation: '+id);
     }
     await page.locator('[data-admin-page="staff"]').first().click();
     assert.equal(await page.locator('[data-admin-reset]').count(), 0, 'No simulated password reset control');
-    assert.equal(await page.getByText('Built-in training access', { exact: true }).count(), 3, 'All three public access identities must be protected');
+    assert.equal(await page.getByText('Built-in training access', { exact: true }).count(), 3, 'All three protected training identities must be labelled in cards');
+    for(const username of ['teacher','admin','swilliams']){
+      const card=page.locator('.rfa-directory-card').filter({has:page.locator('.rfa-directory-person small').filter({hasText:new RegExp('^'+username+' · ')})});
+      assert.equal(await card.count(),1,username+' staff card');
+      assert.equal(await card.locator('[data-admin-toggle]').count(),0,username+' cannot be deactivated');
+    }
+    await page.locator('[data-rfa-id="staff:table"]').click();
+    assert.equal(await page.getByText('Built-in training access',{exact:true}).count(),3,'Protected training identities labelled in table');
+    await page.locator('[data-rfa-id="staff:cards"]').click();
     await page.locator('[data-admin-page="movements"]').first().click();
     assert.equal((await page.locator('#rf-admin-destinations-title').innerText()).trim(),
       'Manage movement destinations');
@@ -647,14 +788,13 @@ async function test() {
     await page.locator('[data-nav="movements"]').first().click();
     await page.locator('#rf-movements-date').fill(today);
     await page.locator('#rf-movements-date').dispatchEvent('change');
-    assert(await page.locator('#movementDestination option[value="Wellbeing Centre"]').count(),
+    await selectPassStudent('S7001');
+    assert(await page.locator('[data-rf-move-dest="Wellbeing Centre"]').count(),
       'Teacher should see the new administrator destination');
     assert.equal(await page.locator('[data-rf-remove-movement-destination]').count(), 0,
       'Teacher page must not expose admin removal controls');
 
-    await page.locator('#movementStudentSearch').fill('S7001');
-    await page.locator('[data-movement-choice="S7001"]').click();
-    await page.locator('#movementDestination').selectOption('Wellbeing Centre');
+    await selectPassDestination('Wellbeing Centre');
     await page.locator('#movementIssueButton').click();
     assert.equal(await page.locator('.rf-movement-return-button').count(), 1,
       'New destination needs to work with the existing live pass action');
@@ -679,23 +819,22 @@ async function test() {
     await page.locator('[data-nav="movements"]').first().click();
     await page.locator('#rf-movements-date').fill(today);
     await page.locator('#rf-movements-date').dispatchEvent('change');
-    assert.equal(await page.locator('#movementDestination option[value="Wellbeing Centre"]').count(), 0,
+    await selectPassStudent('S7001');
+    assert.equal(await page.locator('[data-rf-move-dest="Wellbeing Centre"]').count(), 0,
       'Removed destination must not be selectable for new passes');
     assert.match(await page.locator('.rf-movement-table tbody').innerText(), /Wellbeing Centre/,
       'Previously returned passes must keep their destination after deletion');
 
-    await page.locator('#movementStudentSearch').fill('S7001');
-    await page.locator('[data-movement-choice="S7001"]').click();
+    await selectPassDestination('Library');
     await page.evaluate(() => {
-      const select = document.getElementById('movementDestination');
-      select.add(new Option('Wellbeing Centre', 'Wellbeing Centre'));
-      select.value = 'Wellbeing Centre';
+      document.getElementById('movementDestination').value = 'Wellbeing Centre';
     });
     const beforeInvalid = await page.locator('.rf-movement-stat-total strong').innerText();
     await page.locator('#movementIssueButton').click();
     assert.equal(await page.locator('.rf-movement-stat-total strong').innerText(), beforeInvalid,
       'A stale/forged removed destination should not create a pass');
 
+    console.log('PASS: administrator destinations persist, reject duplicates and forged removed values, and preserve historical records.');
     // Exercise visible teacher/admin navigation across representative desktop and iPad sizes.
     async function assertWorkspaceFits(label, selector) {
       const result = await page.locator(selector).first().evaluate(main => {
@@ -707,20 +846,20 @@ async function test() {
         label+' workspace exceeds viewport: '+JSON.stringify(result));
       assert(result.xOverflow <= 3, label+' page has horizontal overflow: '+JSON.stringify(result));
     }
-    const deviceSizes = [{width:1920,height:1200},{width:1024,height:768},{width:768,height:1024},{width:820,height:1180}];
+    const deviceSizes = [{width:1920,height:1200},{width:1024,height:768},{width:768,height:1024},{width:820,height:1180},{width:390,height:844}];
     for (const size of deviceSizes) {
       await page.setViewportSize(size);
-      for (const route of ['home','timetable','master','finder','search','movements','alerts','profile','preferences','help','attendance-overview','classroom-management','student-support','follow-ups','seating-plans','class-lists','school-calendar']) {
-        await page.locator('.permanent-sidebar [data-nav="'+route+'"]').first().click();
+      for (const route of ['timetable','master','finder','search','movements','alerts','profile','preferences','help','attendance-overview','classroom-management','student-support','follow-ups','school-calendar']) {
+        await clickSidebar(page,'.permanent-sidebar [data-nav="'+route+'"],.permanent-sidebar .nav-utility [data-rf-personal="'+route+'"]');
         await assertWorkspaceFits('Teacher '+route+' '+JSON.stringify(size), '.content-shell>.main');
       }
     }
-    await page.locator('[data-demo-signout]').first().click();
+    await clickSidebar(page,'.nav-utility [data-demo-signout]');
     await logIn(page, 'admin', 'admin', '.v31-admin');
     for (const size of deviceSizes) {
       await page.setViewportSize(size);
-      for (const route of ['dashboard','staff','students','classes','timetable','master','movements','student-actions','teacher-modules','roles','data','oneschool','audit']) {
-        await page.locator('.v31-nav [data-admin-page="'+route+'"]').click();
+      for (const route of ['dashboard','staff','students','classes','timetable','master','attendance','movements','student-actions','teacher-modules','calendar','accounts','roles','data','oneschool','audit']) {
+        await clickSidebar(page,'.nav-primary [data-admin-page="'+route+'"]');
         await assertWorkspaceFits('Admin '+route+' '+JSON.stringify(size), '.v31-content>main');
       }
     }
