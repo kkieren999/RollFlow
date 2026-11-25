@@ -170,4 +170,32 @@ header.rf-appbar{
 @media(prefers-reduced-motion:reduce){
  *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}
 }
+
+/* Administration visual parity; server-side forms and permissions are unchanged. */
+:root{--rf-canvas:#edf0f2;--rf-radius:12px;--rf-shadow:0 3px 12px #1837490b;--rf-teal:#00728a}
+.rf-legacy-admin .main{max-width:1400px;gap:16px}
+.rf-legacy-admin .main>.panel,.rf-legacy-admin .kpi,.rf-page .panel,.rf-page .card{border-radius:12px;box-shadow:var(--rf-shadow)}
+.rf-legacy-admin .nav-link,.rf-legacy-admin .btn,.rf-page .btn,.rf-page button:not(.rf-signout){border-radius:8px}
+.rf-legacy-admin .btn.primary,.rf-page :is(.btn.primary,button.primary,button[type=submit]:not(.secondary):not(.danger)){background:var(--rf-teal);border-color:var(--rf-teal);color:white}
+.rf-legacy-admin .kpi{border-top:3px solid var(--rf-teal);padding:18px 20px}
+.rf-legacy-admin .kpi strong{font-size:29px}
+.rf-legacy-admin .table-wrap,.rf-page .table-wrap,.rf-page .scroll{border:1px solid var(--rf-border);border-radius:9px}
+.rf-legacy-admin th,.rf-page th{background:#edf5f8;color:#405969;text-transform:uppercase;font-size:11px;letter-spacing:.035em}
+.rf-legacy-admin tbody tr:hover,.rf-page tbody tr:hover{background:#f2f7f9}
+.rf-legacy-admin input:not([type=checkbox]):not([type=radio]),.rf-legacy-admin select,.rf-legacy-admin textarea,.rf-page input:not([type=checkbox]):not([type=radio]):not([type=hidden]),.rf-page select,.rf-page textarea{border-radius:8px}
+.rf-legacy-admin .student-hero{padding:15px;background:#f3f8fa;border:1px solid var(--rf-border);border-radius:10px}
+.rf-legacy-admin .tag,.rf-page .tag{border-radius:999px}
+.rf-admin-hero{background:linear-gradient(115deg,#13394c,#12576a);color:#fff;padding:20px 22px;border-radius:12px}
+.rf-admin-hero h2{color:#fff;margin:5px 0;font-size:24px}.rf-admin-hero p,.rf-admin-hero small{color:#d5e8ed}
+.rf-native-tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0}
+.rf-native-tiles button{display:grid!important;justify-items:start!important;align-content:start;gap:5px;min-height:100px;background:#fff!important;color:#203c4d!important;border:1px solid #d7e3e8!important;border-radius:12px!important;text-align:left}
+.rf-native-tiles button[aria-pressed="true"]{background:#e4f2f5!important;border-color:#007b97!important;box-shadow:inset 0 0 0 1px #007b97}
+.rf-native-tiles strong{font-size:24px;color:#00728a}.rf-native-tiles small{font-size:12px;color:#526c7b}
+.rf-native-tile-panel{max-width:1060px}.rf-native-tile-results section{border:1px solid var(--rf-border);border-radius:9px;margin:12px 0;padding:12px}
+.rf-native-tile-results .mt-slot{min-width:0;white-space:normal}.rf-native-tile-results .mt-slot strong{white-space:normal;overflow-wrap:anywhere}
+.rf-native-tile-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.rf-native-tile-head .actions{display:flex;gap:8px;flex-wrap:wrap}.rf-native-tile-head select{max-width:100%}
+@media(max-width:640px){.rf-native-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.rf-legacy-admin .kpi{padding:14px}.rf-admin-hero{padding:15px}}
+[hidden]{display:none!important}
+
 </style>
