@@ -94,6 +94,40 @@ async function test() {
       } finally {await rolePage.close()}
     }
 
+
+    // Isolated cross-role writes: one referral travels from the teacher's
+    // shared register to the existing administrator support queue and back.
+    const sharedPage=await browser.newPage({viewport:{width:1440,height:1000}});
+    const sharedErrors=[];sharedPage.on('pageerror',error=>sharedErrors.push(error.message));
+    try{
+      await sharedPage.goto(url,{waitUntil:'load'});
+      await logIn(sharedPage,'teacher','teacher');
+      await sharedPage.locator('.nav-primary [data-rfu-page="referrals"]').click();
+      await sharedPage.locator('.rfu-create summary').click();
+      const form=sharedPage.locator('#rfu-record-form');
+      await form.locator('[name="title"]').fill('Cross-role referral smoke');
+      await form.locator('[name="student"]').selectOption({index:0});
+      await form.locator('[name="detail"]').fill('Fictional shared referral');
+      await form.locator('button[type="submit"],button.primary').click();
+      const row=sharedPage.locator('tr').filter({hasText:'Cross-role referral smoke'});
+      assert.match(await row.innerText(),/Open/);
+      await sharedPage.locator('[data-demo-signout]').first().click();
+      await logIn(sharedPage,'admin','admin');
+      await sharedPage.locator('.nav-primary [data-admin-page="student-actions"]').click();
+      const adminRow=sharedPage.locator('tr').filter({hasText:'Cross-role referral smoke'});
+      await adminRow.getByRole('button',{name:'Mark reviewed'}).click();
+      assert.match(await adminRow.innerText(),/Reviewed/);
+      await adminRow.getByRole('button',{name:'Resolve referral'}).click();
+      assert.match(await adminRow.innerText(),/Resolved/);
+      assert.equal(await adminRow.locator('button').count(),0);
+      await sharedPage.locator('[data-demo-signout]').first().click();
+      await logIn(sharedPage,'teacher','teacher');
+      await sharedPage.locator('.nav-primary [data-nav="student-support"]').click();
+      assert.match(await sharedPage.locator('tr').filter({hasText:'Cross-role referral smoke'}).innerText(),/Resolved/);
+      assert.deepEqual(sharedErrors,[],'Cross-role referral runtime errors');
+      console.log('PASS: shared teacher referral reviewed and resolved by admin; status returned to teacher.');
+    } finally {await sharedPage.close()}
+
     const page = await browser.newPage();
     page.on('pageerror', error => { console.error('Browser error:', error); });
     await page.goto(url, { waitUntil: 'load' });
