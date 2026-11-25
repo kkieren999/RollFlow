@@ -1775,7 +1775,7 @@ document.addEventListener('submit',async e=>{
  if(demoRole!=='admin'||!['v32-student-editor','v32-student-search','v32-student-import'].includes(e.target.id))return;
  e.preventDefault();e.stopImmediatePropagation();const f=e.target,d=new FormData(f);adminMessage='';
  try{
- if(f.id==='v32-student-search'){studentAdminQuery=String(d.get('q')||'');studentAdminYear=String(d.get('year')||'');studentAdminGroup=String(d.get('group')||'');studentAdminStatus=String(d.get('status')||'all')}
+ if(f.id==='v32-student-search'){rfAdminBrowseStudents=false;studentAdminQuery=String(d.get('q')||'');studentAdminYear=String(d.get('year')||'');studentAdminGroup=String(d.get('group')||'');studentAdminStatus=String(d.get('status')||'all')}
  else if(f.id==='v32-student-import'){const file=d.get('csv');if(!file||file.size>250000)throw Error('Choose a CSV below 250 KB.');const incoming=parsePreviewStudentCsv(await file.text());if(demoRole!=='admin')return;if(studentPreviewSave([...previewStudents,...incoming],'Student CSV imported',String(incoming.length)+' students'))studentAdminMode='list'}
  else{const old=previewStudents.find(p=>p.id===studentAdminId),v={};for(const k of ['id','first','last','preferred','group','status','enrolled','left'])v[k]=String(d.get(k)||'').trim();v.id=old?.id||v.id.toUpperCase();v.year=Number(d.get('year'));v.portrait=old?.portrait||false;validatePreviewStudent(v);if(!old&&previewStudents.some(p=>p.id.toUpperCase()===v.id.toUpperCase()))throw Error('Student ID already exists.');
  const next=old?previewStudents.map(p=>p.id===old.id?v:p):[...previewStudents,v];if(studentPreviewSave(next,old?'Student updated':'Student created',v.id)){studentAdminMode='detail';studentAdminId=v.id}}
@@ -1907,7 +1907,7 @@ document.addEventListener('click',e=>{
 document.addEventListener('submit',async e=>{
  if(demoRole!=='admin')return;const f=e.target;if(!['v33-plan-editor','v33-class-search','v33-slot-search','v33-enrol','v33-import'].includes(f.id)&&!f.matches('.v33-end'))return;e.preventDefault();e.stopImmediatePropagation();adminMessage='';const d=new FormData(f),val=k=>String(d.get(k)||'').trim(),next=JSON.parse(JSON.stringify(planning));
  try{
- if(f.id==='v33-class-search'){planQuery=val('q');planYear=val('year')}
+ if(f.id==='v33-class-search'){rfAdminBrowseClasses=false;planQuery=val('q');planYear=val('year')}
  else if(f.id==='v33-slot-search'){planTeacher=val('teacher')}
  else if(f.id==='v33-import'){const file=d.get('csv');if(!file||file.size>250000)throw Error('CSV must be below 250 KB.');previewTimetableImport(await file.text(),next);if(demoRole!=='admin')return;planSave(next,'Timetable imported','CSV')}
  else if(f.id==='v33-enrol'){const c=next.classes.find(c=>c.code===planId),p=previewStudents.find(p=>p.id===val('student')),start=val('start');if(!c?.active||!p||p.status!=='active'||p.year!==c.year||!start||!studentDateValid(start)||p.enrolled&&start<p.enrolled||next.enrolments.some(x=>x.classCode===planId&&x.studentId===p.id&&(!x.end||x.end>=start)))throw Error('Invalid or overlapping enrolment.');next.enrolments.push({classCode:planId,studentId:p.id,start,end:''});planSave(next,'Class enrolment added',planId)}
@@ -2155,12 +2155,17 @@ async function osInitialize(){
  catch(err){osStorageError=String(err.message||err)}
  finally{osReady=true;render()}
 }
-async function osPublishImport(raw,name){
+let rfAdminImportDraft=null;
+async function osPrepareImport(raw,name){
  const p=osParse(raw);
  const bytes=new TextEncoder().encode(raw);
  const digest='v345-'+Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');
- const version={id:digest,name:name.trim().slice(0,100)||'Imported timetable',status:'published',created_at:new Date().toISOString(),...p};
- osVersions=await osUpdate(list=>{const existing=list.find(v=>v.id===digest);return [{...(existing||version),status:'published'},...list.filter(v=>v.id!==digest).map(v=>({...v,status:'archived'}))]});
+ return {id:digest,name:name.trim().slice(0,100)||'Imported timetable',status:'published',created_at:new Date().toISOString(),...p};
+}
+async function osPublishImport(raw,name){return osCommitPreparedImport(await osPrepareImport(raw,name))}
+async function osCommitPreparedImport(version,expectedActive){
+ const digest=version.id;
+ osVersions=await osUpdate(list=>{if(expectedActive!==undefined&&(list.find(v=>v.status==='published')?.id||'')!==expectedActive)throw Error('The published timetable changed. Cancel this review and validate the file again.');const existing=list.find(v=>v.id===digest);return [{...(existing||version),status:'published'},...list.filter(v=>v.id!==digest).map(v=>({...v,status:'archived'}))]});
  osReviewId=digest;osDate=osDefaultDate(osPublished());osQuery='';osYear='';osStaff='';osRoom='';osCollapsed.clear();
  // The old fictional version cache is obsolete; remove it only after publication succeeds.
  try{localStorage.removeItem('rollflow_oneschool_demo_v34')}catch{}
@@ -2241,11 +2246,12 @@ function osParse(raw){
 const osMetric=(label,value)=>`<article><span>${esc(label)}</span><strong>${esc(value)}</strong></article>`;
 function osImportPage(){
  if(!osReady)return '<section class="v31-panel"><h2>OneSchool Import Centre</h2><p>Loading saved timetable versions…</p></section>';
+ if(rfAdminImportDraft)return rfAdminImportReview(rfAdminImportDraft.version);
  const v=osVersions.find(x=>x.id===osReviewId);
  if(v){const a=v.summary;
  return `<section class="v31-panel"><div class="v31-title"><div><h2>${esc(v.name)}</h2><p>${esc(v.status)} · ${a.first_date} – ${a.last_date}</p></div><button type="button" class="v31-btn" data-os-action="back">Back to imports</button></div></section><div class="v31-kpis">${[['Source rows',a.source_rows],['Distinct allocations',a.lessons],['Classes',a.classes],['Staff IDs',a.staff],['Rooms',a.rooms],['School days',a.days],['Period names',a.periods]].map(([l,n])=>osMetric(l,n.toLocaleString())).join('')}</div><section class="v31-panel"><h2>Import validation</h2><p>Shared allocations may be intentional. Overlaps are retained and flagged.</p><div class="v31-table-wrap"><table class="v31-table"><thead><tr><th>Warning</th><th>Count</th></tr></thead><tbody>${Object.entries(a.warnings).map(([k,n])=>`<tr><td>${esc(k.replaceAll('_',' '))}</td><td>${n.toLocaleString()}</td></tr>`).join('')}</tbody></table></div></section><section class="v31-panel"><h2>Timetable version</h2>${v.status==='published'?'<button class="v31-btn primary" data-admin-page="master">Open Master Timetable</button>':`<form id="os-restore"><label><input type="checkbox" name="ack" required> Replace the active imported timetable with this version.</label><div class="v31-form-actions"><button class="v31-btn primary" ${osBusy?'disabled':''}>Publish version</button></div></form>`}${v.status==='published'?'<p>To remove this active timetable, publish a replacement first.</p>':`<form id="os-remove" style="margin-top:20px"><label><input type="checkbox" name="ack" required> Permanently remove this locally stored imported version.</label><div class="v31-form-actions"><button class="v31-btn" style="color:#a12d32" ${osBusy?'disabled':''}>Remove version</button></div></form>`}</section>`;
  }
- return `<section class="v31-panel"><div class="v31-title"><div><h2>OneSchool Timetable Export</h2><p>Import & publish a dated timetable</p></div></div><p>Accepts the original 15-column OneSchool CSV, up to 20 MB and 150,000 rows. In this browser edition, class, staff and room identifiers are replaced with aliases before saving. School period labels are retained as configured; recognised Prep and numeric year codes are normalised. Do not include personal information in period labels. Names, original identifiers, MISIDs and the original file are not saved or transmitted by the import code. Dates and lesson times are retained. The saved schedule is local to this browser, not shared across devices or users. Use only data approved for this purpose by your school. For original identifiers and individual staff accounts, use the protected school-hosted edition.</p>${osStorageError?`<p class="v31-message" role="alert">${esc(osStorageError)}</p>`:''}<div class="rfa-import-steps"><article><b>1</b><strong>Choose export</strong><small>Original OneSchool CSV</small></article><article><b>2</b><strong>Authorise &amp; validate</strong><small>Schema, dates and warnings</small></article><article><b>3</b><strong>Publish &amp; review</strong><small>Replace version and inspect results</small></article></div><form id="os-live-import" class="v31-import"><label>Timetable version name<input name="name" maxlength="100" required placeholder="e.g. 2026 Term 4" ${osBusy?'disabled':''}></label><label>OneSchool timetable CSV<input type="file" name="csv" accept=".csv,text/csv" required ${osBusy?'disabled':''}></label><label><input type="checkbox" name="approved" required ${osBusy?'disabled':''}> I am authorised to import and retain this masked schedule on this device, including the school’s period labels.</label><label><input type="checkbox" name="replace" required ${osBusy?'disabled':''}> Replace the active imported timetable; prior versions will be archived.</label><button class="v31-btn primary" ${osBusy||osStorageError?'disabled':''}>${osBusy?'Importing timetable…':'Import & publish timetable'}</button></form></section><section class="v31-panel"><h2>Timetable versions</h2><div class="v31-table-wrap"><table class="v31-table"><thead><tr><th>Version</th><th>Coverage</th><th>Lessons</th><th>Status</th><th></th></tr></thead><tbody>${osVersions.map(v=>`<tr><td>${esc(v.name)}</td><td>${v.summary.first_date} – ${v.summary.last_date}</td><td>${v.summary.lessons.toLocaleString()}</td><td><span class="v31-status ${v.status==='published'?'active':''}">${esc(v.status)}</span></td><td><button class="v31-btn" data-os-action="review" data-os-id="${esc(v.id)}">Review</button></td></tr>`).join('')||'<tr><td colspan="5">No imported timetable versions.</td></tr>'}</tbody></table></div></section><section class="v31-panel"><h2>Student and class membership imports</h2><p>These require a separately supported student directory and class membership export. Attendance is not connected to imported timetables.</p></section>`;
+ return `<section class="v31-panel"><div class="v31-title"><div><h2>OneSchool Timetable Export</h2><p>Import & publish a dated timetable</p></div></div><p>Accepts the original 15-column OneSchool CSV, up to 20 MB and 150,000 rows. In this browser edition, class, staff and room identifiers are replaced with aliases before saving. School period labels are retained as configured; recognised Prep and numeric year codes are normalised. Do not include personal information in period labels. Names, original identifiers, MISIDs and the original file are not saved or transmitted by the import code. Dates and lesson times are retained. The saved schedule is local to this browser, not shared across devices or users. Use only data approved for this purpose by your school. For original identifiers and individual staff accounts, use the protected school-hosted edition.</p>${osStorageError?`<p class="v31-message" role="alert">${esc(osStorageError)}</p>`:''}<div class="rfa-import-steps"><article><b>1</b><strong>Choose export</strong><small>Original OneSchool CSV</small></article><article><b>2</b><strong>Authorise &amp; validate</strong><small>Schema, dates and warnings</small></article><article><b>3</b><strong>Publish &amp; review</strong><small>Replace version and inspect results</small></article></div><form id="os-live-import" class="v31-import"><label>Timetable version name<input name="name" maxlength="100" required placeholder="e.g. 2026 Term 4" ${osBusy?'disabled':''}></label><label>OneSchool timetable CSV<input type="file" name="csv" accept=".csv,text/csv" required ${osBusy?'disabled':''}></label><label><input type="checkbox" name="approved" required ${osBusy?'disabled':''}> I am authorised to import and retain this masked schedule on this device, including the school’s period labels.</label><label><input type="checkbox" name="replace" required ${osBusy?'disabled':''}> I understand that publishing will replace the active timetable; prior versions will be archived.</label><button class="v31-btn primary" ${osBusy||osStorageError?'disabled':''}>${osBusy?'Validating timetable…':'Validate & review timetable'}</button></form></section><section class="v31-panel"><h2>Timetable versions</h2><div class="v31-table-wrap"><table class="v31-table"><thead><tr><th>Version</th><th>Coverage</th><th>Lessons</th><th>Status</th><th></th></tr></thead><tbody>${osVersions.map(v=>`<tr><td>${esc(v.name)}</td><td>${v.summary.first_date} – ${v.summary.last_date}</td><td>${v.summary.lessons.toLocaleString()}</td><td><span class="v31-status ${v.status==='published'?'active':''}">${esc(v.status)}</span></td><td><button class="v31-btn" data-os-action="review" data-os-id="${esc(v.id)}">Review</button></td></tr>`).join('')||'<tr><td colspan="5">No imported timetable versions.</td></tr>'}</tbody></table></div></section><section class="v31-panel"><h2>Student and class membership imports</h2><p>These require a separately supported student directory and class membership export. Attendance is not connected to imported timetables.</p></section>`;
 }
 
 const POLISH_KEY='rollflow_view_prefs_v343';
@@ -2326,7 +2332,7 @@ document.addEventListener('click',e=>{
  if(osPublished()&&((demoRole==='admin'&&adminPage==='master')||(demoRole==='teacher'&&state.page==='master'))){refreshMaster();const target=[...document.querySelectorAll('[data-os-action]')].find(b=>b.dataset.osAction===a&&(!id||b.dataset.osId===id));(target||document.querySelector('#os-date-search [name=staff]'))?.focus({preventScroll:true})}else render();
 },true);
 document.addEventListener('submit',async e=>{
- const f=e.target;if(!['os-live-import','os-restore','os-remove','os-date-search'].includes(f.id))return;
+ const f=e.target;if(!['os-live-import','os-confirm-import','os-restore','os-remove','os-date-search'].includes(f.id))return;
  if(f.id!=='os-date-search'&&demoRole!=='admin'||!['admin','teacher'].includes(demoRole))return;
  e.preventDefault();e.stopImmediatePropagation();const d=new FormData(f);adminMessage='';
  if(f.id==='os-date-search'){const date=String(d.get('date')||'');if(osDateValid(date)){osDate=date;osQuery=String(d.get('q')||'').slice(0,150);osYear=String(d.get('year')||'');osStaff=String(d.get('staff')||'');osRoom=String(d.get('room')||'');refreshMaster()}return}
@@ -2338,8 +2344,10 @@ document.addEventListener('submit',async e=>{
   const name=String(d.get('name')||'');if(!name.trim())throw Error('Enter a version name.');
   osBusy=true;render();
   const raw=new TextDecoder('utf-8',{fatal:true}).decode(await file.arrayBuffer());if(epoch!==osEpoch||demoRole!=='admin')return;
-  await osPublishImport(raw,name);
- }else if(f.id==='os-restore'){if(!d.has('ack'))throw Error('Confirm publication.');osBusy=true;await osRepublish(osReviewId)}
+  const expectedActive=osPublished()?.id||'',version=await osPrepareImport(raw,name);if(epoch!==osEpoch||demoRole!=='admin')return;
+  rfAdminImportDraft={version,expectedActive};adminMessage='Validation complete. Review warnings before publishing.';
+ }else if(f.id==='os-confirm-import'){if(!d.has('ack')||!rfAdminImportDraft)throw Error('Confirm publication of the reviewed timetable.');osBusy=true;const draft=rfAdminImportDraft;await osCommitPreparedImport(draft.version,draft.expectedActive);rfAdminImportDraft=null}
+ else if(f.id==='os-restore'){if(!d.has('ack'))throw Error('Confirm publication.');osBusy=true;await osRepublish(osReviewId)}
  else if(f.id==='os-remove'){if(!d.has('ack'))throw Error('Confirm removal.');osBusy=true;await osRemove(osReviewId)}
  }catch(err){adminMessage=String(err.message||err)}
  finally{osBusy=false;render();if(osSyncPending)osSync()}
@@ -2447,7 +2455,7 @@ document.addEventListener('click',e=>{
  if(demoRole!=='admin')return;
  const el=e.target.closest('[data-admin-page],[data-admin-edit],[data-admin-cancel],[data-admin-toggle]');if(!el)return;
  e.stopImmediatePropagation();adminMessage='';
- if(el.dataset.adminPage){rfAdminStaffProfile='';if(!adminSections.some(([,items])=>items.some(([id])=>id===el.dataset.adminPage)))return;adminPage=el.dataset.adminPage;adminEdit=null;planMode='list';planId='';periodRemovePending='';if(adminPage==='oneschool')osReviewId='';if(adminPage==='timetable')osTab=polishTab(polishPrefs.tab||'overview');if(adminPage==='master'){rfAdminMasterMode='tiles';rfMasterReset();osSetView(false);osResetFilters();osWide=false;if(osPublished())osDate=osDefaultDate(osPublished())}if(adminPage==='students'){studentAdminMode='list';studentAdminId=null}}
+ if(el.dataset.adminPage){rfAdminImportDraft=null;rfAdminStaffProfile='';if(!adminSections.some(([,items])=>items.some(([id])=>id===el.dataset.adminPage)))return;adminPage=el.dataset.adminPage;adminEdit=null;planMode='list';planId='';periodRemovePending='';if(adminPage==='oneschool')osReviewId='';if(adminPage==='timetable')osTab=polishTab(polishPrefs.tab||'overview');if(adminPage==='master'){rfAdminMasterMode='tiles';rfMasterReset();osSetView(false);osResetFilters();osWide=false;if(osPublished())osDate=osDefaultDate(osPublished())}if(adminPage==='students'){studentAdminMode='list';studentAdminId=null;rfAdminBrowseStudents=false}if(adminPage==='classes')rfAdminBrowseClasses=false}
  else if(el.dataset.adminEdit){adminPage='staff';adminEdit=el.dataset.adminEdit}
  else if(el.hasAttribute('data-admin-cancel'))adminEdit=null;
  else{const p=previewStaff.find(x=>x.id===(el.dataset.adminToggle));if(!p||['admin','teacher','swilliams'].includes(p.username))return;
@@ -2488,7 +2496,7 @@ function setDemoRole(role){
  // A full fresh load resets ALL cross-cutting demo-only state (attendance,
  // planner and workspace) before another fictional teacher signs in.
  if(teacherChanged){window.location.reload();return}
- osEpoch++;osWide=false;osSetView(false);osResetFilters();
+ osEpoch++;rfAdminImportDraft=null;osWide=false;osSetView(false);osResetFilters();
  clearDemoOverlays();state.history=[];profileEditing=false;
  if(demoRole==='teacher'){
   state.date=brisbaneToday();state.page=['home','timetable','roll'].includes(workspace.settings.landing)?workspace.settings.landing:'home';
@@ -3328,6 +3336,10 @@ let rfAdminMasterMode='tiles',rfAdminStaffProfile='',rfAdminBrowseStudents=false
 try{rfAdminDark=localStorage.getItem('rollflow_admin_theme')==='dark'}catch{}
 function rfMasterTilesVisible(){return demoRole==='teacher'&&state.page==='master'||demoRole==='admin'&&adminPage==='master'&&rfAdminMasterMode==='tiles'}
 function rfAdminMasterPage(){return '<div class="rfa-master-switch"><button type="button" class="v31-btn" data-rfa-action="master-mode" data-rfa-id="tiles" aria-pressed="'+(rfAdminMasterMode==='tiles')+'">Year-level tiles</button><button type="button" class="v31-btn" data-rfa-action="master-mode" data-rfa-id="grid" aria-pressed="'+(rfAdminMasterMode==='grid')+'">Full planning grid</button></div>'+(rfAdminMasterMode==='grid'?'<section class="v31-panel">'+(osPublished()?osDatedContent(false):masterContent())+'</section>':rfMasterTeacherContent())}
+function rfAdminImportReview(v){
+ const a=v.summary,years=osImportedYears(v),labels=[...new Set(Object.values(v.days).flatMap(rows=>rows.map(r=>r.period)))].sort();
+ return '<section class="v31-panel"><div class="v31-title"><div><h2>Review before publication</h2><p>'+esc(v.name)+' · '+esc(a.first_date)+' – '+esc(a.last_date)+' · Not published</p></div><button type="button" class="v31-btn" data-rfa-action="cancel-import" '+(osBusy?'disabled':'')+'>Cancel import</button></div></section>'+rfAdminMetrics([['Validated allocations',a.lessons],['Classes',a.classes],['Year levels',years.length],['School days',a.days]])+'<section class="v31-panel"><h2>Detected timetable structure</h2><p><strong>Year levels:</strong> '+esc(years.map(y=>rfMasterYearLabel(String(y))).join(', '))+'</p><p><strong>Period names:</strong> '+esc(labels.join(' · '))+'</p><h2>Validation warnings</h2><p>Overlaps may be intentional. Review these before publishing.</p><div class="v31-table-wrap"><table class="v31-table"><thead><tr><th>Warning</th><th>Count</th></tr></thead><tbody>'+Object.entries(a.warnings).map(([k,n])=>'<tr><td>'+esc(k.replaceAll('_',' '))+'</td><td>'+n+'</td></tr>').join('')+'</tbody></table></div></section><section class="v31-panel"><h2>Confirm publication</h2><p>Only the masked schedule and fingerprint will be saved. The previous publication stays active until you confirm.</p><form id="os-confirm-import" class="v31-import"><label><input type="checkbox" name="ack" required '+(osBusy?'disabled':'')+'> I have reviewed the validation results and approve publication.</label><button class="v31-btn primary" '+(osBusy?'disabled':'')+'>'+(osBusy?'Publishing…':'Publish reviewed timetable')+'</button></form></section>';
+}
 function rfAdminMetrics(items){return '<div class="v31-kpis rfa-metrics">'+items.map(([label,n,icon])=>'<article><span class="rfa-metric-icon">'+navSvg(icon||'clipboard-check')+'</span><span>'+esc(label)+'</span><strong>'+esc(typeof n==='number'?n.toLocaleString('en-AU'):n)+'</strong></article>').join('')+'</div>'}
 function rfAdminStaffDetail(p){
  const slots=planning.slots.filter(s=>s.active&&s.teacher===p.username).sort((a,b)=>a.day-b.day||(planning.periods.find(x=>x.code===a.period)?.start||'').localeCompare(planning.periods.find(x=>x.code===b.period)?.start||''));
@@ -3344,7 +3356,7 @@ function rfAdminAttendanceAggregate(sources,students,classes,enrolments,start,en
 }
 function rfAdminRate(rows){const n=rows.reduce((a,r)=>a+r.total,0);return n?(100*rows.reduce((a,r)=>a+r.P+r.L,0)/n).toFixed(1)+'%':'—'}
 function rfAdminAttendanceData(year='',code=''){
- const today=brisbaneToday(),sem=rfStudentSemester(today),students=previewStudents.filter(p=>p.status==='active'&&(!year||String(p.year)===year)),classes=planning.classes.filter(c=>c.active&&(!code||c.code===code));
+ const today=brisbaneToday(),sem=rfStudentSemester(today),roster=code?new Set(planning.enrolments.filter(e=>e.classCode===code&&e.start<=today&&(!e.end||e.end>=sem.start)).map(e=>e.studentId)):null,students=previewStudents.filter(p=>p.status==='active'&&(!year||String(p.year)===year)&&(!roster||roster.has(p.id))),classes=planning.classes.filter(c=>c.active&&(!code||c.code===code));
  const result=rfAdminAttendanceAggregate(rfAttendanceSources(new Set(classes.map(c=>c.code))),students,classes,planning.enrolments,sem.start,today);return {...result,sem,today};
 }
 function rfAdminAttendancePage(){
@@ -3369,7 +3381,8 @@ function rfAdminDashboard(){
 document.addEventListener('click',e=>{
  const b=e.target.closest('[data-rfa-action]');if(!b||demoRole!=='admin')return;e.preventDefault();e.stopImmediatePropagation();
  const a=b.dataset.rfaAction,id=b.dataset.rfaId;
- if(a==='theme'){rfAdminDark=!rfAdminDark;try{localStorage.setItem('rollflow_admin_theme',rfAdminDark?'dark':'light')}catch{}}
+ if(a==='cancel-import'){if(osBusy)return;rfAdminImportDraft=null;adminMessage='Import cancelled; the published timetable was not changed.'}
+ else if(a==='theme'){rfAdminDark=!rfAdminDark;try{localStorage.setItem('rollflow_admin_theme',rfAdminDark?'dark':'light')}catch{}}
  else if(a==='master-mode'){rfAdminMasterMode=id==='grid'?'grid':'tiles';masterSelected=''}
  else if(a==='staff-profile'){rfAdminStaffProfile=id;adminEdit=null}
  else if(a==='staff-back'){rfAdminStaffProfile='';adminEdit=null}
