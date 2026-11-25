@@ -1817,9 +1817,13 @@ function masterContent(){
  const summaries=(label,key,clash=false)=>`<tr class="mt-summary"><th scope="row">${label}</th>${cols.map(p=>{const n=data.stats[p.code][key];return `<td class="${clash&&n?'mt-warning':''}">${n}</td>`}).join('')}</tr>`;
  return `<div class="mt-root"><div class="mt-tabs" role="group" aria-label="Weekday">${tab}</div><div class="mt-toolbar"><form id="mt-search"><label><span class="mt-sr">Search timetable</span><input name="q" value="${esc(masterQuery)}" placeholder="Search class, teacher or room" maxlength="150"></label><label><span class="mt-sr">Year level</span><select name="year">${planOpt([['','All years'],...[7,8,9,10,11,12].map(y=>[y,'Year '+y])],masterYear)}</select></label><button class="mt-button">Search</button>${masterQuery||masterYear?'<button type="button" class="mt-button" data-master-action="clear">Clear</button>':''}</form><div class="mt-controls"><button type="button" class="mt-button" data-master-action="breaks" aria-pressed="${masterHideBreaks}">${masterHideBreaks?'Show breaks':'Hide breaks'}</button><button type="button" class="mt-button" data-master-action="expand">Expand all</button><button type="button" class="mt-button" data-master-action="collapse">Collapse all</button><button type="button" class="mt-button" data-master-action="print">Print</button></div></div><p class="mt-caption">${esc(planDays[Number(masterDay)-1])} · ${shown.length} of ${data.slots.length} scheduled lessons · Recurring weekly planning · Fictional data. Resource counts cover the full day schedule, not search results.</p>${masterDetail(data)}${cols.length?`<div class="mt-scroll" tabindex="0" aria-label="Master timetable grid"><table class="mt-table"><thead><tr><th scope="col" class="mt-rowlabel">Year</th>${head}</tr></thead><tbody>${rows}<tr class="mt-band"><th colspan="${totalCols}">Clashes</th></tr>${summaries('Staff clashes','teacherClashes',true)}${summaries('Room clashes','roomClashes',true)}<tr class="mt-band"><th colspan="${totalCols}">Free resources</th></tr>${summaries('Staff resources','freeTeachers')}${summaries('Room resources','freeRooms')}</tbody></table></div>`:'<div class="mt-detail">No visible school periods. Add periods in Timetable Management or show breaks.</div>'}<p class="mt-caption">Staff/room counts use ${data.staffCount} known teaching staff and ${data.roomCount} active rooms in the preview. Breaks are recognised by period names such as Break, Recess or Lunch. Timetable versions and authorised relief allocations remain planned.</p></div>`;
 }
-let rfMasterPeriod='',rfMasterOpen=null,rfMasterQuery='',rfMasterLimit=50;
+let rfAdminMasterMode='tiles';
+function rfMasterTilesVisible(){return !serverIdentity&&(demoRole==='teacher'&&state.page==='master'||demoRole==='admin'&&adminPage==='master'&&rfAdminMasterMode==='tiles')}
+function rfAdminMasterPage(){return '<div class="rfa-master-switch"><button type="button" class="v31-btn" data-rfa-master-mode="tiles" aria-pressed="'+(rfAdminMasterMode==='tiles')+'">Year-level tiles</button><button type="button" class="v31-btn" data-rfa-master-mode="grid" aria-pressed="'+(rfAdminMasterMode==='grid')+'">Full planning grid</button></div>'+(rfAdminMasterMode==='grid'?'<section class="v31-panel">'+(osPublished()?osDatedContent(false):masterContent())+'</section>':rfMasterTeacherContent())}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-rfa-master-mode]');if(!b||serverIdentity||demoRole!=='admin'||adminPage!=='master')return;e.preventDefault();e.stopImmediatePropagation();rfAdminMasterMode=b.dataset.rfaMasterMode==='grid'?'grid':'tiles';masterSelected='';render()},true);
+let rfMasterPeriod='',rfMasterOpen=new Set(),rfMasterAnchor=null,rfMasterQuery='',rfMasterLimit=50;
 function rfMasterReset(){
- rfMasterPeriod='';rfMasterOpen=null;rfMasterQuery='';rfMasterLimit=50;masterSelected='';masterQuery='';masterYear='';masterDay=String(Math.max(1,planDays.indexOf(weekdayFor(brisbaneToday()))+1));osDate=brisbaneToday();osResetFilters();osHideBreaks=true;masterHideBreaks=true;
+ rfMasterPeriod='';rfMasterOpen=new Set();rfMasterAnchor=null;rfMasterQuery='';rfMasterLimit=50;masterSelected='';masterQuery='';masterYear='';masterDay=String(Math.max(1,planDays.indexOf(weekdayFor(brisbaneToday()))+1));osDate=brisbaneToday();osResetFilters();osHideBreaks=true;masterHideBreaks=true;
 }
 function rfMasterDayData(imported,day,date){
  if(imported){
@@ -1829,15 +1833,30 @@ function rfMasterDayData(imported,day,date){
  const data=masterData(day);
  return {periods:data.periods.map(p=>({key:p.code,label:p.label,start:p.start,end:p.end,break:isMasterBreak(p)})),rows:data.slots.map(r=>{const p=data.periods.find(p=>p.code===r.period);return {code:r.classCode,year:r.klass.year,teacher:r.teacherName,room:r.room,subject:r.klass.name,period:r.period,label:p?.label||r.period,start:p?.start||'',end:p?.end||'',day,date,id:r.id}})};
 }
-function rfMasterMatches(r,q){return q.split(/\s+/).filter(Boolean).every(t=>[r.code,r.year,'Year '+r.year,r.teacher,r.room,r.subject,r.label].join(' ').toLowerCase().includes(t))}
+function rfMasterMatches(r,q){return q.split(/\s+/).filter(Boolean).every(t=>[r.code,r.year,rfMasterYearLabel(String(r.year??'unknown')),r.teacher,r.room,r.subject,r.label].join(' ').toLowerCase().includes(t))}
 function rfMasterYearLabel(year){return year==='0'?'Prep':year==='unknown'?'Other classes':/^\d+$/.test(year)?'Year '+year:year}
 function rfMasterTable(rows,find=false,imported=false){
  return '<div class="rf-master-table-wrap"><table class="rf-master-table"><thead><tr>'+(find?'<th>Day / period</th>':'')+'<th>Class</th><th>Teacher</th><th>Room</th>'+(!imported?'<th><span class="mt-sr">Details</span></th>':'')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+(find?'<td>'+esc(r.date||planDays[Number(r.day)-1])+'<small>'+esc(r.label+' · '+r.start)+'</small></td>':'')+'<td><strong>'+esc(r.code)+'</strong>'+(r.subject?'<small>'+esc(r.subject)+'</small>':'')+'</td><td>'+esc(r.teacher||'—')+'</td><td>'+esc(r.room||'—')+'</td>'+(!imported?'<td><button type="button" class="mt-button rf-master-detail-btn" data-rf-master-action="detail" data-rf-master-id="'+esc(r.id)+'" data-rf-master-day="'+esc(r.day)+'" data-rf-master-period="'+esc(r.period)+'" data-rf-master-year="'+esc(String(r.year??'unknown'))+'">Details</button></td>':'')+'</tr>').join('')+'</tbody></table></div>';
 }
+function rfMasterSelectYears(selected,anchor,id,ordered,range=false,add=false){
+ const next=new Set(selected);
+ if(range){
+  const from=ordered.indexOf(anchor),to=ordered.indexOf(id);
+  const span=from>=0&&to>=0?ordered.slice(Math.min(from,to),Math.max(from,to)+1):[id];
+  return {selected:new Set(add?[...next,...span]:span),anchor:from>=0?anchor:id};
+ }
+ if(add){if(next.has(id))next.delete(id);else next.add(id);return {selected:next,anchor:id}}
+ return {selected:new Set(next.size===1&&next.has(id)?[]:[id]),anchor:id};
+}
 function rfMasterGroups(rows,imported){
  const groups=new Map();for(const r of rows){const y=String(r.year??'unknown');if(!groups.has(y))groups.set(y,[]);groups.get(y).push(r)}
- const sorted=[...groups].sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true}));
- return sorted.map(([year,items])=>{const open=rfMasterOpen===year||!!rfMasterQuery.trim();const list=items.sort((a,b)=>String(a.code).localeCompare(String(b.code))),visible=list.slice(0,rfMasterLimit);return '<section class="rf-master-year"><button type="button" class="rf-master-year-toggle" data-rf-master-action="year" data-rf-master-id="'+esc(year)+'" aria-expanded="'+open+'"><span aria-hidden="true">'+(open?'▾':'▸')+'</span><strong>'+esc(rfMasterYearLabel(year))+'</strong><small>'+items.length+' '+(items.length===1?'class':'classes')+'</small></button>'+(open?rfMasterTable(visible,false,imported)+(list.length>visible.length?'<button type="button" class="mt-button rf-master-more" data-rf-master-action="more">Show more ('+(list.length-visible.length)+' remaining)</button>':''):'')+'</section>'}).join('')||'<div class="rf-master-empty">No matching classes in this period.</div>';
+ const sorted=[...groups].sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true})),searching=!!rfMasterQuery.trim();
+ if(!sorted.length)return '<div class="rf-master-empty">No matching classes in this period.</div>';
+ const selected=new Set([...rfMasterOpen].filter(y=>groups.has(y)));
+ const tiles='<div class="rf-master-year-heading"><div><div class="rf-master-section-label">Year levels</div><small>Ctrl / Cmd-click to select multiple · Shift-click to select a range</small></div><div class="rf-master-year-tools"><span aria-live="polite">'+selected.size+' selected</span><button type="button" class="mt-button" data-rf-master-action="all-years">Select all</button><button type="button" class="mt-button" data-rf-master-action="clear-years" '+(selected.size?'':'disabled')+'>Clear</button></div></div><div class="rf-master-year-grid" role="group" aria-label="Select year levels">'+sorted.map(([year,items])=>'<button type="button" class="rf-master-tile" data-rf-master-action="year" data-rf-master-id="'+esc(year)+'" aria-pressed="'+selected.has(year)+'" aria-controls="rf-master-year-results"><span class="rf-master-tile-number" aria-hidden="true">'+esc(year==='0'?'P':year==='unknown'?'—':year)+'</span><strong>'+esc(rfMasterYearLabel(year))+'</strong><small>'+items.length+' '+(items.length===1?'class':'classes')+'</small><span class="rf-master-tile-arrow" aria-hidden="true">›</span></button>').join('')+'</div>';
+ const results=selected.size?sorted.filter(([year])=>selected.has(year)):searching?sorted:[];
+ const detail=results.map(([year,items])=>{const list=items.slice().sort((a,b)=>String(a.code).localeCompare(String(b.code))),visible=list.slice(0,rfMasterLimit);return '<section class="rf-master-year"><div class="rf-master-results-head"><h3>'+esc(rfMasterYearLabel(year))+' classes</h3><small>'+items.length+' '+(items.length===1?'class':'classes')+'</small></div>'+rfMasterTable(visible,false,imported)+(list.length>visible.length?'<button type="button" class="mt-button rf-master-more" data-rf-master-action="more">Show more ('+(list.length-visible.length)+' remaining)</button>':'')+'</section>'}).join('');
+ return tiles+'<div id="rf-master-year-results" class="rf-master-year-results">'+(detail||'<div class="rf-master-empty rf-master-select-hint">Select a year level to view its classes.</div>')+'</div>';
 }
 function rfMasterTeacherContent(){
  const imported=!!osPublished(),today=brisbaneToday(),q=rfMasterQuery.trim().toLowerCase(),day=masterDay,date=imported?osDate:'',monday=imported?polishShift(osDate,-((new Date(osDate+'T12:00:00Z').getUTCDay()+6)%7)):'',data=rfMasterDayData(imported,day,date);
@@ -1846,62 +1865,99 @@ function rfMasterTeacherContent(){
  const dates=imported?'<div class="rf-master-datebar"><button type="button" class="mt-button" data-rf-master-action="prev">← Previous week</button><label class="rf-master-date-label">Date <input type="date" id="rf-master-date" value="'+esc(date)+'"></label><button type="button" class="mt-button" data-rf-master-action="next">Next week →</button></div>':'';
  const periods=data.periods.filter(p=>!p.break),current=(imported?date===today:planDays[Number(day)-1]===weekdayFor(today)),now=polishClock();
  if(!periods.some(p=>p.key===rfMasterPeriod)){rfMasterPeriod=(current?(periods.find(p=>p.start<=now&&now<p.end)||periods.find(p=>p.start>now)||periods.at(-1)):periods[0])?.key||''}
- const periodButtons='<div class="rf-master-periods" role="group" aria-label="School period">'+periods.map(p=>'<button type="button" data-rf-master-action="period" data-rf-master-id="'+esc(p.key)+'" aria-pressed="'+(rfMasterPeriod===p.key)+'"><strong>'+esc(p.label)+'</strong><small>'+esc(p.start)+'–'+esc(p.end)+'</small></button>').join('')+'</div>';
- const search='<div class="rf-master-search"><label class="mt-sr" for="rf-master-query">Search timetable</label><input type="search" id="rf-master-query" value="'+esc(rfMasterQuery)+'" placeholder="Search class, teacher or room…" maxlength="150">'+(q?'<button type="button" class="mt-button" data-rf-master-action="clear">Clear</button>':'')+'</div>';
+ const periodPicker='<label class="rf-master-period-picker"><span>Change period</span><select id="rf-master-period-select" aria-label="Change teaching period" '+(periods.length?'':'disabled')+'>'+ (periods.length?periods.map(p=>'<option value="'+esc(p.key)+'" '+(rfMasterPeriod===p.key?'selected':'')+'>'+esc(p.label+' · '+p.start+'–'+p.end)+'</option>').join(''):'<option>No periods</option>')+'</select></label>';
+ const search='<div class="rf-master-search"><label class="mt-sr" for="rf-master-query">Search timetable</label><span class="rf-master-search-icon" aria-hidden="true"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/></svg></span><input type="search" id="rf-master-query" value="'+esc(rfMasterQuery)+'" placeholder="Search class, teacher or room…" maxlength="150">'+(q?'<button type="button" class="mt-button" data-rf-master-action="clear">Clear</button>':'')+'</div>';
  const rows=data.rows.filter(r=>r.period===rfMasterPeriod&&rfMasterMatches(r,q)),p=periods.find(p=>p.key===rfMasterPeriod);
- const body=periodButtons+'<div class="rf-master-summary"><strong>'+esc(p?.label||'No scheduled periods')+'</strong><span>'+rows.length+' matching classes</span></div>'+(!imported?masterDetail(masterData()):'')+(periods.length?rfMasterGroups(rows,imported):'<div class="rf-master-empty">No timetable available for this day.</div>');
- return '<div class="mt-root rf-master-root">'+dates+days+search+body+(imported?osCoverageNotice(osPublished())+'<p class="mt-caption">Masked imported timetable · not live attendance or staff availability.</p>':'<p class="mt-caption">Recurring demo timetable · not live attendance or staff availability.</p>')+'</div>';
+ const dayName=imported?weekdayFor(date):planDays[Number(day)-1]||'',groupCount=new Set(rows.map(r=>String(r.year??'unknown'))).size;
+ const body='<section class="rf-master-summary" aria-label="Selected timetable period"><div class="rf-master-summary-main"><span class="rf-master-eyebrow">'+esc(dayName)+'</span><strong>'+esc(p?.label||'No scheduled periods')+'</strong>'+(p?'<span class="rf-master-summary-time">'+esc(p.start)+' – '+esc(p.end)+'</span>':'')+'</div><div class="rf-master-summary-controls">'+periodPicker+'<div class="rf-master-summary-stats"><div><strong>'+rows.length+'</strong><span>'+(q?'Matching classes':'Classes')+'</span></div><div><strong>'+groupCount+'</strong><span>Year levels</span></div></div></div></section>'+search+(!imported?masterDetail(masterData()):'')+(periods.length?rfMasterGroups(rows,imported):'<div class="rf-master-empty">No timetable available for this day.</div>');
+ return '<section class="sheet mt-root rf-master-root rf-master-unified"><section class="rf-master-navigation">'+dates+'<div class="rf-master-section-label">School day</div>'+days+'</section>'+body+(imported?osCoverageNotice(osPublished())+'<p class="mt-caption">Masked imported timetable · not live attendance or staff availability.</p>':'<p class="mt-caption">Recurring demo timetable · not live attendance or staff availability.</p>')+'</section>';
 }
 function masterTeacherPage(){return shell(rfMasterTeacherContent(),'Master Timetable','School-wide timetable');}
 document.addEventListener('click',e=>{
- if(demoRole!=='teacher'||state.page!=='master')return;const b=e.target.closest('[data-rf-master-action]');if(!b)return;e.preventDefault();e.stopImmediatePropagation();
+ if(!rfMasterTilesVisible())return;const b=e.target.closest('[data-rf-master-action]');if(!b)return;e.preventDefault();e.stopImmediatePropagation();
  const a=b.dataset.rfMasterAction,id=b.dataset.rfMasterId||'',imported=!!osPublished();
  if(a==='day'){if(imported){if(!osDateValid(id))return;osDate=id}else{if(!['1','2','3','4','5'].includes(id))return;masterDay=id}masterSelected='';rfMasterLimit=50}
  else if(a==='prev'||a==='next'){if(!imported)return;osDate=polishShift(osDate,a==='prev'?-7:7);masterSelected=''}
  else if(a==='period'){rfMasterPeriod=id;masterSelected='';rfMasterLimit=50}
- else if(a==='year'){rfMasterOpen=rfMasterOpen===id?null:id;rfMasterLimit=50}
+ else if(a==='year'){
+ const ordered=[...document.querySelectorAll('.rf-master-year-grid [data-rf-master-action="year"]')].map(el=>el.dataset.rfMasterId);
+ const result=rfMasterSelectYears(new Set([...rfMasterOpen].filter(y=>ordered.includes(y))),rfMasterAnchor,id,ordered,e.shiftKey,e.ctrlKey||e.metaKey);
+ rfMasterOpen=result.selected;rfMasterAnchor=result.anchor;rfMasterLimit=50;masterSelected=''
+ }
+ else if(a==='all-years'){rfMasterOpen=new Set([...document.querySelectorAll('.rf-master-year-grid [data-rf-master-action="year"]')].map(el=>el.dataset.rfMasterId));rfMasterAnchor=[...rfMasterOpen][0]||null;rfMasterLimit=50;masterSelected=''}
+ else if(a==='clear-years'){rfMasterOpen=new Set();rfMasterAnchor=null;rfMasterLimit=50;masterSelected=''}
  else if(a==='clear'){rfMasterQuery='';rfMasterLimit=50;masterSelected=''}
  else if(a==='more'){rfMasterLimit+=50}
- else if(a==='detail'&&!imported){masterDay=b.dataset.rfMasterDay;rfMasterPeriod=b.dataset.rfMasterPeriod;rfMasterOpen=b.dataset.rfMasterYear;rfMasterQuery='';masterSelected=id;masterQuery='';masterYear=''}
+ else if(a==='detail'&&!imported){masterDay=b.dataset.rfMasterDay;rfMasterPeriod=b.dataset.rfMasterPeriod;rfMasterOpen=new Set([...rfMasterOpen,b.dataset.rfMasterYear]);rfMasterAnchor=b.dataset.rfMasterYear;rfMasterQuery='';masterSelected=id;masterQuery='';masterYear=''}
  else return;
  refreshMaster();[...document.querySelectorAll('[data-rf-master-action]')].find(x=>x.dataset.rfMasterAction===a&&(!id||x.dataset.rfMasterId===id))?.focus({preventScroll:true});
 },true);
 document.addEventListener('input',e=>{
- if(demoRole!=='teacher'||state.page!=='master'||e.target.id!=='rf-master-query')return;
- rfMasterQuery=e.target.value.slice(0,150);rfMasterLimit=50;masterSelected='';const pos=e.target.selectionStart;refreshMaster();const input=document.getElementById('rf-master-query');input?.focus({preventScroll:true});if(input&&pos!==null)input.setSelectionRange(pos,pos);
+ if(!rfMasterTilesVisible()||e.target.id!=='rf-master-query')return;
+ rfMasterQuery=e.target.value.slice(0,150);rfMasterOpen=new Set();rfMasterAnchor=null;rfMasterLimit=50;masterSelected='';const pos=e.target.selectionStart;refreshMaster();const input=document.getElementById('rf-master-query');input?.focus({preventScroll:true});if(input&&pos!==null)input.setSelectionRange(pos,pos);
 },true);
-document.addEventListener('change',e=>{if(demoRole==='teacher'&&state.page==='master'&&e.target.id==='rf-master-date'&&osDateValid(e.target.value)){osDate=e.target.value;masterSelected='';refreshMaster()}},true);
+document.addEventListener('change',e=>{if(!rfMasterTilesVisible())return;if(e.target.id==='rf-master-period-select'){rfMasterPeriod=e.target.value;masterSelected='';rfMasterLimit=50;refreshMaster();document.getElementById('rf-master-period-select')?.focus({preventScroll:true})}else if(e.target.id==='rf-master-date'&&osDateValid(e.target.value)){osDate=e.target.value;masterSelected='';rfMasterLimit=50;refreshMaster()}},true);
 const rfMasterStyle=document.createElement('style');rfMasterStyle.textContent=`
-.rf-master-root{display:grid;gap:14px;width:100%;min-width:0}
-.rf-master-modes,.rf-master-days,.rf-master-periods,.rf-master-datebar,.rf-master-search,.rf-master-summary{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.rf-master-modes{border-bottom:1px solid #ccdbe3;padding-bottom:10px}
-.rf-master-modes button,.rf-master-days button,.rf-master-periods button{background:transparent;border:1px solid #b8cbd5;color:inherit;border-radius:8px;padding:10px 15px;font:inherit;font-weight:600;cursor:pointer}
-.rf-master-modes button[aria-pressed="true"],.rf-master-days button[aria-pressed="true"],.rf-master-periods button[aria-pressed="true"]{background:#007b97;color:white;border-color:#007b97}
-.rf-master-days button,.rf-master-periods button{flex:0 1 auto;min-width:80px}
-.rf-master-days small,.rf-master-periods small{display:block;font-weight:400;font-size:11px;margin-top:3px}
-.rf-master-search input,.rf-master-date-label input{border:1px solid #b8cbd5;border-radius:8px;padding:10px 12px;min-height:42px;font:inherit;background:transparent;color:inherit}
-.rf-master-search input{flex:1;min-width:120px}
-.rf-master-date-label{display:flex;align-items:center;gap:7px}
-.rf-master-summary{gap:10px}.rf-master-summary span{opacity:.75}.rf-master-summary .mt-button{margin-left:auto}
-.rf-master-year{border:1px solid #cadbe4;border-radius:10px;overflow:hidden;background:#fff;color:#263d4c}
-.rf-master-year-toggle{display:flex;align-items:center;gap:12px;padding:14px 16px;background:transparent;color:inherit;border:0;width:100%;cursor:pointer;text-align:left;font:inherit}
-.rf-master-year-toggle[aria-expanded="true"]{background:#e8f3f6;color:#006c84}
-.rf-master-year-toggle small{margin-left:auto;font-size:12px;font-weight:400;opacity:.85}
-.rf-master-table-wrap{overflow:auto;max-width:100%;border:1px solid #d4e0e7;border-radius:8px}
-.rf-master-year .rf-master-table-wrap{border:0;border-radius:0}
-.rf-master-table{width:100%;border-collapse:collapse;text-align:left;font:inherit}
-.rf-master-table th{background:#edf3f6;color:#284657;padding:10px 14px;white-space:nowrap;font-size:12px}
-.rf-master-table td{padding:10px 14px;border-top:1px solid #e0e8ed;vertical-align:middle}
-.rf-master-table td small{display:block;font-size:11px;opacity:.75;margin-top:3px}
-.rf-master-detail-btn{min-height:30px;padding:5px 9px;font-size:12px}
-.rf-master-empty{border:1px solid #d4e0e7;border-radius:10px;text-align:center;padding:34px 16px}.rf-master-empty p{margin-top:8px}
-.rf-master-more{margin:10px;justify-self:start}.rf-master-count{margin:0;opacity:.8}
-body[data-theme="Dark"] .rf-master-year{background:#203744;color:#e9f3f8;border-color:#41616f}
-body[data-theme="Dark"] .rf-master-year-toggle[aria-expanded="true"],body[data-theme="Dark"] .rf-master-table th{background:#294756;color:#d9f2fa}
-body[data-theme="Dark"] .rf-master-table td,body[data-theme="Dark"] .rf-master-table-wrap{border-color:#41616f}
-@media(max-width:600px){.rf-master-days button,.rf-master-periods button{flex:1 1 auto;padding:8px;min-width:62px}.rf-master-table td,.rf-master-table th{padding:9px 7px}.rf-master-year-toggle{padding:12px}.rf-master-detail-btn{padding:4px 6px}}
-@media print{.rf-master-modes,.rf-master-days,.rf-master-periods,.rf-master-datebar,.rf-master-search,.rf-master-summary .mt-button,.rf-master-detail-btn{display:none!important}}
-`;document.head.appendChild(rfMasterStyle);
+.rf-master-root{--mt-ink:#203c4d;--mt-muted:#526c7b;--mt-line:#d7e3e8;--mt-surface:#fff;--mt-soft:#eef5f7;--mt-accent:#007b97;display:grid;gap:12px;width:100%;min-width:0;font-size:14px}
+.rf-master-root.rf-master-unified{background:var(--mt-surface);color:var(--mt-ink);border:1px solid var(--mt-line);border-radius:12px;box-shadow:0 3px 12px #1837490b;padding:22px;max-width:1060px;margin:0;gap:16px;overflow:hidden;container-type:inline-size}
+.rf-master-navigation{display:grid;gap:9px;background:transparent;color:var(--mt-ink);padding:0;border:0;border-radius:0;box-shadow:none}
+.rf-master-section-label{font-weight:700;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--mt-muted)}
+.rf-master-days,.rf-master-periods{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(min(100%,112px),1fr))}
+.rf-master-days{grid-template-columns:repeat(5,minmax(0,1fr));margin-bottom:5px}
+.rf-master-days button,.rf-master-periods button{min-width:0;background:var(--mt-soft);border:1px solid transparent;color:var(--mt-ink);border-radius:9px;padding:11px 13px;font:inherit;font-weight:700;cursor:pointer;text-align:left;overflow-wrap:anywhere}
+.rf-master-days button{text-align:center;min-height:43px}.rf-master-periods button{min-height:62px}
+.rf-master-days button[aria-pressed="true"]{background:#163b50;color:white;border-color:#163b50}
+.rf-master-periods button[aria-pressed="true"]{background:#00728a;color:#fff;border-color:#00728a;box-shadow:0 3px 8px #00728a22}
+.rf-master-days button:hover,.rf-master-periods button:hover{border-color:var(--mt-accent)}
+.rf-master-days small,.rf-master-periods small{display:block;font-weight:400;font-size:11px;line-height:1.3;margin-top:5px}
+.rf-master-datebar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin-bottom:5px}
+.rf-master-date-label{display:flex;gap:8px;align-items:center}.rf-master-date-label input{border:1px solid var(--mt-line);border-radius:8px;padding:8px;font:inherit;background:var(--mt-surface);color:var(--mt-ink)}
+.rf-master-summary{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;background:linear-gradient(115deg,#13394c,#12576a);color:#fff;border-radius:13px;padding:17px 21px}
+.rf-master-summary-main{display:grid;gap:4px;min-width:0}.rf-master-eyebrow{font-size:11px;letter-spacing:.10em;text-transform:uppercase;color:#c4e0e8;font-weight:600}.rf-master-summary-main>strong{font-size:clamp(20px,2.2vw,28px);line-height:1.2;overflow-wrap:anywhere}.rf-master-summary-time{font-size:12px;color:#d5e8ed}
+.rf-master-summary-stats{display:flex;gap:24px}.rf-master-summary-stats>div{border-left:1px solid #ffffff35;padding-left:20px;display:grid;gap:3px}.rf-master-summary-stats strong{font-size:25px;line-height:1.1}.rf-master-summary-stats span{font-size:11px;color:#e0edf2}
+.rf-master-search{display:flex;gap:9px;align-items:center;min-width:0;border:1px solid var(--mt-line);border-radius:11px;background:var(--mt-surface);color:var(--mt-ink);padding:4px 12px}.rf-master-search:focus-within{border-color:var(--mt-accent);box-shadow:0 0 0 2px #007b9718}.rf-master-search-icon{display:flex;color:var(--mt-muted)}
+.rf-master-search input{flex:1;min-width:0;min-height:42px;border:0!important;background:transparent;color:inherit;font:inherit;outline:none!important;padding:8px 2px}.rf-master-search input::placeholder{color:var(--mt-muted)}.rf-master-search .mt-button{min-height:32px;padding:5px 10px}
+.rf-master-year{background:var(--mt-surface);color:var(--mt-ink);border:1px solid var(--mt-line);border-radius:12px;overflow:hidden;box-shadow:0 2px 6px #19394b08}
+.rf-master-year-toggle{display:flex;align-items:center;gap:13px;width:100%;border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;text-align:left;padding:10px 15px;min-height:60px}.rf-master-year-toggle:hover{background:var(--mt-soft)}.rf-master-year-toggle[aria-expanded="true"]{background:var(--mt-soft);box-shadow:inset 4px 0 var(--mt-accent)}
+.rf-master-year-icon{display:grid;place-items:center;flex:0 0 37px;height:37px;border-radius:10px;background:#dceff2;color:#075c70;font-weight:800;font-size:16px}.rf-master-year-toggle>strong{font-size:15px;overflow-wrap:anywhere}.rf-master-year-toggle small{margin-left:auto;color:var(--mt-muted);font-size:12px;white-space:nowrap;font-weight:500}
+.rf-master-chevron{display:block;flex:0 0 8px;width:8px;height:8px;border-right:2px solid var(--mt-muted);border-bottom:2px solid var(--mt-muted);transform:rotate(-45deg);margin:0 4px}.rf-master-year-toggle[aria-expanded="true"] .rf-master-chevron{transform:rotate(45deg)}
+.rf-master-table-wrap{overflow:auto;max-width:100%}.rf-master-table{width:100%;border-collapse:collapse;text-align:left;font:inherit}.rf-master-table th{background:var(--mt-soft);color:var(--mt-muted);padding:10px 16px;white-space:nowrap;font-size:11px;letter-spacing:.05em;text-transform:uppercase}.rf-master-table td{padding:11px 16px;border-top:1px solid var(--mt-line);vertical-align:middle;overflow-wrap:anywhere}.rf-master-table td strong{color:var(--mt-ink);font-size:13px}.rf-master-table td small{display:block;font-size:11px;color:var(--mt-muted);margin-top:3px}.rf-master-table tbody tr:hover{background:var(--mt-soft)}
+.rf-master-detail-btn{min-height:32px;padding:5px 10px;font-size:12px}.rf-master-empty{background:var(--mt-surface);border:1px solid var(--mt-line);border-radius:12px;text-align:center;padding:34px 16px;color:var(--mt-muted)}.rf-master-more{margin:10px;justify-self:start}
+body[data-theme="Dark"] .rf-master-root,[data-theme="dark"] .rf-master-root{--mt-ink:#e6f2f7;--mt-muted:#b7cdd7;--mt-line:#41616f;--mt-surface:#203744;--mt-soft:#294756;--mt-accent:#69cadb}
+body[data-theme="Dark"] .rf-master-year-icon,[data-theme="dark"] .rf-master-year-icon{background:#325c6b;color:#d0f3fa}
+@media(max-width:650px){.rf-master-root.rf-master-unified{padding:12px;gap:12px}.rf-master-navigation{padding:0}.rf-master-days{grid-template-columns:repeat(auto-fit,minmax(82px,1fr))}.rf-master-periods{grid-template-columns:repeat(auto-fit,minmax(100px,1fr))}.rf-master-days button,.rf-master-periods button{padding:9px}.rf-master-summary{padding:15px;gap:14px}.rf-master-summary-stats{gap:15px}.rf-master-summary-stats>div{padding-left:12px}.rf-master-year-toggle{padding:10px 12px;gap:10px}.rf-master-table th,.rf-master-table td{padding:9px 8px}.rf-master-detail-btn{padding:4px 6px}}
+@media print{.rf-master-navigation,.rf-master-search,.rf-master-detail-btn,.rf-master-more{display:none!important}.rf-master-summary{background:white;color:#203c4d;border:1px solid #d7e3e8}.rf-master-summary span{color:#526c7b}.rf-master-year{break-inside:avoid}}
+
+.rf-master-summary-controls{display:flex;flex-wrap:wrap;align-items:center;gap:20px;min-width:0}
+.rf-master-period-picker{display:grid;gap:5px;max-width:100%;font-size:11px;font-weight:600;color:#d5e8ed}
+.rf-master-period-picker select{width:100%;max-width:265px;min-height:38px;padding:8px 10px;border-radius:8px;border:1px solid #ffffff55;background:#27576a;color:#fff;font:inherit;font-size:13px;cursor:pointer}
+.rf-master-period-picker select option{background:#fff;color:#203c4d}
+.rf-master-year-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.rf-master-tile{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-height:111px;min-width:0;padding:14px 16px;border:1px solid var(--mt-line);border-radius:12px;background:var(--mt-surface);color:var(--mt-ink);text-align:left;font:inherit;cursor:pointer;transition:border-color .15s,background .15s,box-shadow .15s}
+.rf-master-tile:hover{border-color:var(--mt-accent);background:var(--mt-soft)}
+.rf-master-tile[aria-pressed="true"]{background:var(--mt-soft);border-color:var(--mt-accent);box-shadow:inset 0 0 0 1px var(--mt-accent)}
+.rf-master-tile-number{font-size:27px;font-weight:800;line-height:1.1;color:var(--mt-accent)}
+.rf-master-tile>strong{font-size:14px;overflow-wrap:anywhere}.rf-master-tile small{color:var(--mt-muted);font-size:12px}
+.rf-master-tile-arrow{position:absolute;right:13px;top:13px;font-size:22px;line-height:1;color:var(--mt-muted)}
+.rf-master-tile[aria-pressed="true"] .rf-master-tile-arrow{color:var(--mt-accent);transform:rotate(90deg)}
+.rf-master-year-results{display:grid;gap:12px;min-width:0}
+.rf-master-results-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 16px;border-bottom:1px solid var(--mt-line)}
+.rf-master-results-head h3{font-size:16px;margin:0;color:var(--mt-ink)}.rf-master-results-head small{color:var(--mt-muted);white-space:nowrap}
+.rf-master-select-hint{padding:19px 12px;border-style:dashed}
+@container (max-width:520px){.rf-master-year-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.rf-master-tile{padding:12px;min-height:100px}.rf-master-summary-controls{gap:12px;width:100%}}
+@media(max-width:400px){.rf-master-year-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.rf-master-tile{padding:10px}}
+@media print{.rf-master-period-picker,.rf-master-year-grid{display:none!important}}
+
+.rf-master-year-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.rf-master-year-heading small{display:block;margin-top:4px;font-size:11px;color:var(--mt-muted)}
+.rf-master-year-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rf-master-year-tools>span{font-size:12px;color:var(--mt-muted)}
+.rf-master-year-tools .mt-button{min-height:32px;padding:5px 10px;font-size:12px}
+.rf-master-tile{user-select:none}
+.rf-master-tile[aria-pressed="true"] .rf-master-tile-arrow{transform:none;font-size:0;width:19px;height:19px;background:var(--mt-accent);border-radius:50%;display:grid;place-items:center}
+.rf-master-tile[aria-pressed="true"] .rf-master-tile-arrow::after{content:'✓';color:#fff;font-size:13px;line-height:1;font-weight:700}
+@media print{.rf-master-year-tools,.rf-master-year-heading small{display:none!important}}
+.rfa-master-switch{display:flex;gap:8px;flex-wrap:wrap}.v31-admin .v31-panel,.v31-admin .v31-kpis article{border-radius:12px;border-color:#d4e0e7;box-shadow:0 3px 12px #1837490b}.v31-admin .v31-btn{border-radius:8px}.v31-admin .v31-btn.primary,.v31-admin .v31-btn[aria-pressed=true]{background:#00728a;color:#fff;border-color:#00728a}.v31-admin .v31-table th{background:#edf5f8;color:#405969}.v31-admin .v31-table tbody tr:hover{background:#f2f7f9}.v31-admin{background:#edf0f2}`;document.head.appendChild(rfMasterStyle);
 function refreshMaster(focusAction='',id=''){
  const root=document.querySelector('.mt-scroll'),left=root?.scrollLeft||0,top=root?.scrollTop||0,main=document.querySelector('main'),scroll=main?.scrollTop||0,appTop=app.scrollTop||0;
  render();const newRoot=document.querySelector('.mt-scroll');if(newRoot){newRoot.scrollLeft=left;newRoot.scrollTop=top}const newMain=document.querySelector('main');if(newMain)newMain.scrollTop=scroll;app.scrollTop=appTop;
@@ -2226,7 +2282,7 @@ document.addEventListener('click',event=>{
 function demoAdminContent(){
  if(adminPage==='movements')return rfAdminMovementDestinationsPage();
  if(adminPage==='oneschool')return osImportPage();
- if(adminPage==='master')return osPublished()?osDatedContent(false):masterContent();
+ if(adminPage==='master')return rfAdminMasterPage();
  if(adminPage==='classes')return demoPlanning();
  if(adminPage==='timetable')return osPlanningPage();
  if(adminPage==='students')return demoStudentAdmin();
@@ -2246,7 +2302,7 @@ document.addEventListener('click',e=>{
  if(demoRole!=='admin')return;
  const el=e.target.closest('[data-admin-page],[data-admin-edit],[data-admin-cancel],[data-admin-reset],[data-admin-toggle]');if(!el)return;
  e.stopImmediatePropagation();adminMessage='';
- if(el.dataset.adminPage){adminPage=el.dataset.adminPage;adminEdit=null;planMode='list';planId='';periodRemovePending='';if(adminPage==='oneschool')osReviewId='';if(adminPage==='timetable')osTab=polishTab(polishPrefs.tab||'overview');if(adminPage==='master'){osSetView(false);osResetFilters();osWide=false}if(adminPage==='students'){studentAdminMode='list';studentAdminId=null}}
+ if(el.dataset.adminPage){adminPage=el.dataset.adminPage;adminEdit=null;planMode='list';planId='';periodRemovePending='';if(adminPage==='oneschool')osReviewId='';if(adminPage==='timetable')osTab=polishTab(polishPrefs.tab||'overview');if(adminPage==='master'){rfAdminMasterMode='tiles';rfMasterReset();osSetView(false);osResetFilters();osWide=false;if(osPublished())osDate=osDefaultDate(osPublished())}if(adminPage==='students'){studentAdminMode='list';studentAdminId=null}}
  else if(el.dataset.adminEdit){adminPage='staff';adminEdit=el.dataset.adminEdit}
  else if(el.hasAttribute('data-admin-cancel'))adminEdit=null;
  else{const p=previewStaff.find(x=>x.id===(el.dataset.adminToggle||el.dataset.adminReset));if(!p||['admin','teacher'].includes(p.username))return;
