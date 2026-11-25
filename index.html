@@ -3602,7 +3602,7 @@ function rfuRecordForm(module){
 function rfuRecordsPage(module){
  const label=RFU_MODULES.find(m=>m[0]===module)?.[1]||module,rows=rfuRows(module),visible=rows.filter(r=>rfuMatch(r.title,r.detail,r.status,rfuStaffName(r.owner),r.studentId?rfuStudentName(r.studentId):''));
  const action=r=>{const next=rfuCanChange(module,r)&&rfuNextStatus(module,r);return next?'<button type="button" class="v31-btn" data-rfu-change="'+esc(r.id)+'">'+esc(rfuStatusAction(next,module))+'</button>':''};
- return rfAdminMetrics([['Records',rows.length],['Open',rows.filter(r=>['Open','Awaiting review','In review'].includes(r.status)).length],['Completed / reviewed',rows.filter(r=>['Complete','Reviewed','Approved','Recorded'].includes(r.status)).length]])+rfuPanel(label,rfuSearch()+rfuRecordForm(module)+rfuTable(['Record','Assigned to','Date / time','Status','Action'],visible.map(r=>['<strong>'+esc(r.title)+'</strong><small>'+esc(r.studentId?rfuStudentName(r.studentId):r.classCode||'')+'</small><small>'+esc(r.detail||'')+'</small>',esc(rfuStaffName(r.owner)),esc(r.date+(r.time?' · '+r.time:'')),esc(r.status),action(r)])),module==='approvals'?'Delegated assistance and review only. Never modifies submitted attendance or OneSchool.':'Fictional operational records · scoped to your assignments and delegated responsibilities.');
+ return rfAdminMetrics([['Records',rows.length],['Open',rows.filter(r=>['Open','Awaiting review','In review'].includes(r.status)).length],['Completed / reviewed',rows.filter(r=>['Complete','Reviewed','Approved','Recorded','Resolved'].includes(r.status)).length]])+rfuPanel(label,rfuSearch()+rfuRecordForm(module)+rfuTable(['Record','Assigned to','Date / time','Status','Action'],visible.map(r=>['<strong>'+esc(r.title)+'</strong><small>'+esc(r.studentId?rfuStudentName(r.studentId):r.classCode||'')+'</small><small>'+esc(r.detail||'')+'</small>',esc(rfuStaffName(r.owner)),esc(r.date+(r.time?' · '+r.time:'')),esc(r.status),action(r)])),module==='approvals'?'Delegated assistance and review only. Never modifies submitted attendance or OneSchool.':'Fictional operational records · scoped to your assignments and delegated responsibilities.');
 }
 function rfuDashboard(){
  const modules=RFU_MODULES.filter(m=>m[0]!=='dashboard'&&rfuCan(m[0])),metrics=[];
@@ -3911,7 +3911,7 @@ function rfuNextStatus(module,r){
  }
  if(module==='referrals'){
   if(status==='Resolved')return '';
-  if(status==='Reviewed')return rfuRecordAllowed(module,r,rfuActor,['manage','review'])?'Resolved':'';
+  if(status==='Reviewed')return rfuRecordAllowed(module,r,rfuActor,['manage'])?'Resolved':'';
   return 'Reviewed';
  }
  if(module==='relief')return status==='Allocated'?'Complete':status==='Complete'?'':'Allocated';
