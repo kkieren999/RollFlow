@@ -3,9 +3,33 @@
 **Last reviewed:** 27 November 2026 (Australia/Brisbane)  
 **Project:** kkieren999/RollFlow  
 **Goal:** Deliver a secure, school-wide Windows/browser application suitable for an approved Queensland secondary school pilot and eventually live deployment. The current website is the UX reference, not the production data layer.  
-**Status:** V4.0 security foundation committed; final validation and outstanding security work remain. No production launch or real school data authorised.
+**Status:** V4.1 school data foundation committed; final validation and outstanding security/data work remain. No production launch or real school data authorised.
 
-## CURRENT CHECKPOINT — V4.0 security foundation (27 Nov 2026)
+## CURRENT CHECKPOINT — V4.1 school data and OneSchool (27 Nov 2026)
+
+**Latest cumulative branch:** `feature/v4.1-school-data-oneschool`, head `a664b900422dbce5683e004a295b0ecb552798d3`, draft PR #38 https://github.com/kkieren999/RollFlow/pull/38 (base windows-release, includes all previous phases). Verify actual head before further edits. This checkpoint supersedes prior phase status below.
+
+### Build state
+- V4.0 exact commit 963bf058: #309 https://github.com/kkieren999/RollFlow/actions/runs/45893460694 and #310 both passed standard and PostgreSQL/native checks; #309 Windows browser step still running at inspection.
+- V4.1 initial commit b5e5caed: #311 https://github.com/kkieren999/RollFlow/actions/runs/45893836092 passed standard and PostgreSQL/native jobs, Windows in progress. New tests and safety enhancements in 990595b1 and a664b900 remain under validation.
+- Latest exact-commit push #314 https://github.com/kkieren999/RollFlow/actions/runs/45893959902 and PR #315 https://github.com/kkieren999/RollFlow/actions/runs/45893967536 started. Verify each job and artifact before claiming success. Artifact name RollFlow-V4.1.0-School-Data-OneSchool-Windows-x64-STAGING.
+- No real school data, merge or deployment authorised.
+
+### Implemented
+- Admin-only School data centre /manage/school-data/: existing dated CSV, SM110, membership CSV, line alignment, PDF imports and staff identity verification retained; candidate comparison, duplicate/overlap/empty roster diagnostics, applied source freshness and recent import history, publication history.
+- Dated snapshot validation version 1. Attendance readiness fails if current applied student/membership batch changes, is missing/purged, or timetable changes; school mode requires actual source provenance. Legacy synthetic fixtures without source refs only accepted outside school mode.
+- Identical publish is a no-op; replacing active dated publication with rolls requires explicit acknowledgement. Prior attendance remains attached to original publication. Restore creates a new immutable publication only when exact old digest/sources/snapshot rebuild from current inputs and no affected attendance exists. Full historical import rollback not implemented.
+- Migration 0018 AttendanceTransferReview. Admin-only local review CSV for complete submitted revisions, validates frozen roster, original identity, submission history/actor, rejects spreadsheet formulas, stale review digest, invalid identity; audit and one-time operator attestation. No names in CSV; student identifiers restricted to authorised local review. Not OneSchool-approved format, no API/upload or external confirmation.
+- Tests appended to accounts/test_dated_school.py and accounts/test_live_foundation.py; verify exact-commit CI. Version bump Windows 4.1.0. Documentation docs/v4.1-school-data.md.
+
+### Next actions
+1. Verify #314/#315 and V4.0 Windows #309/#310, investigate actual failures and repair before reporting release. Inspect exact artifact presence/expiry. 
+2. Finish V4.1 gaps: full dated student enrolment/withdrawal history and explicit reviewed changes, true import rollback using approved backup/restore procedures, source application locking/concurrency and source freshness regression across all import paths; approved OneSchool transfer format and process from school ICT, not guessed. Test restoration of a real fictional backup.
+3. Continue previous V4.0 security gates (temporary relief roster/marking access, delegated action-level permissions, SSO/MFA provider approval, role/session audits, protected browser E2E) and V3.9 protected multi-session workflow; existing Windows Chrome test is fictional training.
+4. Next major phase V4.2 Complete Live Attendance: actual all-lesson daily completeness, pending/draft/submitted monitoring, auditable authorised corrections with reason and immutable revisions, exact lesson ownership and relief handling, approved manual reconciliation and re-review after corrections, exception handling and protected multi-session testing. OneSchool remains official; never represent local CSV as approved direct transfer. Distinguish implementation from successful builds and production approval.
+5. Keep this file current on development-handover branch. Do not overwrite main or windows-release without review/approval.
+
+## PREVIOUS CHECKPOINT — V4.0 security foundation (27 Nov 2026)
 
 **Latest cumulative development branch:** `feature/v4.0-accounts-roles-security`, head `963bf058d32ff67d8173caf69ce7bd96a5631e51`, draft PR #37 https://github.com/kkieren999/RollFlow/pull/37 (base windows-release; includes prior drafts). Do not restart from main, windows-release or V3.9 for subsequent development. Recheck actual branch head before edits. Sections below retain the earlier roadmap/history; this checkpoint supersedes older statements of current phase.
 
@@ -35,7 +59,7 @@ This file is the durable project handover, not a transcript. Read it in full bef
 
 1. Connect to the GitHub repository and re-check the live branch heads, open pull requests, workflow runs, job logs and artifacts. Facts in this file are a snapshot; current repository evidence takes precedence.
 2. Resume the first incomplete task in the CURRENT CHECKPOINT above, then consult the earlier roadmap sections. Do not start an unrelated implementation or restart from an older release just because it is the default branch.
-3. Work from the latest cumulative Windows development branch, presently `feature/v4.0-accounts-roles-security`. For a new phase, create a feature branch from the verified cumulative head. Inspect other overlapping branches before merging. Use an expected-head lease when updating a branch.
+3. Work from the latest cumulative Windows development branch, presently `feature/v4.1-school-data-oneschool`. For a new phase, create a feature branch from the verified cumulative head. Inspect other overlapping branches before merging. Use an expected-head lease when updating a branch.
 4. Preserve working OneSchool imports, database schema/history, access boundaries and public website. Prefer incremental migrations and shared UI components; do not discard working code unnecessarily. Do not merge, deploy, delete existing databases, publish real data, or change school infrastructure without explicit approval.
 5. Add tests with fictional data. Run/trigger Django checks, migration consistency, all relevant regression tests, PostgreSQL/native smoke, browser checks and Windows packaging. Investigate failed jobs rather than weakening security or suppressing tests. A queued/running build is not a successful build.
 6. Create or update a draft PR. Report actual changes, limitations, branch, commit, PR, test outcomes and a verified artifact URL. Never claim an installer is ready unless the exact commit's required jobs passed and the artifact exists.
@@ -54,7 +78,9 @@ Stable handover URL: https://github.com/kkieren999/RollFlow/blob/development-han
 | Prior cumulative V3.9 development source | `feature/v3.9-live-foundation` — `d3940a8f51d8db08e2c8d9954c0e9803449c127f`, draft PR #36 |
 | Other overlapping shared-core work | `integration/shared-core`, draft PR #33 to main — inspect independently, do not assume merged |
 
-| **Current cumulative development source** | `feature/v4.0-accounts-roles-security` — `963bf058d32ff67d8173caf69ce7bd96a5631e51`, draft PR #37 |
+| Prior cumulative V4.0 development source | `feature/v4.0-accounts-roles-security` — `963bf058d32ff67d8173caf69ce7bd96a5631e51`, draft PR #37 |
+
+| **Current cumulative development source** | `feature/v4.1-school-data-oneschool` — `a664b900422dbce5683e004a295b0ecb552798d3`, draft PR #38 |
 
 Links:
 - Website: https://kkieren999.github.io/RollFlow/
