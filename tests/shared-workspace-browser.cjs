@@ -24,12 +24,22 @@ async function run(){
    const context=await browser.newContext({viewport:{width:1440,height:1000}}),page=await context.newPage();
    const errors=[];page.on('pageerror',e=>errors.push(String(e)));
    let stage='login';try{
+   await context.addInitScript(()=>{
+    if(localStorage.getItem('rollflow_calendar_v1')===null){
+     const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Australia/Brisbane',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+     localStorage.setItem('rollflow_calendar_v1',JSON.stringify([
+      {id:'qa-operational',title:'QA pupil-free day',date:today,end:today,category:'Pupil-free day',impact:'non-teaching'},
+      {id:'qa-general',title:'QA community celebration',date:today,category:'School event'}
+     ]));
+    }
+   });
    await page.goto(url);
    assert.match(await page.locator('.demo-auth-footer').innerText(),/Do not enter real school credentials or records/);
    await page.locator('#demo-username').fill(id);await page.locator('#demo-password').fill(id);await page.locator('#demo-login-form button[type="submit"]').click();
    await page.locator('.rf-compact-account summary').waitFor();
    assert.equal(await page.locator('.rf-training-notice').count(),0,'Persistent banner removed');
    assert.equal(await page.locator('.nav-primary button').count(),counts[id],id+' compact menu count');
+   assert.equal(await page.locator('.nav-primary [data-nav="school-calendar"],.nav-primary [data-rfu-page="calendar"],.rf-compact-tabs [data-nav="school-calendar"],.rf-compact-tabs [data-rfu-page="calendar"]').count(),0,id+' calendar route removed');
    const teacher=['teacher','swilliams'].includes(id),attr=id==='admin'?'data-admin-page':teacher?'data-nav':'data-rfu-page';
    await capture(page,id+'-desktop-landing');
    for(const label of ['My Profile','My Preferences','Help & Support']){
@@ -56,6 +66,18 @@ async function run(){
     }
    }
 
+   if(id==='admin'||['principal','deputy','business'].includes(id)){
+    const attr=id==='admin'?'data-admin-page':'data-rfu-page',route=id==='admin'?'timetable':'master';
+    await page.locator('.nav-primary ['+attr+'="'+route+'"]').click();
+    assert.equal(await page.locator('.rf-scheduling-manage').count(),1,id+' authorised exception manager');
+    assert(!await page.locator('.content-shell>main').innerText().then(t=>t.includes('QA community celebration')),id+' general events hidden');
+   }else if(!teacher){
+    const route=await page.locator('.nav-primary [data-rfu-page="schedule"]').count()?'schedule':await page.locator('.nav-primary [data-rfu-page="master"]').count()?'master':'dashboard';
+    await page.locator('.nav-primary [data-rfu-page="'+route+'"]').click();
+    assert.equal(await page.locator('.rf-scheduling-manage').count(),0,id+' read-only exception access');
+    assert.match(await page.locator('.rf-scheduling-notices').innerText(),/QA pupil-free day/);
+    assert(!await page.locator('.rf-scheduling-notices').innerText().then(t=>t.includes('QA community celebration')));
+   }
    if(teacher){
     await page.locator('.nav-primary [data-nav="finder"]').click();
     const code=id==='swilliams'?'ENG071A':'MAF102A';
