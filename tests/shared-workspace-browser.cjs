@@ -106,11 +106,14 @@ async function run(){
         const linear=rgb.map(v=>{v/=255;return v<=0.04045?v/12.92:((v+0.055)/1.055)**2.4});
         return .2126*linear[0]+.7152*linear[1]+.0722*linear[2];
        };
-       const readable=heads.every(h=>{
-        const bg=getComputedStyle(h),name=h.querySelector('button strong'),date=h.querySelector('button small');
+       const visibleNames=heads.map(h=>[...h.querySelectorAll('button strong')].filter(el=>getComputedStyle(el).display!=='none'));
+       const workspace=grid.closest('.rf-timetable-workspace'),compact=parseFloat(getComputedStyle(workspace).width)<=999;
+       const readable=heads.every((h,i)=>{
+        const bg=getComputedStyle(h),name=visibleNames[i][0],date=h.querySelector('button small');
+        if(visibleNames[i].length!==1)return false;
         return [name,date].every(el=>{
          const fg=getComputedStyle(el),r=box(el),l1=luminance(bg.backgroundColor),l2=luminance(fg.color);
-         return fg.visibility==='visible'&&Number(fg.opacity)>0&&r.w>0&&r.h>0&&r.t>=box(h).t-1&&r.b<=box(h).b+1&&(Math.max(l1,l2)+.05)/(Math.min(l1,l2)+.05)>=4.5;
+         return fg.visibility==='visible'&&Number(fg.opacity)>0&&r.w>0&&r.h>0&&r.t>=box(h).t-1&&r.b<=box(h).b+1&&r.l>=box(h).l-1&&r.r<=box(h).r+1&&(Math.max(l1,l2)+.05)/(Math.min(l1,l2)+.05)>=4.5;
         });
        });
        const timeHead=box(grid.querySelector('.rf-week-label-head')),timeRects=[...grid.querySelectorAll('.rf-week-label')].map(box);
@@ -123,9 +126,12 @@ async function run(){
        const stickyTime=box(grid.querySelector('.rf-week-label-head'));
        const timeTop=document.elementFromPoint(stickyTime.l+stickyTime.w/2,stickyTime.t+stickyTime.h/2);
        const stickyTimeVisible=!!timeTop?.closest('.rf-week-label-head');
-       return {overlap,timeOverlap,cardOverflow,stickyTimeVisible,readable,labels:heads.map(h=>h.querySelector('button strong').textContent),headerY:headerRects.map(r=>r.t),scrollWidth:scroll.scrollWidth,clientWidth:scroll.clientWidth,scrollBox,last,first};
+       return {overlap,timeOverlap,cardOverflow,stickyTimeVisible,readable,compact,labels:visibleNames.map(names=>names[0]?.textContent),fullNames:heads.map(h=>h.querySelector('button').getAttribute('aria-label')),headerY:headerRects.map(r=>r.t),scrollWidth:scroll.scrollWidth,clientWidth:scroll.clientWidth,scrollBox,last,first};
       });
-      assert.deepEqual(geometry.labels,['Monday','Tuesday','Wednesday','Thursday','Friday']);
+      assert.deepEqual(geometry.labels,geometry.compact?['Mon','Tue','Wed','Thu','Fri']:['Monday','Tuesday','Wednesday','Thursday','Friday']);
+      assert(geometry.fullNames.every((label,i)=>label.includes(['Monday','Tuesday','Wednesday','Thursday','Friday'][i])),'Full accessible weekday names remain available '+width);
+      if(width===1440)assert(!geometry.compact,'Desktop uses full weekday names');
+      if(width<=820)assert(geometry.compact,'Narrow schedules use abbreviated weekdays');
       assert(geometry.readable,'Weekday names and dates must be visible with at least 4.5:1 contrast '+width);
       assert(geometry.headerY.every(y=>Math.abs(y-geometry.headerY[0])<2),'Weekday header alignment '+width);
       assert(!geometry.overlap,'Overlapping grid cells '+width);
