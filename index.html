@@ -4726,6 +4726,113 @@ render=function(){
 window.addEventListener('storage',e=>{if(['rollflow_room_changes_v1','rollflow_room_closures_v1'].includes(e.key)&&rfRoomStaff()&&!document.querySelector('#rf-room-dialog[open]'))render()});
 const rfRoomCSS=document.createElement('style');rfRoomCSS.textContent='.rf-room-inline{display:inline-flex;align-items:center;gap:4px;max-width:100%;flex-wrap:wrap;vertical-align:middle}.rf-room-marker{color:#8b641e;display:inline-flex;align-items:center}body[data-theme="Dark"] .rf-room-marker{color:#e8c16e}.rf-room-action{border:0;background:transparent;color:inherit;font-size:18px;line-height:1;min-width:26px;min-height:24px;border-radius:4px;padding:2px 4px}.rf-room-action:hover{background:#8495a52a}.rf-room-link{appearance:none;border:0;background:none;padding:0 1px;color:inherit;font:inherit;line-height:inherit;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:2px;cursor:pointer;max-width:100%;overflow-wrap:anywhere;border-radius:2px}.rf-room-link:hover{color:var(--school-secondary,#0076a8);text-decoration-thickness:2px}.rf-room-link:focus-visible{outline:2px solid var(--school-secondary,#0076a8);outline-offset:3px}body[data-theme="Dark"] .rf-room-link:hover{color:#a6ddf3}body[data-theme="Dark"] .rf-room-link:focus-visible{outline-color:#a6ddf3}.rf-room-inline{column-gap:3px;row-gap:1px}.rf-room-dialog{width:min(460px,calc(100% - 24px));max-height:90dvh;overflow:auto;border:1px solid var(--rf-border,#dbe4e6);border-radius:12px;padding:20px;background:var(--rf-surface,#fff);color:var(--rf-text,#17283a);box-shadow:0 12px 50px #0003}.rf-room-dialog::backdrop{background:#0006}.rf-room-dialog form,.rf-room-dialog label{display:grid;gap:7px}.rf-room-dialog form{gap:12px}.rf-room-dialog input,.rf-room-dialog select{width:100%;min-height:38px;padding:7px;border:1px solid var(--rf-border,#aab7c1);border-radius:5px;background:var(--rf-surface,#fff);color:var(--rf-text,#17283a)}.rf-room-dialog-head,.rf-room-dialog-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}.rf-room-dialog [data-rf-room-message]{color:var(--rf-text);font-weight:600}.rf-room-notices{margin-bottom:12px}.rf-room-notices summary{cursor:pointer}.rf-room-more{border-top:1px solid var(--rf-border,#dbe4e6);border-bottom:1px solid var(--rf-border,#dbe4e6);padding:9px 0}.rf-room-more summary,.rf-room-group summary{cursor:pointer;font-weight:600}.rf-room-more summary small{display:block;font-weight:400;margin:3px 0 0 17px}.rf-room-scopes{display:grid;gap:9px;padding:9px 0 3px}.rf-room-dialog .rf-room-scopes label:has(input[type=radio]){display:flex;align-items:center;gap:7px}.rf-room-dialog .rf-room-scopes input[type=radio]{width:auto;min-height:0;flex:none}.rf-room-dialog [hidden]{display:none!important}.rf-room-review-list{display:grid;gap:5px;max-height:245px;overflow:auto;padding:2px}.rf-room-review-row,.rf-room-group-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;padding:7px 0;border-bottom:1px solid var(--rf-border,#dbe4e6)}.rf-room-review-row>div{display:grid;gap:2px}.rf-room-review-row label{flex:1 1 125px}.rf-room-review-row small{font-size:11px}.rf-room-dialog [data-rf-room-review] h3{font-size:15px;margin-bottom:4px}.rf-room-group{margin-top:6px}.rf-room-group-row{font-size:12px}.rf-room-notices .rf-module-body{padding:12px;display:grid;gap:8px}';document.head.appendChild(rfRoomCSS);
 
+/* Shared date picker and school calendar; native inputs remain the source of truth. */
+function rfCalValid(date){return /^\d{4}-\d{2}-\d{2}$/.test(date||'')&&osDateValid(date)}
+function rfCalMonth(date){return date.slice(0,7)}
+function rfCalShift(month,delta){const [y,m]=month.split('-').map(Number),d=new Date(Date.UTC(y,m-1+delta,1));return d.toISOString().slice(0,7)}
+function rfCalDays(month){const first=month+'-01',offset=(new Date(first+'T12:00:00Z').getUTCDay()+6)%7;return Array.from({length:42},(_,i)=>dateOffset(first,i-offset))}
+function rfCalTerm(date){const i=SARAH_2026_TERMS.findIndex(([a,b])=>date>=a&&date<=b);return i<0?'':('Term '+(i+1))}
+function rfCalEvents(date,events){return events.filter(e=>e.date<=date&&(e.end||e.date)>=date)}
+function rfCalInfo(date,events=[]){
+ const day=new Date(date+'T12:00:00Z').getUTCDay(),term=rfCalTerm(date),matches=rfCalEvents(date,events),exception=matches.find(e=>e.impact==='non-teaching');
+ const known=date.startsWith('2026-'),weekend=day===0||day===6,holiday=SARAH_2026_NO_STUDENTS[date]||'',off=weekend||!!holiday||!!exception||(known&&!term);
+ const status=holiday||exception?.title||(weekend?'Weekend':known&&!term?'School holidays / outside term':known?'School day':'School calendar not configured for this year');
+ return {off,status,term,events:matches};
+}
+function rfCalAllowed(date,min='',max='',step='',base='1970-01-01'){
+ if(!rfCalValid(date)||min&&date<min||max&&date>max)return false;
+ const n=Number(step);return !step||step==='any'||!Number.isFinite(n)||n<=0||Math.abs((Date.parse(date)-Date.parse(base))/86400000/n-Math.round((Date.parse(date)-Date.parse(base))/86400000/n))<1e-8;
+}
+function rfCalGrid(month,selected,focus,min,max,events,range='',full=false,step='',base='1970-01-01'){
+ const today=brisbaneToday(),from=range&&range<selected?range:selected,to=range&&range>selected?range:selected;
+ return '<div class="rf-cal-grid" role="group" aria-label="Calendar days">'+['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d=>'<span class="rf-cal-weekday">'+d+'</span>').join('')+rfCalDays(month).map(date=>{
+  const info=rfCalInfo(date,events),inMonth=rfCalMonth(date)===month,allowed=rfCalAllowed(date,min,max,step,base),isSelected=date===selected||date===range;
+  const label=new Date(date+'T12:00:00Z').toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'Australia/Brisbane'})+' · '+info.status+(info.events.length?' · '+info.events.length+' event(s)':'');
+  const classes=['rf-cal-day',info.off?'rf-cal-nonschool':'',!inMonth?'rf-cal-outside':'',date===today?'rf-cal-today':'',range&&selected&&date>from&&date<to?'rf-cal-range':'',isSelected?'rf-cal-selected':''].filter(Boolean).join(' ');
+  return '<button type="button" class="'+classes+'" data-rf-cal-day="'+date+'" aria-label="'+esc(label)+'" title="'+esc(label)+'" aria-pressed="'+isSelected+'" '+(date===today?'aria-current="date" ':'')+'tabindex="'+(date===focus&&allowed?'0':'-1')+'" '+(!allowed?'disabled':'')+'><span>'+Number(date.slice(-2))+'</span>'+(info.events.length?'<span class="rf-cal-dot" aria-hidden="true"></span>':'')+(full?info.events.slice(0,2).map(e=>'<span class="rf-cal-event">'+esc(e.title)+'</span>').join(''):'')+'</button>';
+ }).join('')+'</div>';
+}
+function rfCalRangeAnchor(input){
+ const form=input.form||input.closest('section')||input.parentElement?.parentElement;
+ if(!form)return '';
+ if(input.name==='end'&&form.id==='rf-room-form')return form.elements.date?.value||'';
+ const keys=['name','data-student-filter','data-individual','data-report','data-rf-unified-filter','data-rf-admin-filter','id'];
+ for(const key of keys){
+  const value=input.getAttribute(key)||'',pair=/^(from|start)(date)?$/i.test(value)?['to','end','todate','enddate']:/^(to|end)(date)?$/i.test(value)?['from','start','fromdate','startdate']:null;
+  if(pair){const other=[...form.querySelectorAll('input[type=date]')].find(el=>el!==input&&pair.includes((el.getAttribute(key)||'').toLowerCase()));if(other&&rfCalValid(other.value))return other.value}
+ }
+ return '';
+}
+function rfCalMonthTitle(month){return new Date(month+'-01T12:00:00Z').toLocaleDateString('en-AU',{month:'long',year:'numeric',timeZone:'Australia/Brisbane'})}
+let rfCalDialog=null;
+function rfCalOpen(input=null,full=false){
+ if(input&&(!input.isConnected||input.disabled||input.readOnly||input.matches('[data-rf-native-date]')))return;
+ if(full&&!rfScheduleAllowed())return;
+ if(rfCalDialog?.open)rfCalDialog.close();
+ const today=brisbaneToday(),min=input&&rfCalValid(input.min)?input.min:'',max=input&&rfCalValid(input.max)?input.max:'',step=input?.getAttribute('step')||'',base=min||(rfCalValid(input?.getAttribute('value'))?input.getAttribute('value'):'1970-01-01');
+ const valid=d=>rfCalAllowed(d,min,max,step,base),range=input?rfCalRangeAnchor(input):'';
+ let selected=input&&rfCalValid(input.value)?input.value:full?today:'',focus=selected||today;
+ if(min&&focus<min)focus=min;if(max&&focus>max)focus=max;
+ let month=rfCalMonth(focus);
+ const events=rfScheduleAllowed()?rfScheduleExceptions():[];
+ const returnFocus=input||document.activeElement,dialog=document.createElement('dialog');rfCalDialog=dialog;dialog.className='rf-ui-dialog rf-ui-calendar-dialog'+(full?' rf-ui-calendar-dialog--full rf-cal-full':'');dialog.setAttribute('aria-labelledby','rf-cal-title');document.body.append(dialog);
+ function paint(focusDay=false){
+  const info=rfCalInfo(selected||focus,events),term=rfCalTerm(month+'-15'),known=month.startsWith('2026-');
+  const minMonth=min?rfCalMonth(min):'1900-01',maxMonth=max?rfCalMonth(max):'2099-12';
+  const days=rfCalDays(month);if(!days.includes(focus)||!valid(focus))focus=days.find(d=>rfCalMonth(d)===month&&valid(d))||days.find(valid)||'';
+  const details=full?'<div class="rf-cal-events"><strong>Events on selected date</strong>'+(info.events.length?info.events.map(e=>'<article><strong>'+esc(e.title)+'</strong><small>'+esc(rfScheduleDateLabel(e)+' · '+e.category)+'</small></article>').join(''):'<p class="rf-ui-muted">No events recorded for this day.</p>')+'</div>':'';
+  dialog.innerHTML='<header class="rf-ui-header"><span class="rf-ui-icon" aria-hidden="true">'+navSvg('calendar-days')+'</span><div class="rf-ui-header-copy"><h2 id="rf-cal-title">'+(full?'School Calendar':range?'Select date · range':'Select date')+'</h2><p>'+(full?'School dates and scheduling exceptions':'Choose a date')+'</p></div><button type="button" class="rf-ui-close" data-rf-cal-close aria-label="Close calendar">×</button></header><div class="rf-cal-toolbar"><button class="rf-ui-button rf-cal-nav" type="button" data-rf-cal-shift="-1" aria-label="Previous month" '+(month<=minMonth?'disabled':'')+'>‹</button><div class="rf-cal-heading"><strong>'+esc(rfCalMonthTitle(month))+'</strong><small>'+esc(term||(known?'School calendar':'School dates not configured'))+'</small></div><button class="rf-ui-button rf-cal-nav" type="button" data-rf-cal-shift="1" aria-label="Next month" '+(month>=maxMonth?'disabled':'')+'>›</button></div><label class="rf-ui-field">Jump to month<input class="rf-ui-control" type="month" data-rf-cal-jump min="'+minMonth+'" max="'+maxMonth+'" value="'+month+'"></label>'+rfCalGrid(month,selected,focus,min,max,events,range,full,step,base)+'<div class="rf-cal-legend"><span><i class="rf-cal-key"></i> Selected</span><span><i class="rf-cal-key rf-cal-key--off"></i> No school / weekend</span><span><i class="rf-cal-key rf-cal-key--today"></i> Today</span><span><i class="rf-cal-dot"></i> Event</span></div><div class="rf-ui-context rf-cal-summary"><strong>'+esc(new Date((selected||focus||today)+'T12:00:00Z').toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'Australia/Brisbane'}))+'</strong><small>'+esc(info.status+(info.term?' · '+info.term:''))+'</small>'+(range&&selected?'<small>Range: '+esc([range,selected].sort().join(' – '))+'</small>':'')+'</div>'+details+'<div class="rf-cal-actions"><button class="rf-ui-button" type="button" data-rf-cal-today '+(!valid(today)?'disabled':'')+'>Today</button>'+(input&&!input.required?'<button class="rf-ui-button" type="button" data-rf-cal-clear>Clear</button>':'')+(input?'<button class="rf-ui-button" type="button" data-rf-cal-native>Native picker</button>':'')+'<button class="rf-ui-button" type="button" data-rf-cal-close>'+(full?'Close':'Cancel')+'</button></div>';
+  if(focusDay)dialog.querySelector('[data-rf-cal-day="'+focus+'"]')?.focus();
+ }
+ function choose(date){
+  if(date&&!valid(date)||!date&&input?.required)return;
+  if(full){selected=date;focus=date;month=rfCalMonth(date);paint(true);return}
+  if(!input?.isConnected){dialog.close();return}
+  const old=input.value;dialog.close();input.value=date;
+  if(input.value!==old){input.dispatchEvent(new Event('input',{bubbles:true}));if(input.isConnected)input.dispatchEvent(new Event('change',{bubbles:true}))}
+ }
+ dialog.addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b||b.disabled)return;
+  if(b.hasAttribute('data-rf-cal-close')){dialog.close();return}
+  if(b.hasAttribute('data-rf-cal-native')){dialog.close();if(input?.isConnected){input.focus();try{input.showPicker?.()}catch{}}return}
+  if(b.hasAttribute('data-rf-cal-clear')){choose('');return}
+  if(b.hasAttribute('data-rf-cal-today')){choose(today);return}
+  if(b.dataset.rfCalDay){choose(b.dataset.rfCalDay);return}
+  if(b.dataset.rfCalShift){month=rfCalShift(month,Number(b.dataset.rfCalShift));focus=month+'-01';paint(true)}
+ });
+ dialog.addEventListener('change',e=>{if(e.target.matches('[data-rf-cal-jump]')&&/^\d{4}-\d{2}$/.test(e.target.value)&&e.target.checkValidity()){month=e.target.value;focus=month+'-01';paint(true)}});
+ dialog.addEventListener('keydown',e=>{
+  const day=e.target.dataset?.rfCalDay;if(!day)return;
+  let next='',delta=({'ArrowLeft':-1,'ArrowRight':1,'ArrowUp':-7,'ArrowDown':7})[e.key];
+  if(delta)next=dateOffset(day,delta);
+  else if(e.key==='Home'||e.key==='End'){const offset=(new Date(day+'T12:00:00Z').getUTCDay()+6)%7;next=dateOffset(day,e.key==='Home'?-offset:6-offset)}
+  else if(e.key==='PageUp'||e.key==='PageDown'){const m=rfCalShift(rfCalMonth(day),(e.key==='PageUp'?-1:1)*(e.shiftKey?12:1));next=m+'-'+String(Math.min(Number(day.slice(-2)),new Date(Date.UTC(Number(m.slice(0,4)),Number(m.slice(5)),0)).getUTCDate())).padStart(2,'0')}
+  if(!next)return;e.preventDefault();if(!valid(next))return;focus=next;month=rfCalMonth(next);paint(true);
+ });
+ dialog.addEventListener('close',()=>{dialog.remove();if(rfCalDialog===dialog)rfCalDialog=null;if(returnFocus?.isConnected)returnFocus.focus({preventScroll:true})});
+ paint();dialog.showModal();dialog.querySelector('[data-rf-cal-day][tabindex="0"]')?.focus();
+}
+/* Capture date clicks only; all underlying form names, min/max and handlers remain. */
+document.addEventListener('click',e=>{
+ const input=e.target.closest?.('input[type=date]');if(input&&!input.disabled&&!input.readOnly&&!input.hasAttribute('data-rf-native-date')&&!e.ctrlKey&&!e.metaKey){e.preventDefault();e.stopImmediatePropagation();rfCalOpen(input);return}
+ const launch=e.target.closest?.('[data-rf-school-calendar]');if(launch){e.preventDefault();e.stopImmediatePropagation();rfCalOpen(null,true)}
+},true);
+document.addEventListener('keydown',e=>{if(e.altKey&&e.key==='ArrowDown'&&e.target.matches?.('input[type=date]:not([data-rf-native-date])')&&!e.target.disabled&&!e.target.readOnly){e.preventDefault();rfCalOpen(e.target)}},true);
+function rfCalEnhance(){
+ for(const select of document.querySelectorAll('select:not([multiple]):not([size]:not([size="1"]))')){
+  if(select.classList.contains('rf-ui-room-select'))continue;
+  const compact=select.closest('.roll-view,.lesson-actions,td,.rf-compact-tabs,.mt-toolbar,.rf-master-table')||select.classList.contains('small');
+  select.classList.add(compact?'rf-ui-select--compact':'rf-ui-select');
+ }
+ if(!rfScheduleAllowed()||rfPersonalPage)return;
+ const route=demoRole==='admin'?adminPage:demoRole==='teacher'&&!rfuTeacherExtra?state.page:rfuPage,main=app.querySelector('.content-shell>main,.v31-content>main');
+ if(main&&['timetable','schedule','master','workforce'].includes(route)&&!main.querySelector('[data-rf-school-calendar]'))main.insertAdjacentHTML('afterbegin','<div class="rf-cal-launch"><button type="button" class="rf-ui-button" data-rf-school-calendar>'+navSvg('calendar-days')+' School Calendar</button></div>');
+}
+const rfCalBeforeRender=render;render=function(){rfCalBeforeRender();rfCalEnhance()};
+/* Enhance dynamically opened dialogs without modifying their form handlers. */
+const rfCalObserver=new MutationObserver(records=>{if(records.some(r=>[...r.addedNodes].some(n=>n.nodeType===1&&(n.matches?.('select')||n.querySelector?.('select')))))rfCalEnhance()});
+rfCalObserver.observe(document.body,{childList:true,subtree:true});
+
 /* Load shared design primitives after legacy injected styles. */
 const rfDesignLink=document.createElement('link');rfDesignLink.rel='stylesheet';rfDesignLink.href='styles/rollflow-design.css';document.head.appendChild(rfDesignLink);
 window.visualViewport?.addEventListener('resize',()=>requestAnimationFrame(fitGrid));
