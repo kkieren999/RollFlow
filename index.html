@@ -4575,49 +4575,122 @@ function rfRoomRecipients(slot,date){
  return [...new Set([...admins,slot.teacher,...assigned,...support].filter(id=>rfuIdentity(id)))];
 }
 function rfRoomCanUndo(row){return rfRoomStaff()&&(rfRoomAdmin()||row.actor===rfuActor)}
-function rfRoomSave(code,date,period,room,reason){
+
+function rfRoomPeriodOrder(p){const code=rfRoomPeriod(p),slot=planning.periods.find(x=>rfRoomPeriod(x.code)===code);return slot?.start?slot.start:code==='ROLL'?'00:00':String(Number(code)||99).padStart(2,'0')+':00'}
+function rfRoomKey(date,period){return date+'|'+rfRoomPeriod(period)}
+function rfRoomTargets(code,date,period,scope='single',end=date){
+ const start=rfRoomOccurrence(code,date,period);if(!start)return [];
+ if(!['single','day','range'].includes(scope))return [];
+ if(scope==='single')return [{...start,date}];
+ if(scope==='day')end=date;
+ if(!osDateValid(end)||end<date||end>dateOffset(date,90))return [];
+ const result=[];
+ for(let d=date;d<=end;d=dateOffset(d,1)){
+  const slots=rfRoomSlots(d).filter(x=>x.classCode===code&&(d!==date||rfRoomPeriodOrder(x.period)>=rfRoomPeriodOrder(start.period))).sort((x,y)=>rfRoomPeriodOrder(x.period).localeCompare(rfRoomPeriodOrder(y.period)));
+  result.push(...slots.map(x=>({...x,date:d})));
+ }
+ return result;
+}
+function rfRoomPlan(code,date,period,room,scope,end){
+ return rfRoomTargets(code,date,period,scope,end).map(x=>{
+  const current=rfRoomEffective(code,x.date,x.period,x.room),available=planning.rooms.filter(r=>r.active&&r.code!==current&&rfRoomFree(r.code,code,x.date,x.period)).sort((a,b)=>a.code.localeCompare(b.code,undefined,{numeric:true})),same=room===current;
+  return {...x,key:rfRoomKey(x.date,x.period),current,available,room:same?'':available.some(r=>r.code===room)?room:'',same};
+ });
+}
+function rfRoomSaveBatch(code,date,period,scope,end,choices,reason){
  if(!rfRoomStaff())return 'Staff access required.';
- const slot=rfRoomOccurrence(code,date,period),rows=rfRoomStore();if(!slot)return 'That scheduled lesson is no longer available.';
- const existing=rfRoomActive(code,date,period,rows),current=existing?.room||slot.room;
  if(!reason.trim())return 'Select a reason.';
- if(room===current)return 'Select a different room.';
- if(!rfRoomFree(room,code,date,period,rows))return 'That room is no longer available. Choose another room.';
- const row={id:rfModuleId(),code,date,period:slot.period,original:existing?.original||slot.room,previous:current,room,reason:reason.trim().slice(0,200),actor:rfuActor,at:new Date().toISOString(),status:'Active',recipients:rfRoomRecipients(slot,date),readBy:[]};
- if(!rfuWrite('rollflow_room_changes_v1',[...rows.map(r=>r===existing?{...r,status:'Superseded'}:r),row]))return 'Could not save room change.';
- rfuAudit('Temporary room change '+code+' '+date+' '+slot.period+' '+current+' → '+room,row.id);return '';
+ const targets=rfRoomTargets(code,date,period,scope,end),rows=rfRoomStore();
+ if(!targets.length)return 'No scheduled lessons in the selected range.';
+ if(!Array.isArray(choices)||!choices.length)return 'Select at least one lesson to change.';
+ const wanted=new Map(choices.map(x=>[x.key,x.room]));
+ if(wanted.size!==choices.length||[...wanted.keys()].some(k=>!targets.some(t=>rfRoomKey(t.date,t.period)===k)))return 'The timetable has changed. Review the affected lessons again.';
+ const batchId=rfModuleId(),at=new Date().toISOString(),changes=[],replace=new Set();
+ for(const slot of targets){
+  const key=rfRoomKey(slot.date,slot.period);if(!wanted.has(key))continue;
+  const room=wanted.get(key),existing=rfRoomActive(code,slot.date,slot.period,rows),current=existing?.room||slot.room;
+  if(room===current)return 'The current room has changed. Review the affected lessons again.';
+  if(!rfRoomFree(room,code,slot.date,slot.period,rows))return 'Room '+room+' is unavailable on '+slot.date+' ('+slot.period+'). Review the affected lessons again.';
+  if(existing)replace.add(existing.id);
+  changes.push({id:batchId+'-'+changes.length,batchId,code,date:slot.date,period:slot.period,original:existing?.original||slot.room,previous:current,room,reason:reason.trim().slice(0,200),actor:rfuActor,at,status:'Active',recipients:rfRoomRecipients(slot,slot.date),readBy:[]});
+ }
+ if(!changes.length)return 'Select at least one lesson to change.';
+ if(!rfuWrite('rollflow_room_changes_v1',[...rows.map(r=>replace.has(r.id)?{...r,status:'Superseded'}:r),...changes]))return 'Could not save room changes.';
+ rfuAudit('Temporary room change '+code+' '+changes.length+' lesson(s), '+changes[0].date+' to '+changes.at(-1).date,batchId);return '';
 }
-function rfRoomUndo(id){
- const rows=rfRoomStore(),row=rows.find(r=>r.id===id&&r.status==='Active');if(!row||!rfRoomCanUndo(row))return 'Not authorised to reverse this change.';
- const slot=rfRoomOccurrence(row.code,row.date,row.period);if(!slot||!rfRoomFree(slot.room,row.code,row.date,row.period,rows))return 'Original room is unavailable. Select another room instead.';
- const next={...row,id:rfModuleId(),previous:row.room,room:slot.room,actor:rfuActor,at:new Date().toISOString(),status:'Reversed',readBy:[],recipients:rfRoomRecipients(slot,row.date)};
- if(!rfuWrite('rollflow_room_changes_v1',[...rows.map(r=>r===row?{...r,status:'Cancelled'}:r),next]))return 'Could not reverse change.';
- rfuAudit('Reversed temporary room change',id);return '';
+function rfRoomSave(code,date,period,room,reason){return rfRoomSaveBatch(code,date,period,'single',date,[{key:rfRoomKey(date,period),room}],reason)}
+function rfRoomUndoMany(id,group=false){
+ const rows=rfRoomStore(),selected=rows.filter(r=>r.status==='Active'&&(group?(r.batchId||r.id)===id:r.id===id));
+ if(!selected.length||selected.some(r=>!rfRoomCanUndo(r)))return 'Not authorised to reverse this change.';
+ const batchId=rfModuleId(),at=new Date().toISOString(),reversed=[],ids=new Set(selected.map(r=>r.id));
+ for(const row of selected){
+  const slot=rfRoomOccurrence(row.code,row.date,row.period);
+  if(!slot||!rfRoomFree(slot.room,row.code,row.date,row.period,rows))return 'Original room is unavailable on '+row.date+' ('+row.period+'). Select another room instead.';
+  reversed.push({...row,id:batchId+'-'+reversed.length,batchId,previous:row.room,room:slot.room,actor:rfuActor,at,status:'Reversed',readBy:[],recipients:rfRoomRecipients(slot,row.date)});
+ }
+ if(!rfuWrite('rollflow_room_changes_v1',[...rows.map(r=>ids.has(r.id)?{...r,status:'Cancelled'}:r),...reversed]))return 'Could not reverse change.';
+ rfuAudit('Reversed temporary room change '+selected.length+' lesson(s)',batchId);return '';
 }
+function rfRoomUndo(id){return rfRoomUndoMany(id)}
 function rfRoomDialog(code='',date=brisbaneToday(),period=''){
  if(!rfRoomStaff())return;document.querySelector('#rf-room-dialog')?.remove();
  const dialog=document.createElement('dialog');dialog.id='rf-room-dialog';dialog.className='rf-room-dialog';dialog.setAttribute('aria-labelledby','rf-room-title');document.body.append(dialog);
  function paint(code,date,period){
  const slots=rfRoomSlots(date),selected=slots.find(x=>x.classCode===code&&x.period===rfRoomPeriod(period)),row=selected&&rfRoomActive(code,date,period),current=selected&&(row?.room||selected.room);
  const options=selected?planning.rooms.filter(r=>r.active&&r.code!==current&&rfRoomFree(r.code,code,date,period)).sort((a,b)=>a.code.localeCompare(b.code,undefined,{numeric:true})):[];
- dialog.innerHTML='<form id="rf-room-form"><div class="rf-room-dialog-head"><h2 id="rf-room-title">Change room</h2><button type="button" class="rf-room-action" data-rf-room-close aria-label="Close">×</button></div><p class="quiet">Applies only to this lesson. Relevant administration and staff receive an in-app notice.</p><label>Date<input type="date" name="date" required value="'+esc(date)+'"></label><label>Lesson<select name="lesson" required>'+planOpt([['','Select a lesson'],...slots.map(x=>[JSON.stringify([x.classCode,x.period]),x.classCode+' · '+(x.period==='ROLL'?'Home group':'Period '+x.period)+' · '+x.room])],selected?JSON.stringify([code,selected.period]):'')+'</select></label>'+(selected?'<p>Current room: <strong>'+esc(current)+'</strong></p><label>New room<select name="room" required>'+planOpt([['','Select an available room'],...options.map(r=>[r.code,r.code+(r.name?' · '+r.name:'')])],'')+'</select></label><label>Reason<select name="reason" required>'+planOpt([['','Select reason'],...['Room unavailable','Maintenance','Equipment issue','Activity requirements','Other'].map(r=>[r,r])],'')+'</select></label>':'')+'<p role="status" data-rf-room-message>'+(selected&&!options.length?'No available replacement rooms.':'')+'</p><div class="rf-room-dialog-actions">'+(row&&rfRoomCanUndo(row)?'<button type="button" class="btn small" data-rf-room-undo="'+esc(row.id)+'">Restore original room</button>':'')+'<button type="button" class="btn small" data-rf-room-close>Cancel</button><button type="submit" class="btn green" '+(!selected||!options.length?'disabled':'')+'>Confirm room change</button></div></form>';
- dialog.querySelector('[name=date]').addEventListener('change',e=>paint('',e.target.value,''));
- dialog.querySelector('[name=lesson]').addEventListener('change',e=>{let k=[];try{k=JSON.parse(e.target.value)}catch{}paint(k[0]||'',date,k[1]||'')});
- dialog.querySelector('form').addEventListener('submit',e=>{e.preventDefault();e.stopPropagation();const form=new FormData(e.target),error=rfRoomSave(code,date,period,String(form.get('room')||''),String(form.get('reason')||''));if(error){dialog.querySelector('[data-rf-room-message]').textContent=error;return}dialog.close();render()});
+ dialog.innerHTML='<form id="rf-room-form"><div class="rf-room-dialog-head"><h2 id="rf-room-title">Change room</h2><button type="button" class="rf-room-action" data-rf-room-close aria-label="Close">×</button></div><p class="quiet">This lesson only by default. Relevant administration and staff receive an in-app notice.</p><label>Date<input type="date" name="date" required value="'+esc(date)+'"></label><label>Lesson<select name="lesson" required>'+planOpt([['','Select a lesson'],...slots.map(x=>[JSON.stringify([x.classCode,x.period]),x.classCode+' · '+(x.period==='ROLL'?'Home group':'Period '+x.period)+' · '+x.room])],selected?JSON.stringify([code,selected.period]):'')+'</select></label>'+(selected?'<p>Current room: <strong>'+esc(current)+'</strong></p><label>New room<select name="room" required>'+planOpt([['','Select an available room'],...options.map(r=>[r.code,r.code+(r.name?' · '+r.name:'')])],'')+'</select></label><label>Reason<select name="reason" required>'+planOpt([['','Select reason'],...['Room unavailable','Maintenance','Equipment issue','Activity requirements','Other'].map(r=>[r,r])],'')+'</select></label><details class="rf-room-more"><summary>Apply to more lessons <small data-rf-room-scope-label>This lesson only</small></summary><div class="rf-room-scopes"><label><input type="radio" name="scope" value="single" checked> This lesson only</label><label><input type="radio" name="scope" value="day"> This class — remaining lessons today</label><label><input type="radio" name="scope" value="range"> This class — until a selected date</label><label data-rf-room-end hidden>Until (inclusive)<input type="date" name="end" min="'+esc(date)+'" max="'+esc(dateOffset(date,90))+'" value="'+esc(date)+'" disabled></label><small class="quiet">Only scheduled lessons from the selected lesson onwards. The regular timetable is not changed.</small></div></details><div data-rf-room-review hidden></div>':'')+'<p role="status" data-rf-room-message>'+(selected&&!options.length?'No available replacement rooms.':'')+'</p><div class="rf-room-dialog-actions">'+(row&&rfRoomCanUndo(row)?'<button type="button" class="btn small" data-rf-room-undo="'+esc(row.id)+'">Restore original room</button>':'')+'<button type="button" class="btn small" data-rf-room-close>Cancel</button><button type="submit" data-rf-room-confirm class="btn green" '+(!selected||!options.length?'disabled':'')+'>Confirm room change</button></div></form>';
+ const form=dialog.querySelector('form'),msg=form.querySelector('[data-rf-room-message]'),button=form.querySelector('[data-rf-room-confirm]'),review=form.querySelector('[data-rf-room-review]');let reviewed=null;
+ form.elements.date.addEventListener('change',e=>paint('',e.target.value,''));
+ form.elements.lesson.addEventListener('change',e=>{let k=[];try{k=JSON.parse(e.target.value)}catch{}paint(k[0]||'',date,k[1]||'')});
+ function invalidate(){
+  if(!selected)return;reviewed=null;review.hidden=true;review.innerHTML='';
+  const scope=form.elements.scope.value,end=form.elements.end,range=scope==='range';end.disabled=!range;end.required=range;form.querySelector('[data-rf-room-end]').hidden=!range;
+  form.querySelector('[data-rf-room-scope-label]').textContent=scope==='single'?'This lesson only':scope==='day'?'Remaining lessons today':'Until selected date';
+  button.textContent=scope==='single'?'Confirm room change':'Review affected lessons';msg.textContent='';
+ }
+ if(selected)form.addEventListener('change',e=>{if(['scope','end','room','reason'].includes(e.target.name))invalidate()});
+ form.addEventListener('submit',e=>{
+  e.preventDefault();e.stopPropagation();if(!selected)return;
+  const scope=form.elements.scope.value,end=scope==='range'?form.elements.end.value:date,room=form.elements.room.value,reason=form.elements.reason.value;
+  if(scope==='single'){const error=rfRoomSave(code,date,period,room,reason);if(error){msg.textContent=error;return}dialog.close();render();return}
+  if(!reviewed){
+   const plan=rfRoomPlan(code,date,period,room,scope,end);if(!plan.length){msg.textContent='No scheduled lessons in this date range (maximum 90 days).';return}
+   const conflicts=plan.filter(x=>!x.same&&!x.room).length,available=plan.filter(x=>x.room).length;
+   review.hidden=false;review.innerHTML='<h3>Review affected lessons</h3><p>'+available+' available · '+conflicts+' conflict'+(conflicts===1?'':'s')+' · '+plan.filter(x=>x.same).length+' already in selected room</p><p class="quiet">Choose an alternative room or explicitly exclude any conflicting lesson.</p><div class="rf-room-review-list">'+plan.map(x=>'<div class="rf-room-review-row"><div><strong>'+esc(x.date+' · '+(x.period==='ROLL'?'Home group':'Period '+x.period))+'</strong><small>Current room '+esc(x.current)+'</small></div>'+(x.same?'<small>Already in selected room</small>':'<label><span class="quiet">'+(x.room?'Replacement room':'Room conflict — choose an option')+'</span><select data-rf-room-choice="'+esc(x.key)+'" required>'+planOpt([['','Choose room or exclude'],['__exclude__','Exclude this lesson'],...x.available.map(r=>[r.code,r.code])],x.room)+'</select></label>')+'</div>').join('')+'</div>';
+   reviewed=plan;button.textContent='Confirm room changes';msg.textContent='';review.scrollIntoView({block:'nearest'});return
+  }
+  const choices=[...review.querySelectorAll('[data-rf-room-choice]')].filter(x=>x.value&&x.value!=='__exclude__').map(x=>({key:x.dataset.rfRoomChoice,room:x.value}));
+  const error=rfRoomSaveBatch(code,date,period,scope,end,choices,reason);
+  if(error){msg.textContent=error;if(!error.startsWith('Select at least')){reviewed=null;button.textContent='Review affected lessons'}return}dialog.close();render();
+ });
  }
  paint(code,date,period);dialog.addEventListener('close',()=>dialog.remove());dialog.showModal();
 }
+function rfRoomVisible(row){return rfRoomAdmin()||row.recipients?.includes(rfuActor)||row.actor===rfuActor}
+function rfRoomNoticeGroups(rows){
+ const groups=new Map();for(const r of rows){const key=r.batchId||r.id;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(r)}
+ return [...groups.entries()].map(([id,items])=>({id,items:items.sort((a,b)=>a.date.localeCompare(b.date)||rfRoomPeriodOrder(a.period).localeCompare(rfRoomPeriodOrder(b.period))),unread:items.some(r=>!r.readBy?.includes(rfuActor))})).sort((a,b)=>b.items[0].at.localeCompare(a.items[0].at));
+}
 function rfRoomNoticePanel(){
- const rows=rfRoomStore().filter(r=>rfRoomAdmin()||r.recipients?.includes(rfuActor)||r.actor===rfuActor).sort((a,b)=>b.at.localeCompare(a.at)),unread=rows.filter(r=>!r.readBy?.includes(rfuActor)),visible=rows.slice(0,20);
- return '<details class="sheet rf-room-notices"><summary class="sheet-head">Room changes'+(unread.length?' · '+unread.length+' unread':'')+'</summary><div class="rf-module-body"><button class="btn small" type="button" data-rf-room-quick>Change room</button>'+(visible.length?'<div class="rf-scheduling-list">'+visible.map(r=>'<article><div><strong>'+esc(r.code+' · '+r.previous+' → '+r.room)+'</strong><small>'+esc(r.date+' · '+(r.period==='ROLL'?'Home group':'Period '+r.period)+' · '+r.reason)+'</small><small>'+esc(rfuStaffName(r.actor)+' · '+r.status)+'</small></div>'+(!r.readBy?.includes(rfuActor)?'<button type="button" class="btn small" data-rf-room-read="'+esc(r.id)+'">Mark read</button>':'')+(r.status==='Active'&&rfRoomCanUndo(r)?'<button type="button" class="btn small" data-rf-room-undo="'+esc(r.id)+'">Restore room</button>':'')+'</article>').join('')+'</div>':'<p class="quiet">No room change notices.</p>')+'</div></details>';
+ const groups=rfRoomNoticeGroups(rfRoomStore().filter(rfRoomVisible)),unread=groups.filter(g=>g.unread),visible=groups.slice(0,20);
+ const cards=visible.map(g=>{
+  const items=g.items,r=items[0],last=items.at(-1),active=items.filter(x=>x.status==='Active'),rooms=[...new Set(items.map(x=>x.room))],from=[...new Set(items.map(x=>x.previous))],many=items.length>1,summary=from.length===1&&rooms.length===1?from[0]+' → '+rooms[0]:rooms.length===1?'Room '+rooms[0]:'Multiple replacement rooms',canGroup=active.length>1&&active.every(rfRoomCanUndo)&&rfRoomStore().filter(x=>x.status==='Active'&&(x.batchId||x.id)===g.id).length===active.length;
+  return '<article><div><strong>'+esc(r.code+' · '+summary)+'</strong><small>'+esc((many?r.date+' – '+last.date+' · '+items.length+' lessons':r.date+' · '+(r.period==='ROLL'?'Home group':'Period '+r.period))+' · '+r.reason)+'</small><small>'+esc(rfuStaffName(r.actor)+' · '+(many?(active.length?active.length+' active':'No active changes'):r.status))+'</small>'+(many?'<details class="rf-room-group"><summary>View affected lessons</summary>'+items.map(x=>'<div class="rf-room-group-row"><span>'+esc(x.date+' · '+x.period+' · '+x.previous+' → '+x.room+' · '+x.status)+'</span>'+(x.status==='Active'&&rfRoomCanUndo(x)?'<button type="button" class="btn small" data-rf-room-undo="'+esc(x.id)+'">Restore lesson</button>':'')+'</div>').join('')+'</details>':'')+'</div>'+(g.unread?'<button type="button" class="btn small" data-rf-room-read="'+esc(g.id)+'">Mark read</button>':'')+(canGroup?'<button type="button" class="btn small" data-rf-room-undo-group="'+esc(g.id)+'">Restore all active lessons</button>':!many&&active.length&&rfRoomCanUndo(r)?'<button type="button" class="btn small" data-rf-room-undo="'+esc(r.id)+'">Restore room</button>':'')+'</article>';
+ }).join('');
+ return '<details class="sheet rf-room-notices"><summary class="sheet-head">Room changes'+(unread.length?' · '+unread.length+' unread':'')+'</summary><div class="rf-module-body"><button class="btn small" type="button" data-rf-room-quick>Change room</button>'+(cards?'<div class="rf-scheduling-list">'+cards+'</div>':'<p class="quiet">No room change notices.</p>')+'</div></details>';
 }
 document.addEventListener('click',e=>{
- const b=e.target.closest('[data-rf-room-open],[data-rf-room-quick],[data-rf-room-close],[data-rf-room-undo],[data-rf-room-read]');if(!b)return;e.preventDefault();e.stopImmediatePropagation();
+ const b=e.target.closest('[data-rf-room-open],[data-rf-room-quick],[data-rf-room-close],[data-rf-room-undo],[data-rf-room-undo-group],[data-rf-room-read]');if(!b)return;e.preventDefault();e.stopImmediatePropagation();
  if(b.hasAttribute('data-rf-room-close')){document.querySelector('#rf-room-dialog')?.close();return}
  if(!rfRoomStaff())return;
  if(b.hasAttribute('data-rf-room-quick')){rfRoomDialog();return}
  if(b.hasAttribute('data-rf-room-open')){try{rfRoomDialog(...JSON.parse(b.dataset.rfRoomOpen))}catch{}return}
- if(b.dataset.rfRoomUndo){const error=rfRoomUndo(b.dataset.rfRoomUndo);if(error){const msg=document.querySelector('#rf-room-dialog [data-rf-room-message]');if(msg)msg.textContent=error;else alert(error);return}document.querySelector('#rf-room-dialog')?.close();render();return}
- if(b.dataset.rfRoomRead){const rows=rfRoomStore();if(rfuWrite('rollflow_room_changes_v1',rows.map(r=>r.id===b.dataset.rfRoomRead&&(rfRoomAdmin()||r.recipients?.includes(rfuActor)||r.actor===rfuActor)?{...r,readBy:[...new Set([...(r.readBy||[]),rfuActor])]}:r))){render();const panel=document.querySelector('.rf-room-notices');if(panel)panel.open=true}}
+ if(b.dataset.rfRoomUndo||b.dataset.rfRoomUndoGroup){
+  const group=!!b.dataset.rfRoomUndoGroup;if(group&&!confirm('Restore the original rooms for all active lessons in this group?'))return;
+  const error=rfRoomUndoMany(b.dataset.rfRoomUndoGroup||b.dataset.rfRoomUndo,group);
+  if(error){const msg=document.querySelector('#rf-room-dialog [data-rf-room-message]');if(msg)msg.textContent=error;else alert(error);return}document.querySelector('#rf-room-dialog')?.close();render();return
+ }
+ if(b.dataset.rfRoomRead){const rows=rfRoomStore();if(rfuWrite('rollflow_room_changes_v1',rows.map(r=>(r.batchId||r.id)===b.dataset.rfRoomRead&&rfRoomVisible(r)?{...r,readBy:[...new Set([...(r.readBy||[]),rfuActor])]}:r))){render();const panel=document.querySelector('.rf-room-notices');if(panel)panel.open=true}}
 },true);
 
 function rfRoomClosurePanel(){
@@ -4647,7 +4720,7 @@ render=function(){
  if(main&&(['home','dashboard','master'].includes(route)||demoRole==='admin'&&route==='timetable'))main.insertAdjacentHTML('afterbegin',rfRoomNoticePanel()+(rfRoomAdmin()&&route==='timetable'?rfRoomClosurePanel():''));
 };
 window.addEventListener('storage',e=>{if(['rollflow_room_changes_v1','rollflow_room_closures_v1'].includes(e.key)&&rfRoomStaff()&&!document.querySelector('#rf-room-dialog[open]'))render()});
-const rfRoomCSS=document.createElement('style');rfRoomCSS.textContent='.rf-room-inline{display:inline-flex;align-items:center;gap:4px;max-width:100%;flex-wrap:wrap;vertical-align:middle}.rf-room-marker{color:#8b641e;display:inline-flex;align-items:center}body[data-theme="Dark"] .rf-room-marker{color:#e8c16e}.rf-room-action{border:0;background:transparent;color:inherit;font-size:18px;line-height:1;min-width:26px;min-height:24px;border-radius:4px;padding:2px 4px}.rf-room-action:hover{background:#8495a52a}.rf-room-link{appearance:none;border:0;background:none;padding:0 1px;color:inherit;font:inherit;line-height:inherit;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:2px;cursor:pointer;max-width:100%;overflow-wrap:anywhere;border-radius:2px}.rf-room-link:hover{color:var(--school-secondary,#0076a8);text-decoration-thickness:2px}.rf-room-link:focus-visible{outline:2px solid var(--school-secondary,#0076a8);outline-offset:3px}body[data-theme="Dark"] .rf-room-link:hover{color:#a6ddf3}body[data-theme="Dark"] .rf-room-link:focus-visible{outline-color:#a6ddf3}.rf-room-inline{column-gap:3px;row-gap:1px}.rf-room-dialog{width:min(460px,calc(100% - 24px));max-height:90dvh;overflow:auto;border:1px solid var(--rf-border,#dbe4e6);border-radius:12px;padding:20px;background:var(--rf-surface,#fff);color:var(--rf-text,#17283a);box-shadow:0 12px 50px #0003}.rf-room-dialog::backdrop{background:#0006}.rf-room-dialog form,.rf-room-dialog label{display:grid;gap:7px}.rf-room-dialog form{gap:12px}.rf-room-dialog input,.rf-room-dialog select{width:100%;min-height:38px;padding:7px;border:1px solid var(--rf-border,#aab7c1);border-radius:5px;background:var(--rf-surface,#fff);color:var(--rf-text,#17283a)}.rf-room-dialog-head,.rf-room-dialog-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}.rf-room-dialog [data-rf-room-message]{color:var(--rf-text);font-weight:600}.rf-room-notices{margin-bottom:12px}.rf-room-notices summary{cursor:pointer}.rf-room-notices .rf-module-body{padding:12px;display:grid;gap:8px}';document.head.appendChild(rfRoomCSS);
+const rfRoomCSS=document.createElement('style');rfRoomCSS.textContent='.rf-room-inline{display:inline-flex;align-items:center;gap:4px;max-width:100%;flex-wrap:wrap;vertical-align:middle}.rf-room-marker{color:#8b641e;display:inline-flex;align-items:center}body[data-theme="Dark"] .rf-room-marker{color:#e8c16e}.rf-room-action{border:0;background:transparent;color:inherit;font-size:18px;line-height:1;min-width:26px;min-height:24px;border-radius:4px;padding:2px 4px}.rf-room-action:hover{background:#8495a52a}.rf-room-link{appearance:none;border:0;background:none;padding:0 1px;color:inherit;font:inherit;line-height:inherit;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:2px;cursor:pointer;max-width:100%;overflow-wrap:anywhere;border-radius:2px}.rf-room-link:hover{color:var(--school-secondary,#0076a8);text-decoration-thickness:2px}.rf-room-link:focus-visible{outline:2px solid var(--school-secondary,#0076a8);outline-offset:3px}body[data-theme="Dark"] .rf-room-link:hover{color:#a6ddf3}body[data-theme="Dark"] .rf-room-link:focus-visible{outline-color:#a6ddf3}.rf-room-inline{column-gap:3px;row-gap:1px}.rf-room-dialog{width:min(460px,calc(100% - 24px));max-height:90dvh;overflow:auto;border:1px solid var(--rf-border,#dbe4e6);border-radius:12px;padding:20px;background:var(--rf-surface,#fff);color:var(--rf-text,#17283a);box-shadow:0 12px 50px #0003}.rf-room-dialog::backdrop{background:#0006}.rf-room-dialog form,.rf-room-dialog label{display:grid;gap:7px}.rf-room-dialog form{gap:12px}.rf-room-dialog input,.rf-room-dialog select{width:100%;min-height:38px;padding:7px;border:1px solid var(--rf-border,#aab7c1);border-radius:5px;background:var(--rf-surface,#fff);color:var(--rf-text,#17283a)}.rf-room-dialog-head,.rf-room-dialog-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}.rf-room-dialog [data-rf-room-message]{color:var(--rf-text);font-weight:600}.rf-room-notices{margin-bottom:12px}.rf-room-notices summary{cursor:pointer}.rf-room-more{border-top:1px solid var(--rf-border,#dbe4e6);border-bottom:1px solid var(--rf-border,#dbe4e6);padding:9px 0}.rf-room-more summary,.rf-room-group summary{cursor:pointer;font-weight:600}.rf-room-more summary small{display:block;font-weight:400;margin:3px 0 0 17px}.rf-room-scopes{display:grid;gap:9px;padding:9px 0 3px}.rf-room-dialog .rf-room-scopes label:has(input[type=radio]){display:flex;align-items:center;gap:7px}.rf-room-dialog .rf-room-scopes input[type=radio]{width:auto;min-height:0;flex:none}.rf-room-dialog [hidden]{display:none!important}.rf-room-review-list{display:grid;gap:5px;max-height:245px;overflow:auto;padding:2px}.rf-room-review-row,.rf-room-group-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;padding:7px 0;border-bottom:1px solid var(--rf-border,#dbe4e6)}.rf-room-review-row>div{display:grid;gap:2px}.rf-room-review-row label{flex:1 1 125px}.rf-room-review-row small{font-size:11px}.rf-room-dialog [data-rf-room-review] h3{font-size:15px;margin-bottom:4px}.rf-room-group{margin-top:6px}.rf-room-group-row{font-size:12px}.rf-room-notices .rf-module-body{padding:12px;display:grid;gap:8px}';document.head.appendChild(rfRoomCSS);
 
 window.visualViewport?.addEventListener('resize',()=>requestAnimationFrame(fitGrid));
 window.addEventListener('resize',rfClearTimetableMorph);
