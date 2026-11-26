@@ -1,0 +1,41 @@
+name: Publish allowlisted RollFlow demo
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - index.html
+      - design-system.html
+      - 'shared/**'
+      - 'styles/**'
+      - deployment/public_assets.py
+      - deployment/build_pages.py
+      - '.github/workflows/pages-publish.yml'
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m deployment.build_pages --output public-site
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public-site
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Deploy public artifact only
+        id: deployment
+        uses: actions/deploy-pages@v4

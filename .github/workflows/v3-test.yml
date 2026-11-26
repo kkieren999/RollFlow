@@ -27,7 +27,8 @@ jobs:
           node -e "const fs=require('fs'),vm=require('vm');const h=fs.readFileSync('legacy/index.html','utf8');const m=h.match(/<script>([\s\S]*?)<\/script>/);if(!m)throw Error('Missing inline script');new vm.Script(m[1]);if(!m[1].includes('function rfMovementEntriesForDate()'))throw Error('Movement dashboard missing');"
       - name: Validate bundled website source and permissions
         run: |
-          python deployment/sync_training.py --check
+          python -m deployment.sync_training --check
+          python -m deployment.build_pages --output "$RUNNER_TEMP/rollflow-public"
           python -m unittest deployment.test_training -v
           node tests/shared-schedule-contract.cjs
           node tests/teaching-permissions-logic.cjs

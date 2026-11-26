@@ -34,6 +34,7 @@ async function run(){
     }
    });
    await page.goto(url);
+   assert.equal(await page.evaluate(()=>window.RollFlowSchedule?.VERSION),1,'Shared schedule contract loaded');
    assert.match(await page.locator('.demo-auth-footer').innerText(),/Do not enter real school credentials or records/);
    await page.locator('#demo-username').fill(id);await page.locator('#demo-password').fill(id);await page.locator('#demo-login-form button[type="submit"]').click();
    await page.locator('.rf-compact-account summary').waitFor();

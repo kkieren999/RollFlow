@@ -4,6 +4,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 import functools
 import webbrowser
+from .public_assets import PUBLIC_ROUTES
 
 ROOT = Path(__file__).resolve().parents[1]
 PORT = 18086
@@ -16,7 +17,7 @@ class TrainingHandler(SimpleHTTPRequestHandler):
         if not self.allowed_host():
             self.send_error(403)
             return
-        if urlsplit(self.path).path not in {"/", "/index.html", "/design-system.html", "/styles/rollflow-design.css", "/shared/schedule-core.js", "/shared/schedule.css"}:
+        if urlsplit(self.path).path not in PUBLIC_ROUTES:
             self.send_error(404)
             return
         super().do_GET()
@@ -25,7 +26,7 @@ class TrainingHandler(SimpleHTTPRequestHandler):
         if not self.allowed_host():
             self.send_error(403)
             return
-        if urlsplit(self.path).path not in {"/", "/index.html", "/design-system.html", "/styles/rollflow-design.css", "/shared/schedule-core.js", "/shared/schedule.css"}:
+        if urlsplit(self.path).path not in PUBLIC_ROUTES:
             self.send_error(404)
             return
         super().do_HEAD()

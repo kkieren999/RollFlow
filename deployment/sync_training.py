@@ -4,10 +4,10 @@ No file copying between editions is required. Check the canonical tracked files.
 """
 from pathlib import Path
 import argparse
+from deployment.public_assets import PUBLIC_FILES
 
 ROOT = Path(__file__).resolve().parents[1]
-PUBLIC = ("index.html", "design-system.html", "styles/rollflow-design.css",
-          "shared/schedule-core.js", "shared/schedule.css")
+PUBLIC = PUBLIC_FILES
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
