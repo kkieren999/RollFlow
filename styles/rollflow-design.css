@@ -180,3 +180,17 @@ body .rf-ui-calendar-dialog--full{width:min(920px,calc(100% - 20px))}
 @media(max-width:540px){.rf-cal-full .rf-cal-day{min-height:44px;padding:3px;align-items:center;justify-content:center}.rf-cal-full .rf-cal-event{display:none}.rf-cal-full .rf-cal-grid{gap:2px}.rf-cal-weekday{font-size:10px}}
 
 .rf-cal-day.rf-cal-range-preview:not(.rf-cal-selected){outline:1px dashed var(--rf-focus);outline-offset:-2px;background:var(--rf-icon-bg);color:var(--rf-icon-ink)}
+
+/* Permission-enabled teaching roll. */
+body .rf-teaching-roll{width:min(680px,calc(100% - 24px))}
+.rf-teaching-students{display:grid;gap:4px;max-height:50dvh;overflow:auto}
+.rf-teaching-student{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:10px 2px;border-bottom:1px solid var(--rf-border)}
+.rf-teaching-student>div:first-child{display:grid;gap:2px;min-width:0}
+.rf-teaching-student small{color:var(--rf-muted);font-size:12px}
+.rf-teaching-marks{display:flex;gap:6px}
+.rf-teaching-marks .rf-ui-button{min-width:42px;padding:7px 10px}
+.rf-teaching-marks [aria-pressed=true][data-rf-teaching-mark=P]{color:var(--rf-success-text);background:var(--rf-success-bg);border-color:var(--rf-success-text)}
+.rf-teaching-marks [aria-pressed=true][data-rf-teaching-mark=A]{color:var(--rf-danger-text);background:var(--rf-danger-bg);border-color:var(--rf-danger-text)}
+.rf-teaching-marks [aria-pressed=true][data-rf-teaching-mark=L]{color:var(--rf-warning-text);background:var(--rf-warning-bg);border-color:var(--rf-warning-text)}
+.rf-teaching-roll [data-rf-teaching-error]{color:var(--rf-danger-text)}
+.rf-teaching-roll [data-rf-teaching-error]:empty{display:none}
