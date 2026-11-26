@@ -117,3 +117,64 @@ body .rf-ui-lesson-context {margin-bottom:var(--rf-space-3)}
  .rf-ui-footer .rf-ui-button--primary {flex:1 1 100%}
 }
 @media(prefers-reduced-motion:reduce) {.rf-ui-dialog,.rf-ui-button,.rf-ui-disclosure {transition:none;animation:none}}
+
+/* Native select controls: retain browser menu and validation. */
+body select:not([multiple]):not([size]:not([size="1"])) {
+ appearance:none; -webkit-appearance:none; box-sizing:border-box; max-width:100%; min-width:0;
+ border-radius:var(--rf-control-radius); border:1px solid var(--rf-border);
+ background-color:var(--rf-surface); color:var(--rf-text);
+ background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23586c79' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+ background-repeat:no-repeat;background-position:right 10px center;background-size:18px;
+ padding-inline-end:34px;cursor:pointer;
+}
+body[data-theme="Dark"] select:not([multiple]):not([size]:not([size="1"])) {background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23c0d1db' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")}
+body select:not([multiple]):not([size]:not([size="1"])):hover:not(:disabled){border-color:var(--rf-focus)}
+body select:focus-visible{outline:2px solid var(--rf-focus);outline-offset:2px}
+body select:disabled{cursor:not-allowed;opacity:.65}
+body .rf-ui-select:not([multiple]){min-height:44px;padding-block:8px;padding-inline-start:12px;font-weight:500}
+body .rf-ui-select--compact:not([multiple]){min-height:30px;padding-block:4px;padding-inline-start:8px;font-size:var(--rf-type-xs)}
+body .rf-room-dialog select.rf-ui-room-select{padding-inline-end:28px;background-position:right 3px center;border-radius:0;border:0;border-bottom:1px solid var(--rf-border);font-size:clamp(16px,4vw,22px)}
+body[data-theme="Dark"] input[type=date],body[data-theme="Dark"] input[type=month]{color-scheme:dark}
+body input[type=date],body input[type=month]{border-radius:var(--rf-control-radius);border-color:var(--rf-border);background-color:var(--rf-surface);color:var(--rf-text);max-width:100%;box-sizing:border-box}
+body input[type=date]:focus-visible,body input[type=month]:focus-visible{outline:2px solid var(--rf-focus);outline-offset:2px}
+@media(forced-colors:active){body select:not([multiple]):not([size]:not([size="1"])){appearance:auto;background-image:none;padding-inline-end:8px}}
+/* Shared school-aware calendar: compact picker and full calendar view. */
+body .rf-ui-calendar-dialog{width:min(420px,calc(100% - 20px));padding:16px;max-height:90dvh}
+body .rf-ui-calendar-dialog--full{width:min(920px,calc(100% - 20px))}
+.rf-ui-calendar-dialog .rf-ui-header{margin-bottom:12px}
+.rf-cal-toolbar{display:flex;align-items:center;gap:8px;justify-content:space-between;flex-wrap:wrap;margin:0 0 10px}
+.rf-cal-heading{flex:1;text-align:center;min-width:120px;display:grid;gap:2px}
+.rf-cal-heading strong{font-size:16px;font-weight:650}
+.rf-cal-heading small{font-size:12px;color:var(--rf-muted)}
+.rf-cal-nav{min-height:36px;min-width:36px;padding:5px 10px}
+.rf-cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
+.rf-cal-weekday{text-align:center;padding:5px 0;font-size:11px;font-weight:650;color:var(--rf-muted)}
+.rf-cal-day{box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:0;min-height:38px;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--rf-text);font:inherit;cursor:pointer;padding:4px 1px}
+.rf-cal-day:hover:not(:disabled){background:var(--rf-hover);border-color:var(--rf-border)}
+.rf-cal-day.rf-cal-nonschool{background:var(--rf-context);color:var(--rf-muted)}
+.rf-cal-day.rf-cal-outside{opacity:.5}
+.rf-cal-day.rf-cal-today{border-color:var(--rf-focus)}
+.rf-cal-day.rf-cal-range{background:var(--rf-icon-bg);color:var(--rf-icon-ink)}
+.rf-cal-day.rf-cal-selected{background:var(--rf-action);color:var(--rf-action-text);border-color:var(--rf-action)}
+.rf-cal-day:disabled{opacity:.32;cursor:not-allowed;text-decoration:line-through}
+.rf-cal-day:focus-visible{outline:2px solid var(--rf-focus);outline-offset:1px;z-index:1}
+.rf-cal-dot{width:5px;height:5px;border-radius:50%;background:var(--rf-warning-text)}
+.rf-cal-selected .rf-cal-dot{background:currentColor}
+.rf-cal-legend{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;color:var(--rf-muted);font-size:11px;margin:12px 0}
+.rf-cal-legend span{display:inline-flex;align-items:center;gap:4px}
+.rf-cal-key{width:9px;height:9px;border-radius:3px;background:var(--rf-action);display:inline-block}
+.rf-cal-key--off{background:var(--rf-context);border:1px solid var(--rf-border)}
+.rf-cal-key--today{background:transparent;border:1px solid var(--rf-focus)}
+.rf-cal-summary{margin-top:12px}
+.rf-cal-actions{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px solid var(--rf-border)}
+.rf-cal-actions .rf-ui-button{min-height:36px;font-size:12px}
+.rf-cal-full .rf-cal-day{min-height:78px;justify-content:flex-start;align-items:flex-start;padding:8px;border-color:var(--rf-border);border-radius:8px;overflow:hidden}
+.rf-cal-full .rf-cal-day .rf-cal-event{max-width:100%;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:inherit}
+.rf-cal-full .rf-cal-day.rf-cal-selected{border-color:var(--rf-action)}
+.rf-cal-events{display:grid;gap:6px;margin-top:12px}
+.rf-cal-events article{display:grid;gap:3px;padding:10px 12px;border:1px solid var(--rf-border);border-left:3px solid var(--rf-focus);border-radius:8px;background:var(--rf-surface);overflow-wrap:anywhere}
+.rf-cal-events small{color:var(--rf-muted);font-size:12px}
+.rf-cal-launch{display:flex;justify-content:flex-end;margin:0 0 8px}
+.rf-cal-launch button{display:inline-flex;gap:8px;align-items:center}
+.rf-cal-launch svg{width:17px;height:17px}
+@media(max-width:540px){.rf-cal-full .rf-cal-day{min-height:44px;padding:3px;align-items:center;justify-content:center}.rf-cal-full .rf-cal-event{display:none}.rf-cal-full .rf-cal-grid{gap:2px}.rf-cal-weekday{font-size:10px}}
