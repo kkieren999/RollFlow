@@ -1,3 +1,7 @@
+# V3.8 Windows package — start here
+
+**Start RollFlow.cmd** opens the complete bundled website offline using fictional data. **Protected Workspace.cmd** opens a menu for fresh database-backed staging or backup-first upgrade of the existing database. See [V3.8 rebuild notes](../docs/v3.8-windows-rebuild.md). Old instructions below refer to earlier packages and their original shortcuts. Never use real records in staging.
+
 ## Authoritative school data (V3.7.0 staging)
 
 1. In the private server, use the OneSchool timetable CSV import and publish the complete dated export.

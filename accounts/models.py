@@ -265,3 +265,16 @@ class PendingTeacherSetup(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     activated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+", null=True, blank=True)
     activated_at = models.DateTimeField(null=True, blank=True)
+
+
+class StaffAccessGrant(models.Model):
+    """Explicit, bounded read access. Never confers Django admin or teaching."""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+                             related_name="school_access_grants")
+    role = models.CharField(max_length=80)
+    scope = models.CharField(max_length=12)
+    scope_value = models.CharField(max_length=100, blank=True)
+    capabilities = models.JSONField(default=list)
+    created_at = models.DateTimeField(auto_now_add=True)
+    granted_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+                                   related_name="+")
