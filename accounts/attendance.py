@@ -1,7 +1,6 @@
 """First protected attendance workflow: reviewed dated publication, today's own lessons."""
 from collections import Counter
 from datetime import time
-from django.db.models import Q
 from django.utils import timezone
 from .connected_school import canonical, personal_codes, visible_slots
 from .models import AttendanceRoll, ImportedTimetable, Student

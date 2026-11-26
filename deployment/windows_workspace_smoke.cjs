@@ -4,14 +4,40 @@ const assert = require('node:assert/strict');
 const { spawn } = require('node:child_process');
 const { chromium } = require('playwright-core');
 const path = require('node:path');
+const fs = require('node:fs');
+const http = require('node:http');
 const root = path.resolve(__dirname, '..');
 const py = process.env.RF_PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
 const users = ['admin','principal','deputy','hod','ylc','business','office','teacher','swilliams','learning','aide','relief','guidance'];
-const counts = {admin:10,principal:10,deputy:10,hod:7,ylc:7,business:6,office:8,teacher:7,swilliams:7,learning:5,aide:4,relief:3,guidance:3};
+// Compare actual public source menus to packaged menus rather than stale hard-coded counts.
+const reference=http.createServer((req,res)=>{
+ const pathname=new URL(req.url,'http://localhost').pathname;
+ const asset=pathname==='/'?'index.html':pathname==='/styles/rollflow-design.css'?'styles/rollflow-design.css':null;
+ if(!asset){res.writeHead(404);res.end();return;}
+ res.writeHead(200,{'Content-Type':asset.endsWith('.css')?'text/css':'text/html; charset=utf-8'});
+ res.end(fs.readFileSync(path.join(root,'training',asset)));
+});
+async function signature(page){
+ return page.locator('.nav-primary button').evaluateAll(bs=>bs.map(b=>({
+  label:b.innerText.trim(),route:b.getAttribute('data-admin-page')||b.getAttribute('data-nav')||b.getAttribute('data-rfu-page')||''
+ })));
+}
+async function referenceSignature(browser,id,url){
+ const ctx=await browser.newContext({viewport:{width:1440,height:1000}});
+ try{
+  const p=await ctx.newPage();await p.goto(url);
+  await p.locator('#demo-username').fill(id);await p.locator('#demo-password').fill(id);
+  await p.locator('#demo-login-form button[type="submit"]').click();
+  await p.locator('.rf-compact-account summary').waitFor();
+  return await signature(p);
+ }finally{await ctx.close()}
+}
 async function main(){
  const server=spawn(py,['-m','deployment.training','--port','0','--no-browser'],{cwd:root,env:{...process.env,PYTHONUNBUFFERED:'1'},stdio:['ignore','pipe','pipe']});
  let browser;
  try{
+  await new Promise((resolve,reject)=>{reference.once('error',reject);reference.listen(0,'127.0.0.1',resolve)});
+  const referenceUrl='http://127.0.0.1:'+reference.address().port+'/';
   const url=await new Promise((resolve,reject)=>{
    let buf='';const timeout=setTimeout(()=>reject(Error('Training server did not start')),15000);
    server.once('error',e=>{clearTimeout(timeout);reject(e)});
@@ -42,7 +68,9 @@ async function main(){
     await page.locator('#demo-password').fill(id);
     await page.locator('#demo-login-form button[type="submit"]').click();
     await page.locator('.rf-compact-account summary').waitFor();
-    assert.equal(await page.locator('.nav-primary button').count(),counts[id],id+' menu');
+    const actual=await signature(page),expected=await referenceSignature(browser,id,referenceUrl);
+    assert(actual.length>0,id+' empty menu');
+    assert.deepEqual(actual,expected,id+' packaged menu differs from pinned public source');
     const teacher=['teacher','swilliams'].includes(id);
     const attr=id==='admin'?'data-admin-page':teacher?'data-nav':'data-rfu-page';
     const routes=await page.locator('.nav-primary button').evaluateAll((bs,a)=>bs.map(b=>b.getAttribute(a)).filter(Boolean),attr);
@@ -68,6 +96,6 @@ async function main(){
     console.log('PASS packaged workspace: '+id+' ('+routes.length+' primary routes)');
    }finally{await context.close()}
   }
- }finally{if(browser)await browser.close();server.kill()}
+ }finally{if(browser)await browser.close();server.kill();reference.close()}
 }
 main().catch(e=>{console.error(e);process.exitCode=1});
