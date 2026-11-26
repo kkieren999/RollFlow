@@ -291,6 +291,7 @@ class AccessAudit(models.Model):
 class StaffAccessGrant(models.Model):
     """Explicit, bounded read access. Never confers Django admin or teaching."""
     template = models.ForeignKey(RoleTemplate, null=True, blank=True, on_delete=models.PROTECT)
+    class_publication = models.ForeignKey(ConnectedSchoolPublication, null=True, blank=True, on_delete=models.PROTECT)
     starts_at = models.DateTimeField(null=True, blank=True)
     expires_at = models.DateTimeField(null=True, blank=True)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,

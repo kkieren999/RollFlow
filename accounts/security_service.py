@@ -22,7 +22,7 @@ def audit(actor, action, target=None, before=None, after=None):
 
 def grant_state(g):
     return {"grant":g.pk,"role":g.role,"scope":g.scope,"scope_value":g.scope_value,
-            "capabilities":list(g.capabilities),"template":g.template_id,
+            "capabilities":list(g.capabilities),"template":g.template_id,"class_publication":g.class_publication_id,
             "starts_at":g.starts_at.isoformat() if g.starts_at else None,
             "expires_at":g.expires_at.isoformat() if g.expires_at else None}
 

@@ -50,6 +50,9 @@ def templates(request):
                 return HttpResponseBadRequest("Unknown action.")
             if form.is_valid():
                 c=form.cleaned_data
+                if RoleTemplate.objects.filter(name__iexact=c["name"]).exists():
+                    form.add_error("name","Template name already exists.")
+                    return render(request,"security_templates.html",{"form":form,"templates":Paginator(RoleTemplate.objects.order_by("name"),50).get_page(request.GET.get("page"))})
                 try:
                     with transaction.atomic():
                         template=RoleTemplate.objects.create(**c,created_by=request.user)

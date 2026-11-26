@@ -23,7 +23,7 @@ class GrantForm(forms.Form):
     starts_at = forms.DateTimeField(required=False, widget=forms.DateTimeInput(attrs={"type":"datetime-local"}), help_text="School local time; blank means immediately.")
     expires_at = forms.DateTimeField(required=False, widget=forms.DateTimeInput(attrs={"type":"datetime-local"}), help_text="School local time; blank means no scheduled expiry.")
     scope = forms.ChoiceField(choices=[("faculty", "Staff faculty"), ("year", "Year level"), ("school", "Whole school"), ("class", "Published class (read only)")])
-    scope_value = forms.CharField(max_length=100, required=False, help_text="Exact existing faculty name, or year 7–12. Leave blank for whole school.")
+    scope_value = forms.CharField(max_length=100, required=False, help_text="Exact existing faculty name, year 7–12 or published class code. Leave blank for whole school.")
     capabilities = forms.MultipleChoiceField(choices=list(CAPABILITIES.items()), widget=forms.CheckboxSelectMultiple, required=False)
 
     def __init__(self, *args, **kwargs):
@@ -54,6 +54,10 @@ class GrantForm(forms.Form):
             pub = current()
             if not pub or not any(row.get("code") == value for row in pub.snapshot.get("classes", [])):
                 self.add_error("scope_value", "Choose an exact class code from the active publication.")
+            else:
+                c["class_publication"] = pub.pk
+            if not end:
+                self.add_error("expires_at", "Published class grants require an expiry.")
         if not valid_scope(scope, value):
             self.add_error("scope_value", "Enter a valid scope.")
         elif scope == "faculty" and not StaffProfile.objects.filter(faculty__iexact=value).exists():
@@ -95,11 +99,17 @@ def manage_access(request):
                     current_template = RoleTemplate.objects.select_for_update().filter(pk=template.pk, active=True).first()
                     if not current_template or current_template.scope != c["scope"] or current_template.capabilities != c["capabilities"]:
                         return HttpResponseForbidden("Template changed. Reload and review.")
+                class_publication = None
+                if c["scope"] == "class":
+                    from .models import ConnectedSchoolPublication
+                    class_publication = ConnectedSchoolPublication.objects.select_for_update().filter(pk=c.get("class_publication"), active=True).first()
+                    if not class_publication:
+                        return HttpResponseForbidden("Publication changed; review the class again.")
                 user = User.objects.select_for_update().get(pk=c["user"].pk)
                 if not user.is_active or PendingTeacherSetup.objects.filter(user=user, activated_at__isnull=True).exists():
                     return HttpResponseForbidden("Account not eligible.")
                 grant = StaffAccessGrant.objects.create(user=user, role=template.name if template else (c["custom_role"] if c["role"] == "Custom" else c["role"]),
-                    template=template, starts_at=c.get("starts_at"), expires_at=c.get("expires_at"),
+                    template=template, class_publication=class_publication, starts_at=c.get("starts_at"), expires_at=c.get("expires_at"),
                     scope=c["scope"], scope_value=c["scope_value"], capabilities=c["capabilities"], granted_by=request.user)
                 audit(request.user, "grant_created", user, after=grant_state(grant))
                 SecurityEvent.objects.create(actor=request.user, event="school_access_granted", subject=str(grant.pk))

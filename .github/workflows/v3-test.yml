@@ -151,7 +151,7 @@ jobs:
         run: |
           $bundle = "$env:RUNNER_TEMP/RollFlow"
           $state = "$env:RUNNER_TEMP/rf-test-state"
-          & "$bundle/python/python.exe" -m deployment.native --state $state manage shell -c "from django.urls import reverse; from django.db import connection; from django.conf import settings; from accounts.models import AttendanceRoll, AttendanceRevision; assert settings.ROLLFLOW_PROTECTED_WORKSPACE; assert reverse('live-home') == '/live/'; assert AttendanceRoll._meta.db_table in connection.introspection.table_names(); assert AttendanceRevision._meta.db_table in connection.introspection.table_names()"
+          & "$bundle/python/python.exe" -m deployment.native --state $state manage shell -c "from django.urls import reverse; from django.db import connection; from django.conf import settings; from accounts.models import AttendanceRoll, AttendanceRevision, RoleTemplate, AccessAudit, StaffAccessGrant; assert settings.ROLLFLOW_PROTECTED_WORKSPACE; assert reverse('security-templates') == '/manage/security/templates/'; assert all(m._meta.db_table in connection.introspection.table_names() for m in (RoleTemplate, AccessAudit, StaffAccessGrant)); assert reverse('live-home') == '/live/'; assert AttendanceRoll._meta.db_table in connection.introspection.table_names(); assert AttendanceRevision._meta.db_table in connection.introspection.table_names()"
           if ($LASTEXITCODE -ne 0) { throw 'Central attendance migration or protected workspace missing' }
       - uses: actions/setup-node@v4
         with:

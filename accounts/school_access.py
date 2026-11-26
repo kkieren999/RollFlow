@@ -37,6 +37,10 @@ def valid_scope(scope, value):
 def valid_grant(grant):
     caps = grant.capabilities
     now = timezone.now()
+    if grant.scope == "class":
+        from .models import ConnectedSchoolPublication
+        if not grant.expires_at or not grant.class_publication_id or not ConnectedSchoolPublication.objects.filter(pk=grant.class_publication_id, active=True).exists():
+            return False
     if (grant.starts_at and grant.starts_at > now) or (grant.expires_at and grant.expires_at <= now):
         return False
     return (valid_scope(grant.scope, grant.scope_value) and isinstance(caps, list)
