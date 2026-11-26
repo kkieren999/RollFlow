@@ -1,3 +1,11 @@
+## Authoritative school data (V3.7.0 staging)
+
+1. In the private server, use the OneSchool timetable CSV import and publish the complete dated export.
+2. Review and apply the authorised SM110 student directory and ExportStudentClass membership report separately. A timetable contains allocations, not student enrolments.
+3. Open **Dated OneSchool publication**. Missing staff IDs can be prepared as inactive accounts with unusable passwords. Verify each exact official staff ID, set password, grant teaching access independently of the role, then activate. No identity is inferred from names or staff codes.
+4. Review the counts, skipped memberships, unmapped staff and exact date coverage. Confirm the connected publication. It becomes the source for the master timetable, class directory, daily/weekly schedules and scoped rosters. No weekly repetition fills absent dates. A new export does not alter the reviewed connected snapshot until republished.
+5. The protected server remains read-only for actual attendance, movement and relief changes. These must be implemented and tested against the private data model before deployment.
+
 # V3.7.0 staging — website parity
 
 The Windows release branch packages the exact public Pages snapshot in `app/training` alongside the protected Django/PostgreSQL application. Use **Open Training Demo.cmd** to launch the fictional training workspace on a separate loopback port (18086). Do not use the training workspace for real data. It does not share browser storage with the protected application. The protected application continues to use **Start RollFlow.cmd**.

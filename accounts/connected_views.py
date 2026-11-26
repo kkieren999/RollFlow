@@ -39,7 +39,7 @@ def event(request, name, subject):
 def centre(request):
     existing = current()
     initial = {}
-    if existing:
+    if existing and existing.snapshot.get("source") != "dated":
         from .connected_school import DAYS
         calendar = existing.snapshot["calendar"]
         initial = {"name": existing.name, "starts": existing.starts, "ends": existing.ends,
@@ -168,9 +168,10 @@ def schedule_context(publication, request, codes=None, week=False):
     for d in dates:
         rows = visible_slots(publication, d, codes)
         for row in rows:
-            row["name"] = names[row["code"]]
+            row["name"] = row.get("name") or names[row["code"]]
             if codes is not None:
                 row.pop("staff", None)
+                row.pop("staff_code", None)
         days.append({"date": d, "rows": rows})
     step = timedelta(days=7 if week else 1)
     previous_date = max(publication.starts, day - step)
@@ -217,10 +218,17 @@ def roster(request, code, admin_only=False):
     today = timezone.localdate()
     if not admin_only:
         codes = personal_codes(publication, request.user)
-        if not publication.starts <= today <= publication.ends or not any(
-            s["code"] == code and s["staff"] in codes for s in publication.snapshot["slots"]
-        ):
-            return HttpResponseForbidden("This class is not in your current verified publication.")
+        if publication.snapshot.get("source") == "dated":
+            try:
+                from datetime import date
+                assigned_date = date.fromisoformat(request.GET.get("date", today.isoformat()))
+            except ValueError:
+                return HttpResponseForbidden("Invalid allocation date.")
+            assigned = any(s["code"] == code for s in visible_slots(publication, assigned_date, codes))
+        else:
+            assigned = any(s["code"] == code and s["staff"] in codes for s in publication.snapshot["slots"])
+        if not publication.starts <= today <= publication.ends or not assigned:
+            return HttpResponseForbidden("This class is not in your current verified publication for the requested date.")
     record = next((c for c in publication.snapshot["classes"] if c["code"] == code), None)
     if record is None:
         raise Http404("Unknown published class.")
@@ -232,4 +240,65 @@ def roster(request, code, admin_only=False):
     return render(request, "connected_school.html", {
         "mode": "roster", "publication": publication, "record": record,
         "students": Paginator(students, 50).get_page(request.GET.get("page")),
-        "admin_roster": admin_only})
+        "admin_roster": admin_only, "roster_date": request.GET.get("date", "")})
+
+@administrator
+@require_http_methods(["GET", "POST"])
+def dated_centre(request):
+    """Explicit review/publish of the dated timetable and approved roster source set."""
+    import re
+    from datetime import date
+    from django.contrib.auth.models import User
+    from .dated_school import published_version, build_dated_candidate
+    from .models import ImportedTimetable
+    version = published_version()
+    preview = None
+    error = ""
+    try:
+        with transaction.atomic():
+            if request.method == "POST":
+                # Serialize against dated import publication and concurrent refreshes.
+                list(ImportedTimetable.objects.select_for_update().order_by("pk").values_list("pk", flat=True))
+                version = published_version()
+            sources, snapshot, digest = build_dated_candidate(version)
+            preview = {"stats": snapshot["stats"], "digest": digest,
+                       "starts": snapshot["calendar"]["dates"][0],
+                       "ends": snapshot["calendar"]["dates"][-1]}
+            if request.method == "POST":
+                action = request.POST.get("action")
+                if action not in ("publish", "prepare"):
+                    return HttpResponseBadRequest("Unknown publication action.")
+                if request.POST.get("digest") != digest or request.POST.get("confirm") != "yes":
+                    raise ValueError("Data or settings changed, or approval was missing. Review the latest preview again.")
+                if action == "prepare":
+                    count = 0
+                    for key in snapshot["stats"]["missing_profiles"]:
+                        # No names, MISIDs, password guesses, or automatic activation.
+                        if not re.fullmatch(r"[A-Z0-9_.-]{1,40}", key):
+                            continue
+                        username = "oneschool-" + key.lower()
+                        if (User.objects.filter(username__iexact=username).exists() or
+                                StaffProfile.objects.filter(staff_id__iexact=key).exists()):
+                            continue
+                        user = User.objects.create_user(username=username, is_active=False)
+                        StaffProfile.objects.create(user=user, staff_id=key, timetable_link_verified=False,
+                                                    teaching_enabled=False)
+                        event(request, "dated_staff_prepared", user.username)
+                        count += 1
+                    messages.success(request, f"Prepared {count} inactive staff accounts. Verify identity, set a password, grant teaching and activate separately.")
+                else:
+                    list(ConnectedSchoolPublication.objects.select_for_update().values_list("pk", flat=True))
+                    ConnectedSchoolPublication.objects.filter(active=True).update(active=False)
+                    publication = ConnectedSchoolPublication.objects.create(
+                        name=version.name, starts=date.fromisoformat(preview["starts"]),
+                        ends=date.fromisoformat(preview["ends"]), source_batches=sources,
+                        snapshot=snapshot, digest=digest, published_by=request.user)
+                    event(request, "dated_school_published", publication.pk)
+                    messages.success(request, "Dated school timetable published. It is now the authoritative connected school snapshot.")
+                return redirect("connected-dated")
+    except (ValueError, OSError) as exc:
+        error = str(exc)
+    except IntegrityError:
+        error = "A concurrent school update occurred. Review and retry."
+    return render(request, "connected_dated.html", {
+        "version": version, "preview": preview, "error": error, "publication": current()})

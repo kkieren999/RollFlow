@@ -211,6 +211,14 @@ def personal_codes(publication, user):
     """Verify current role, mapping and original published attestation every request."""
     if not can_teach(user):
         return set()
+    if publication.snapshot.get("source") == "dated":
+        profile = StaffProfile.objects.filter(user=user).first()
+        if not eligible_profile(profile):
+            return set()
+        key = canonical(profile.staff_id)
+        expected = publication.snapshot["bindings"].get(key)
+        actual = {"profile": profile.pk, "user": user.pk, "staff_id": key}
+        return {key} if expected == actual else set()
     mapping = ConnectedStaffMapping.objects.select_related("profile__user").filter(profile__user=user).first()
     if not mapping or not mapping_valid(mapping):
         return set()
@@ -222,6 +230,9 @@ def personal_codes(publication, user):
 
 
 def date_is_school_day(publication, day):
+    if publication.snapshot.get("source") == "dated":
+        return (publication.starts <= day <= publication.ends
+                and day.isoformat() in publication.snapshot["calendar"]["dates"])
     return (publication.starts <= day <= publication.ends and day.weekday() < 5
             and day.isoformat() not in publication.snapshot["calendar"]["closed"])
 
@@ -239,7 +250,10 @@ def selected_day(publication, requested):
 def visible_slots(publication, day, codes=None):
     if not date_is_school_day(publication, day):
         return []
-    return [dict(s, start=publication.snapshot["calendar"]["times"][f"{s['day']}:{s['period']}"][0],
+    if publication.snapshot.get("source") == "dated":
+        return [dict(s, period_label=s["period"]) for s in publication.snapshot["slots"]
+                if s["date"] == day.isoformat() and (codes is None or s["staff"] in codes)]
+    return [dict(s, period_label=f"P{s['period']}", start=publication.snapshot["calendar"]["times"][f"{s['day']}:{s['period']}"][0],
                  end=publication.snapshot["calendar"]["times"][f"{s['day']}:{s['period']}"][1])
             for s in publication.snapshot["slots"]
             if s["day"] == day.isoweekday() and (codes is None or s["staff"] in codes)]

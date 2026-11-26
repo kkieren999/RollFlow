@@ -5,6 +5,7 @@ from accounts import staff_views, student_views, timetable_views, master_views, 
 urlpatterns = [
     path("", staff_views.dashboard, name="management-dashboard"),
     path("connected/", connected_views.centre, name="connected-school"),
+    path("connected/dated/", connected_views.dated_centre, name="connected-dated"),
     path("connected/setup/", automated_views.setup, name="automated-school-setup"),
     path("connected/mapping/", connected_views.mapping, name="connected-mapping"),
     path("connected/classes/", connected_views.classes, name="connected-classes"),
