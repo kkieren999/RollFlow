@@ -10,6 +10,8 @@ from .attendance_operations import daily_status
 @override_settings(ROLLFLOW_PROTECTED_WORKSPACE=True,SECURE_SSL_REDIRECT=False,
                    SESSION_COOKIE_SECURE=False,CSRF_COOKIE_SECURE=False)
 class WorkforceTests(TestCase):
+    payload = test_live_foundation.LiveFoundationTests.payload
+
     def setUp(self):
         test_live_foundation.LiveFoundationTests.setUp(self)
         self.board="/live/workforce/"
