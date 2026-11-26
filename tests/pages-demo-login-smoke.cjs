@@ -288,7 +288,7 @@ async function test() {
       await page.setViewportSize(size);
       for(const mode of ['week','day']){
         await page.locator('[data-timetable-view="'+mode+'"]').click();
-        const geometry=await page.locator('.rf-timetable-workspace').evaluate(workspace=>{
+        const geometry=await page.locator('.rf-timetable-workspace').evaluate((workspace,mode)=>{
           const main=workspace.closest('main'),scroll=workspace.querySelector('.rf-week-scroll');
           const cards=[...workspace.querySelectorAll('.rf-timetable-card')];
           const rect=el=>el.getBoundingClientRect();
