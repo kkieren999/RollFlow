@@ -118,3 +118,6 @@ if ROLLFLOW_SCHOOL_MODE:
     FILE_UPLOAD_TEMP_DIR = str(Path(os.environ["ROLLFLOW_DATA_DIR"]) / "uploads")
     Path(FILE_UPLOAD_TEMP_DIR).mkdir(parents=True, exist_ok=True)
     # Apply HSTS to this host only; ICT owns policy for its parent domain.
+
+# Protected native and school installs never serve the fictional legacy teacher shell.
+ROLLFLOW_PROTECTED_WORKSPACE = ROLLFLOW_SCHOOL_MODE or os.environ.get("ROLLFLOW_PROTECTED_WORKSPACE") == "1"

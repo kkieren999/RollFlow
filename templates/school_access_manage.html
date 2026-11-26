@@ -1,0 +1,9 @@
+{% include "school_access_head.html" with title="Roles and permissions" %}
+<header><strong>RollFlow · Roles &amp; permissions</strong><a href="{% url 'management-dashboard' %}">Administration</a><form method="post" action="{% url 'logout' %}">{% csrf_token %}<button>Sign out</button></form></header>
+<main id="main-content"><h1>Staff access grants</h1>
+<p>Assign explicit read-only modules and a scope. System administrators are still managed through Staff Management; a role label alone does not grant any permission. To change an existing grant, revoke it and create its replacement. Multiple grants combine only within the selected module. Existing administrator and teaching permissions are separate. Faculty classes and timetables refer to the assigned staff member’s faculty, not inferred subject ownership.</p>
+{% for message in messages %}<p role="status">{{ message }}</p>{% endfor %}
+<section><h2>Add access</h2><form method="post">{% csrf_token %}<input type="hidden" name="action" value="grant">{{ form.as_p }}<button>Grant access</button></form></section>
+<section><h2>Current grants</h2><div class="table-wrap"><table><thead><tr><th>Account</th><th>Role</th><th>Scope</th><th>Modules</th><th>Action</th></tr></thead><tbody>
+{% for grant in grants %}<tr><td>{{ grant.user.username }}</td><td>{{ grant.role }}</td><td>{{ grant.scope }} {{ grant.scope_value }}</td><td>{{ grant.capabilities|join:", " }}</td><td><form method="post">{% csrf_token %}<input type="hidden" name="action" value="revoke"><input type="hidden" name="grant_id" value="{{ grant.pk }}"><button>Revoke</button></form></td></tr>{% empty %}<tr><td colspan="5">No grants yet.</td></tr>{% endfor %}
+</tbody></table></div>{% include "school_access_pagination.html" with page=grants %}</section></main></body></html>
