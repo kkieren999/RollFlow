@@ -3,9 +3,33 @@
 **Last reviewed:** 27 November 2026 (Australia/Brisbane)  
 **Project:** kkieren999/RollFlow  
 **Goal:** Deliver a secure, school-wide Windows/browser application suitable for an approved Queensland secondary school pilot and eventually live deployment. The current website is the UX reference, not the production data layer.  
-**Status:** V4.2 live attendance operations committed; final validation and outstanding production gates remain. No production launch or real school data authorised.
+**Status:** V4.3 student movement and destination services committed; validation and production gates remain. No production launch or real school data authorised.
 
-## CURRENT CHECKPOINT — V4.2 live attendance (27 Nov 2026)
+## CURRENT CHECKPOINT — V4.3 student movements and services (27 Nov 2026)
+
+**Latest cumulative branch:** `feature/v4.3-student-movements`, head `456a481e0d919711139bb6dde2a918ab281b90d3`, draft PR #40 https://github.com/kkieren999/RollFlow/pull/40 (base windows-release; includes previous phases). Verify actual head before changes. This supersedes previous checkpoints.
+
+### Build status
+- V4.1 exact commit a664b900 run #314 https://github.com/kkieren999/RollFlow/actions/runs/45893959902: all jobs passed and verified artifact 15151984859 https://github.com/kkieren999/RollFlow/actions/runs/45893959902/artifacts/15151984859 (expires 10 Dec 2026 UTC, recheck).
+- V4.2 exact commit 19b992e8 run #317 https://github.com/kkieren999/RollFlow/actions/runs/45894329046: tests and PostgreSQL/native passed; Windows Chrome step running at inspection. PR #318 also passed tests and PostgreSQL/native at earlier inspection; recheck packaging.
+- V4.3 initial commit 0974ffc2 run #319 https://github.com/kkieren999/RollFlow/actions/runs/45894680285 and latest commit 456a481e run #320 https://github.com/kkieren999/RollFlow/actions/runs/45894760678: application/PostgreSQL checks running. Final Windows artifact name RollFlow-V4.3.0-Student-Movements-Windows-x64-STAGING. No verified V4.3 artifact yet.
+- No production launch, merge or use of real school records authorised.
+
+### Implemented
+- Additive migration 0020 MovementDestination, StudentMovement, MovementEvent; unique open pass per student even across days, explicit state/closed constraints, revision and audit history. Windows version 4.3.0.
+- Teachers issue from current verified dated lesson and roster, including valid exact relief assignment, with active configured destination, explicit confirmation, server-recorded departure/due time. No attendance marks altered. No movement allowed based on unverified class or identity.
+- Staffed destination flow: departure -> arrived -> returning -> returned. Unstaffed flow: departure -> returned. Destination reception granted explicitly by stable numeric destination ID (movement_receive); movement_monitor school-wide read-only, teachers see own issued passes. Admin can record reception and administrative closure with structured reason, not confirmed classroom return. No automatic close at bell or midnight, overdue is due time passed, not a GPS/location claim.
+- Board /live/movements/ includes open across days, overdue, date-filtered completed history, scope-preserving student filter and detailed event timeline. New grants don't imply admin/teaching. /manage/movement-destinations/ create/archive; no rename/delete or automatic default grants/destinations. Archived destinations allow existing passes to resolve but block new issue and new reception grants.
+- No free-text medical, health, guidance or sensitive personal notes; identity mismatch masks student name and blocks ordinary transitions. Atomic state changes, grant/student locks, CSRF, stale revision and duplicate protection. Source and destination metadata frozen at issue. 
+- Code accounts/movement_service.py, accounts/movement_views.py, accounts/test_movements.py, templates/movement_*.html, docs/v4.3-movements.md. Tests cover teacher/destination/monitor scope, direct access, stale revisions, wrong roster/time, duplicate issue, reception flow, unstaffed return, admin closure distinct, archive/revocation, identity change, overdue carryover and CSRF.
+
+### Next actions
+1. Verify #320 and latest PR exact-commit CI, and V4.2 Windows artifact. Fix actual failures and update handover. Protected multi-user browser E2E still required; Chrome package check tests fictional website, not protected UI. Validate concurrent issue/transition/revoke, recovery, full school load and performance.
+2. Finish movement acceptance: approved destinations/expected times, escalation/notifications, student safety follow-up when original teacher unavailable, explicit supervised handover and correction policies, authorised non-class service visits/early departure/late arrival, data minimisation and approved retention; no inferred location or attendance. Medical/guidance/support casework must be separate with need-to-know controls. 
+3. V4.4 Workforce, Relief and Supervision: staff availability/absence and cover, date-specific relief assignment linked to existing ReliefAttendanceAssignment (do not silently reassign existing roll or pass ownership), duty allocation, room changes, calendar exceptions, conflict checks, approvals and auditable notifications; validate school policy and negative access, expiry/cancellation, concurrency. Build on latest cumulative head. Keep central database and fictional mode separation.
+4. Prior V4.0–V4.2 acceptance gaps remain: approved SSO/MFA, delegated actions, approved OneSchool transfer, enrolment history and rollback, attendance correction/reconciliation rules, full protected multi-session browser checks, backup and restore drill, ICT/privacy approval. Do not label staging production ready.
+
+## PREVIOUS CHECKPOINT — V4.2 live attendance (27 Nov 2026)
 
 **Latest cumulative branch:** `feature/v4.2-live-attendance`, head `19b992e8656fde195dbaa632e9f82b66dd1c6faf`, draft PR #39 https://github.com/kkieren999/RollFlow/pull/39 (base windows-release, includes previous development phases). Verify current head before edits. This supersedes earlier checkpoints.
 
@@ -85,7 +109,7 @@ This file is the durable project handover, not a transcript. Read it in full bef
 
 1. Connect to the GitHub repository and re-check the live branch heads, open pull requests, workflow runs, job logs and artifacts. Facts in this file are a snapshot; current repository evidence takes precedence.
 2. Resume the first incomplete task in the CURRENT CHECKPOINT above, then consult the earlier roadmap sections. Do not start an unrelated implementation or restart from an older release just because it is the default branch.
-3. Work from the latest cumulative Windows development branch, presently `feature/v4.2-live-attendance`. For a new phase, create a feature branch from the verified cumulative head. Inspect other overlapping branches before merging. Use an expected-head lease when updating a branch.
+3. Work from the latest cumulative Windows development branch, presently `feature/v4.3-student-movements`. For a new phase, create a feature branch from the verified cumulative head. Inspect other overlapping branches before merging. Use an expected-head lease when updating a branch.
 4. Preserve working OneSchool imports, database schema/history, access boundaries and public website. Prefer incremental migrations and shared UI components; do not discard working code unnecessarily. Do not merge, deploy, delete existing databases, publish real data, or change school infrastructure without explicit approval.
 5. Add tests with fictional data. Run/trigger Django checks, migration consistency, all relevant regression tests, PostgreSQL/native smoke, browser checks and Windows packaging. Investigate failed jobs rather than weakening security or suppressing tests. A queued/running build is not a successful build.
 6. Create or update a draft PR. Report actual changes, limitations, branch, commit, PR, test outcomes and a verified artifact URL. Never claim an installer is ready unless the exact commit's required jobs passed and the artifact exists.
@@ -108,7 +132,9 @@ Stable handover URL: https://github.com/kkieren999/RollFlow/blob/development-han
 
 | Prior cumulative V4.1 development source | `feature/v4.1-school-data-oneschool` — `a664b900422dbce5683e004a295b0ecb552798d3`, draft PR #38 |
 
-| **Current cumulative development source** | `feature/v4.2-live-attendance` — `19b992e8656fde195dbaa632e9f82b66dd1c6faf`, draft PR #39 |
+| Prior cumulative V4.2 development source | `feature/v4.2-live-attendance` — `19b992e8656fde195dbaa632e9f82b66dd1c6faf`, draft PR #39 |
+
+| **Current cumulative development source** | `feature/v4.3-student-movements` — `456a481e0d919711139bb6dde2a918ab281b90d3`, draft PR #40 |
 
 Links:
 - Website: https://kkieren999.github.io/RollFlow/
