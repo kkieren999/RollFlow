@@ -3745,7 +3745,7 @@ function rfCompactGroups(kind,ids,roles=[]){
   const approvalInSchedule=schedule&&!has('attendance');
   defs=[
    ...(schedule?[group('WORKSPACE','Daily Schedule','schedule','dashboard',...extras('schedule'),...(approvalInSchedule?['approvals']:[]))]:[group('WORKSPACE','Dashboard','dashboard',...extras('dashboard'))]),
-   group('WORKSPACE','Master Timetable','master',...(leader?['classes']:[]),...(faculty?['staff']:[]),...extras('master')),
+   group('WORKSPACE','Master Timetable','master',...(leader&&master?['classes']:[]),...(faculty&&master?['staff']:[]),...extras('master')),
    ...(!leader||!master?[group('WORKSPACE','Class Finder','classes')]:[]),
    group('WORKSPACE','Student Search','students'),
    ...(!faculty||!master?[group('WORKSPACE','Staff Directory','staff')]:[]),
@@ -3829,7 +3829,7 @@ function rfCompactNavigation(){
    for(const g of groups){
     const id=g.routes.find(x=>x!=='dashboard');if(!id)continue;
     const source=links.find(b=>b.dataset.rfuPage===id);if(!source)continue;
-    const b=source.cloneNode(true),label=b.querySelector('strong');if(label&&g.label)label.textContent=g.label;grid.append(b);
+    const b=source.cloneNode(true),label=b.querySelector('strong');if(label&&g.label&&g.routes[0]!=='dashboard')label.textContent=g.label;grid.append(b);
    }
   }
  }
