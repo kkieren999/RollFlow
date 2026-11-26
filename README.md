@@ -1,3 +1,7 @@
+# RollFlow — shared-source integration candidate
+
+The integration/shared-core branch combines the fictional public demo and private Django/PostgreSQL application. Root index.html is also the Windows training source. Shared schedule code lives in shared/. The school server computes permissions before producing a read-only schedule projection. See [architecture](docs/SHARED_ARCHITECTURE.md). Staging only.
+
 # RollFlow — Teacher Edition
 
 ## Public Pages teacher demonstration login: swilliams

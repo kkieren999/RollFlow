@@ -1,0 +1,32 @@
+.env
+.env.*
+!.env.example
+.local-data/
+.collected-static/
+*.sqlite3
+*.db
+*.pem
+*.key
+__pycache__/
+*.py[cod]
+.venv/
+backups/
+private-data/
+
+# Do not commit OneSchool exports or raw/encrypted private archives
+ExportTimetable*.csv
+TTLineAlignmentExport*.*
+SM110_DynamicStudentList*.xlsx
+ExportStudentClass*.csv
+*StaffTimetable*.pdf
+ClassList*.pdf
+oneschool-exports/
+oneschool-imports/
+oneschool-import.key
+*.rfenc
+
+# Generated offline distribution and private installation state
+/dist/
+/wheelhouse/
+/instance/
+*.dump

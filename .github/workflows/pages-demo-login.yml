@@ -2,9 +2,12 @@ name: Public Pages demo login smoke
 
 on:
   push:
-    branches: [main, 'feature/**']
+    branches: [main, 'feature/**', 'integration/**']
     paths:
       - 'index.html'
+      - 'shared/**'
+      - 'styles/**'
+      - 'tests/static-demo-server.cjs'
       - 'tests/pages-demo-login-smoke.cjs'
       - 'tests/shared-workspace-browser.cjs'
       - '.github/workflows/pages-demo-login.yml'
@@ -12,6 +15,9 @@ on:
     branches: [main]
     paths:
       - 'index.html'
+      - 'shared/**'
+      - 'styles/**'
+      - 'tests/static-demo-server.cjs'
       - 'tests/pages-demo-login-smoke.cjs'
       - 'tests/shared-workspace-browser.cjs'
       - '.github/workflows/pages-demo-login.yml'
@@ -56,3 +62,16 @@ jobs:
           path: qa-screenshots/
           if-no-files-found: warn
           retention-days: 14
+
+  shared-schedule-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node tests/shared-schedule-contract.cjs
+      - run: npm install --no-save --no-audit --no-fund playwright-core@1.56.1
+      - name: Verify actual shared lesson renderer in browser
+        run: node tests/shared-schedule-browser.cjs

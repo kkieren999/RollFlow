@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en-AU"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>RollFlow · Imported class memberships</title>
+<style>
+*{box-sizing:border-box}body{font:15px/1.5 Arial,sans-serif;background:#eef3f5;color:#203945;margin:0}
+header{background:#112c3b;color:white;padding:18px max(14px,calc((100% - 1050px)/2))}
+header a{color:white}main{max-width:1060px;margin:auto;padding:24px 14px}
+h1{margin:0 0 6px}h2{font-size:18px;margin:0 0 9px}
+.panel{border:1px solid #d4e1e7;border-radius:9px;background:white;padding:20px;margin:16px 0}
+p{color:#4b6570}.info{border-left:4px solid #227f43;background:#f2f9f3;padding:12px 15px}
+input,button{font:inherit;padding:9px 12px;border-radius:6px;border:1px solid #9fb5c0}button{color:white;background:#147f39;border-color:#147f39;font-weight:bold;cursor:pointer}
+a{color:#075f85}a:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid #dea62b;outline-offset:3px}
+table{border-collapse:collapse;width:100%;text-align:left}td,th{padding:10px;border-bottom:1px solid #e5eaee}th{color:#526c78;background:#f5f8fa;font-size:12px}
+.wrap{overflow:auto}.muted{color:#566f7b;font-size:13px}.actions{display:flex;gap:12px;flex-wrap:wrap;margin:14px 0}
+</style>{% include "ui_system.html" %}</head>
+<body><a class="rf-skip" href="#main-content">Skip to main content</a>
+{% include "ui_header.html" with portal="admin" active="imports" %}
+<main id="main-content" class="rf-page"><h1>Imported student-class memberships</h1>
+<p class="info">Administrator review only. Each membership is linked by an existing student EQID and an approved class code. This directory does not change teaching assignments or attendance, and must not be made public.</p>
+<section class="panel"><h2>Class codes with imported memberships</h2>
+<div class="wrap"><table><thead><tr><th>Class code</th><th>Student links</th><th>Action</th></tr></thead><tbody>
+{% for row in overview %}<tr><td>{{ row.class_code }}</td><td>{{ row.member_count }}</td><td><a href="?class={{ row.class_code|urlencode }}">Review membership</a></td></tr>
+{% empty %}<tr><td colspan="3">No class links have been applied. Import ExportStudentClass from OneSchool Import Centre.</td></tr>{% endfor %}
+</tbody></table></div></section>
+{% if class_code %}<section class="panel"><h2>Class {{ class_code }}</h2>
+{% if members %}<p class="muted">{{ members.paginator.count }} linked students. For privacy, lists are visible only to administrators.</p>
+<div class="wrap"><table><thead><tr><th>Student</th><th>EQID</th><th>Year</th><th>Source import</th></tr></thead><tbody>
+{% for entry in members %}<tr><td>{{ entry.student.last_name }}, {{ entry.student.first_name }}</td><td>{{ entry.student.student_id }}</td><td>{{ entry.student.year_level }}</td><td>{{ entry.source_batch.label }}</td></tr>{% empty %}<tr><td colspan="4">No matched students for this class code.</td></tr>{% endfor %}
+</tbody></table></div>
+<div class="actions">{% if members.has_previous %}<a href="?class={{ class_code|urlencode }}&amp;page={{ members.previous_page_number }}">Previous</a>{% endif %}
+<span>Page {{ members.number }} of {{ members.paginator.num_pages }}</span>
+{% if members.has_next %}<a href="?class={{ class_code|urlencode }}&amp;page={{ members.next_page_number }}">Next</a>{% endif %}</div>
+{% else %}<p>Enter a valid existing class code to review memberships.</p>{% endif %}
+</section>{% endif %}
+</main></body></html>

@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en-AU"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>RollFlow · Master Timetable</title>
+{% include "master_styles.html" %}{% include "polish_styles.html" %}
+<style>main.rf-page{max-width:1600px}.rf-page .panel-head{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}.rf-page .table-wrap{overflow:auto}</style>
+{% include "ui_system.html" %}</head>
+<body><a class="rf-skip" href="#main-content">Skip to main content</a>
+{% include "ui_header.html" with portal="teacher" active="master" %}
+<main id="main-content" class="rf-page">
+<h1>School planning timetable</h1>
+<p class="rf-page-intro">Read-only school-wide planning view. This is not a published teacher timetable or attendance register.</p>
+{% include "master_module.html" %}
+</main></body></html>

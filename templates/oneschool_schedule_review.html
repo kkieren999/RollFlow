@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en-AU"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>RollFlow · Approved OneSchool timetable evidence</title>
+<style>
+*{box-sizing:border-box}body{font:15px/1.5 Arial,sans-serif;margin:0;color:#243947;background:#f0f4f6}
+header{background:#112c3b;color:white;padding:16px max(16px,calc((100% - 1160px)/2))}
+header a{color:white}main{max-width:1190px;padding:26px 16px;margin:auto}
+h1{font-size:28px;margin:0}p{color:#56717c}.panel{border:1px solid #d6e0e4;padding:18px;background:white;border-radius:9px;margin:18px 0}
+a{color:#07668b}a:focus-visible,input:focus-visible,button:focus-visible{outline:3px solid #efa73a;outline-offset:3px}
+input,button{padding:9px;border-radius:6px;border:1px solid #9ab2bd;font:inherit}
+button{background:#137a3b;color:white;cursor:pointer;font-weight:bold}
+table{border-collapse:collapse;width:100%;text-align:left}
+th,td{padding:10px;border-bottom:1px solid #e1e8ed;font-size:14px}
+th{background:#f5f8fa;color:#425c68}
+.scroll{overflow:auto}.links{display:flex;gap:15px;flex-wrap:wrap;padding:15px 0}
+.note{background:#fff9e9;border-left:4px solid #b98536;padding:12px 15px}
+</style>{% include "ui_system.html" %}</head><body>
+<a class="rf-skip" href="#main-content">Skip to main content</a>
+{% include "ui_header.html" with portal="admin" active="imports" %}
+<main id="main-content" class="rf-page"><h1>Approved timetable evidence</h1>
+<p class="note">Administrator-only source checks. A printed staff code is not a verified OneSchool staff ID. This page does not assign staff account access or modify attendance.</p>
+<nav class="links" aria-label="Evidence kind">
+<a href="?source=lines">Weekly line allocations</a>
+<a href="?source=staff_pdf">Staff PDF class legends</a>
+<a href="{% url 'oneschool-class-rosters' %}">Student class membership directory</a>
+</nav>
+<div class="panel">
+{% if batch %}
+<h2>{% if source == 'lines' %}Approved seven-line timetable{% else %}Approved staff PDF class evidence{% endif %}</h2>
+<p>Import reference: {{ batch.label }} · Approved {{ batch.applied_at|date:"j M Y H:i" }} · Version {{ batch.summary.applied.timetable_version_id }}</p>
+<form method="get"><input type="hidden" name="source" value="{{ source }}">
+<label for="class-code">Find class code</label> <input id="class-code" name="class" value="{{ class_code }}" maxlength="30" placeholder="Class code"> <button type="submit">Filter</button></form>
+<p>{{ entries.paginator.count }} matching records · page {{ entries.number }} of {{ entries.paginator.num_pages }}.</p>
+<div class="scroll"><table>
+<thead><tr>{% if source == 'lines' %}<th>Class</th><th>Day</th><th>Period</th><th>Year</th><th>Line</th><th>Printed staff code</th><th>Room</th>
+{% else %}<th>Class</th><th>Printed staff code</th><th>Class name</th><th>Line</th>{% endif %}</tr></thead>
+<tbody>{% for row in entries %}
+<tr>{% if source == 'lines' %}
+<td>{{ row.class_code }}</td><td>{{ row.weekday }}</td><td>{{ row.period }}</td>
+<td>{{ row.year_level }}</td><td>{{ row.line_number|default:"Offline" }}</td>
+<td>{{ row.staff_code|default:"Unassigned" }}</td><td>{{ row.room_code|default:"Unassigned" }}</td>
+{% else %}
+<td>{{ row.class_code }}</td><td>{{ row.staff_code }}</td><td>{{ row.subject_name }}</td><td>{{ row.line_number|default:"—" }}</td>
+{% endif %}</tr>
+{% empty %}<tr><td colspan="7">No approved source records match this class.</td></tr>{% endfor %}
+</tbody></table></div>
+<nav class="links">{% if entries.has_previous %}<a href="?source={{ source }}&amp;class={{ class_code|urlencode }}&amp;page={{ entries.previous_page_number }}">Previous</a>{% endif %}
+{% if entries.has_next %}<a href="?source={{ source }}&amp;class={{ class_code|urlencode }}&amp;page={{ entries.next_page_number }}">Next</a>{% endif %}</nav>
+{% else %}<h2>No approved import yet</h2><p>Upload and approve the related files in the OneSchool Import Centre first.</p>{% endif %}
+</div></main></body></html>

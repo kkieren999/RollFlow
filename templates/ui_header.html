@@ -1,0 +1,27 @@
+{# Unified staff-facing navigation, visible links only; server permissions remain authoritative. #}
+<header class="rf-appbar">
+  <a class="rf-brand" href="{% if portal == 'teacher' %}{% url 'teacher-timetable' %}{% else %}{% url 'management-dashboard' %}{% endif %}">
+    <span class="rf-mark" aria-hidden="true">RF</span>
+    <span>RollFlow<small class="rf-portal-label">{% if portal == 'teacher' %}TEACHER PORTAL{% else %}ADMINISTRATION PORTAL{% endif %}</small></span>
+  </a>
+  <nav class="rf-nav" aria-label="{% if portal == 'teacher' %}Teacher{% else %}Administration{% endif %} navigation">
+    {% if portal == 'teacher' %}
+      {% if request.user.is_staff and request.user.is_superuser %}<a class="rf-navlink" href="{% url 'management-dashboard' %}">Administration</a>{% endif %}
+      <a class="rf-navlink" href="{% url 'teacher-timetable' %}" {% if active == 'day' %}aria-current="page"{% endif %}>My day</a>
+      <a class="rf-navlink" href="{% url 'teacher-week' %}" {% if active == 'week' %}aria-current="page"{% endif %}>My week</a>
+    {% else %}
+      {% if request.user.staff_profile.teaching_enabled %}<a class="rf-navlink" href="{% url 'teacher-timetable' %}">My teaching schedule</a>{% endif %}
+      <a class="rf-navlink" href="{% url 'management-dashboard' %}" {% if active == 'dashboard' %}aria-current="page"{% endif %}>Dashboard</a>
+      <a class="rf-navlink" href="{% url 'management-section' section='staff' %}" {% if active == 'staff' %}aria-current="page"{% endif %}>Staff</a>
+      <a class="rf-navlink" href="{% url 'management-student-directory' %}" {% if active == 'students' %}aria-current="page"{% endif %}>Students</a>
+      <a class="rf-navlink" href="{% url 'management-class-directory' %}" {% if active == 'classes' %}aria-current="page"{% endif %}>Classes</a>
+      <a class="rf-navlink" href="{% url 'management-master' %}" {% if active == 'master' %}aria-current="page"{% endif %}>Master timetable</a>
+      <a class="rf-navlink" href="{% url 'oneschool-documents' %}" {% if active == 'imports' %}aria-current="page"{% endif %}>OneSchool imports</a>
+      <a class="rf-navlink" href="{% url 'automated-school-setup' %}" {% if active == 'setup' %}aria-current="page"{% endif %}>Automated setup</a>
+      <a class="rf-navlink" href="{% url 'connected-school' %}" {% if active == 'publish' %}aria-current="page"{% endif %}>Publish</a>
+    {% endif %}
+  </nav>
+  <form method="post" action="{% url 'logout' %}">{% csrf_token %}
+    <button class="rf-signout" type="submit">Sign out</button>
+  </form>
+</header>

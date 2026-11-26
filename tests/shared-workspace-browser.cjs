@@ -12,9 +12,23 @@ async function capture(page,name){
  await page.screenshot({path:path.join(screenshotDir,name.replace(/[^a-zA-Z0-9_-]/g,'-')+'.png'),animations:'disabled',fullPage:false});
 }
 const users=['admin','principal','deputy','hod','ylc','business','office','teacher','swilliams','learning','aide','relief','guidance'];
-const counts={admin:10,principal:10,deputy:10,hod:7,ylc:7,business:6,office:8,teacher:7,swilliams:7,learning:5,aide:4,relief:3,guidance:3};
+// Explicit expected primary route inventory after permission-based classroom access.
+const expectedStaff={
+ principal:['dashboard','master','students','staff','attendance','movements','classroom-management','referrals','workforce','relief','reports'],
+ deputy:['dashboard','master','students','staff','attendance','movements','classroom-management','referrals','workforce','relief','reports'],
+ hod:['dashboard','master','classes','students','attendance','classroom-management','referrals','reports'],
+ ylc:['dashboard','master','students','attendance','movements','classroom-management','referrals','reports'],
+ business:['dashboard','master','staff','workforce','relief','reports'],
+ office:['dashboard','master','students','staff','approvals','movements','workforce','relief'],
+ learning:['schedule','master','classes','students','attendance','classroom-management','observations'],
+ aide:['schedule','classes','students','classroom-management','observations'],
+ relief:['schedule','master','classes','students','attendance','classroom-management'],
+ guidance:['dashboard','students','observations']
+};
+const expectedTeacher=['timetable','master','finder','classroom-management','search','attendance-overview','movements','student-support'];
+const expectedAdmin=['dashboard','staff','students','timetable','attendance','movements','accounts','security','oneschool','teacher-modules'];
 async function run(){
- const server=http.createServer((req,res)=>{res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});res.end(html)});
+ const server=http.createServer(require('./static-demo-server.cjs')(html));
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  const url='http://127.0.0.1:'+server.address().port+'/';
  let browser;
@@ -34,11 +48,13 @@ async function run(){
     }
    });
    await page.goto(url);
+   assert.equal(await page.evaluate(()=>window.RollFlowSchedule?.VERSION),1,'Shared schedule contract loaded');
    assert.match(await page.locator('.demo-auth-footer').innerText(),/Do not enter real school credentials or records/);
    await page.locator('#demo-username').fill(id);await page.locator('#demo-password').fill(id);await page.locator('#demo-login-form button[type="submit"]').click();
    await page.locator('.rf-compact-account summary').waitFor();
    assert.equal(await page.locator('.rf-training-notice').count(),0,'Persistent banner removed');
-   assert.equal(await page.locator('.nav-primary button').count(),counts[id],id+' compact menu count');
+   const navIds=await page.locator('.nav-primary button').evaluateAll(bs=>bs.map(b=>b.getAttribute('data-admin-page')||b.getAttribute('data-nav')||b.getAttribute('data-rfu-page')));
+   assert.deepEqual(navIds,id==='admin'?expectedAdmin:['teacher','swilliams'].includes(id)?expectedTeacher:expectedStaff[id],id+' exact authorised primary routes');
    assert.equal(await page.locator('.nav-primary [data-nav="school-calendar"],.nav-primary [data-rfu-page="calendar"],.rf-compact-tabs [data-nav="school-calendar"],.rf-compact-tabs [data-rfu-page="calendar"]').count(),0,id+' calendar route removed');
    assert.equal(await page.locator('.nav-primary [data-rfu-page="supervision"],.rf-compact-tabs [data-rfu-page="supervision"]').count(),0,id+' supervision route removed');
    const teacher=['teacher','swilliams'].includes(id),attr=id==='admin'?'data-admin-page':teacher?'data-nav':'data-rfu-page';

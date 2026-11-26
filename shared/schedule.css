@@ -1,0 +1,7 @@
+/* Shared, scope-limited lesson identity. No grid or attendance status overrides. */
+.rf-shared-lesson-heading{display:grid;min-width:0;gap:2px;line-height:1.35;overflow-wrap:anywhere}
+.rf-shared-lesson-title{font-size:var(--rf-type-base,14px);font-weight:650;color:inherit}
+.rf-shared-lesson-code{font-size:var(--rf-type-xs,12px);font-weight:400;color:var(--rf-muted,#586c79)}
+
+.rf-shared-lesson-heading h3.rf-shared-lesson-title{margin:0;font-size:14px;line-height:1.35;color:inherit}
+.rf-native-grid .rf-shared-lesson-heading h3.rf-shared-lesson-title{font-size:13px}

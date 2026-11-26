@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en-AU"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>RollFlow V3.6.7 · Connected School Data</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#edf3f5;color:#203b49;font:15px/1.55 Arial,sans-serif}
+header{background:#112c3b;color:white;padding:16px max(18px,calc((100% - 1150px)/2));display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+header a{color:white}nav{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+main{max-width:1190px;margin:auto;padding:26px 17px 50px}h1{font-size:29px;line-height:1.2;margin:0 0 10px}h2{font-size:20px;margin:0 0 12px}h3{font-size:16px}
+.panel{background:white;border:1px solid #d6e2e7;border-radius:9px;padding:20px;margin:18px 0}.hint{color:#52707d}.note{border-left:4px solid #b18134;background:#fff8e9;padding:12px 16px}.success{background:#edf8ef;padding:12px}.errorlist,.error{color:#9c2424}
+a{color:#096487}label{font-weight:bold;display:block;margin:12px 0 4px}
+input,textarea,select,button{font:inherit;border:1px solid #9eb5be;border-radius:6px;padding:9px;max-width:100%}
+textarea{width:100%;max-width:680px;display:block}.btn,button{display:inline-block;background:#11753b;color:white;padding:9px 14px;font-weight:bold;border-radius:6px;border:1px solid #11753b;cursor:pointer;text-decoration:none}
+button.secondary{background:white;color:#244754;border-color:#a7bac4}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #d9a442;outline-offset:3px}
+input[type=checkbox]{margin-right:6px}table{width:100%;text-align:left;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid #dce6eb}th{font-size:12px;background:#f2f6f8;color:#4e6975}.scroll{overflow-x:auto}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px}.metric{background:#f3f7f8;padding:14px;border-radius:6px}.metric strong{display:block;font-size:24px}.actions{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:14px 0}.inline{display:inline-block}header button{background:transparent;border-color:#b1c4cd}small{color:#536e79}
+</style>{% include "ui_system.html" %}</head><body>
+<a class="rf-skip" href="#main-content">Skip to main content</a>
+{% if mode == 'teacher' %}{% if week_view %}{% include "ui_header.html" with portal="teacher" active="week" %}{% else %}{% include "ui_header.html" with portal="teacher" active="day" %}{% endif %}{% elif mode == 'roster' and not admin_roster %}{% include "ui_header.html" with portal="teacher" active="roster" %}{% elif mode == 'master' %}{% include "ui_header.html" with portal="admin" active="master" %}{% elif mode == 'classes' or mode == 'roster' %}{% include "ui_header.html" with portal="admin" active="classes" %}{% else %}{% include "ui_header.html" with portal="admin" active="publish" %}{% endif %}
+<main id="main-content" class="rf-page">
+{% for message in messages %}<p class="{{ message.tags }}" role="status">{{ message }}</p>{% endfor %}
+{% if publication %}<p class="hint">Published: {{ publication.name }} · {{ publication.starts|date:"j M Y" }} – {{ publication.ends|date:"j M Y" }}. {% if publication.snapshot.source == "dated" %}Dated OneSchool CSV snapshot. Missing dates have no imported lessons.{% else %}Weekly planning schedule, not a live daily OneSchool feed.{% endif %}</p>{% endif %}
+{% if mode == 'publish' %}
+<h1>Review and publish school data</h1><p><a class="btn" href="{% url 'connected-dated' %}">Publish the full dated school timetable CSV (recommended)</a></p><p class="rf-page-intro">Review imported sources, confirm teacher identity mappings, then publish a new school timetable snapshot.</p><p><a class="btn" href="{% url 'automated-school-setup' %}">Automated School Setup — detect times and prepare teacher accounts</a></p>
+<p>Publish the latest approved set of four OneSchool imports without overwriting the existing database, source files or manual records. A publication is a fixed term snapshot; new imports do not alter it automatically.</p>
+<section class="panel"><h2>1. Approved source reports</h2>
+{% if source_error %}<p class="note">{{ source_error }}</p><a href="{% url 'oneschool-documents' %}">Finish the import steps</a>{% else %}
+<table><thead><tr><th>Report</th><th>Reference</th><th>Approved</th></tr></thead><tbody>
+{% for kind,batch in batches.items %}<tr><td>{{ batch.get_kind_display }}</td><td><a href="{% url 'oneschool-documents-review' batch.pk %}">{{ batch.label }}</a></td><td>{{ batch.applied_at|date:"j M Y H:i" }}</td></tr>{% endfor %}
+</tbody></table>{% endif %}
+</section>
+<section class="panel"><h2>2. Verify staff mappings</h2>
+<p>Use Staff Management to create each teacher account and verify its authorised OneSchool Staff ID first. Then explicitly link the printed timetable staff code to that verified teacher. Never rely on a name or code match alone.</p>
+<a href="{% url 'management-section' section='staff' %}">Open Staff Management</a>
+<form method="post" action="{% url 'connected-mapping' %}">{% csrf_token %}<input type="hidden" name="action" value="verify">
+<label for="code">Printed staff code</label><select name="staff_code" id="code" required><option value="">Select a code</option>{% for code in codes %}<option>{{ code }}</option>{% endfor %}</select>
+<label for="profile">Verified teacher account</label><select name="profile" id="profile" required><option value="">Select a verified account</option>{% for profile in profiles %}<option value="{{ profile.pk }}">{{ profile.user.username }} · {{ profile.staff_id }}</option>{% endfor %}</select>
+<label><input type="checkbox" name="confirm" value="yes" required>I verified this code-to-account relationship against the authorised staff identity record.</label>
+<button type="submit" {% if not codes or not profiles %}disabled{% endif %}>Verify mapping</button></form>
+<div class="scroll"><table><thead><tr><th>Staff code</th><th>Account</th><th>Verified on</th><th>Action</th></tr></thead><tbody>
+{% for mapping in mappings %}<tr><td>{{ mapping.staff_code }}</td><td>{{ mapping.profile.user.username }}</td><td>{{ mapping.verified_at|date:"j M Y H:i" }}</td><td><form method="post" action="{% url 'connected-mapping' %}">{% csrf_token %}<input type="hidden" name="action" value="revoke"><input type="hidden" name="staff_code" value="{{ mapping.staff_code }}"><label><input type="checkbox" name="confirm" value="yes" required>Confirm revoke</label><button class="secondary" type="submit">Revoke</button></form></td></tr>
+{% empty %}<tr><td colspan="4">No verified code mappings yet. Unmapped lessons remain admin-only.</td></tr>{% endfor %}
+</tbody></table></div></section>
+<section class="panel"><h2>3. Configure term and lesson times</h2>
+<p>Enter the actual term dates, all four lesson times for each weekday in 24-hour format, and any closure dates. Example row: <code>Monday,1,08:50,10:00</code>. Times are suggested from the approved PDF where available. Confirm every cell; blanks need review. Existing published times remain unchanged unless you request PDF suggestions. Include separate Monday and Tuesday–Friday times as needed. No dates are guessed from the export name.</p>
+<form method="post">{% csrf_token %}{{ form.as_p }}
+<div id="visual-times"></div><p><a href="{% url 'connected-school' %}?autofill=1">Reload PDF suggestions (discards unsaved edits)</a></p>
+<div class="actions"><button type="submit" name="action" value="review">Review school data</button></div>
+{% if preview %}
+<h2>4. Review population results</h2>
+<div class="grid">
+<div class="metric"><small>Classes</small><strong>{{ preview.stats.classes }}</strong></div>
+<div class="metric"><small>Weekly slots</small><strong>{{ preview.stats.slots }}</strong></div>
+<div class="metric"><small>Student-class links</small><strong>{{ preview.stats.memberships }}</strong></div>
+<div class="metric"><small>Skipped pairs</small><strong>{{ preview.stats.skipped_pairs }}</strong></div>
+<div class="metric"><small>Verified staff mappings</small><strong>{{ preview.stats.verified_mappings }}</strong></div>
+<div class="metric"><small>Slots with no staff</small><strong>{{ preview.stats.unassigned_slots }}</strong></div>
+<div class="metric"><small>Legend-only classes</small><strong>{{ preview.stats.legend_only }}</strong></div>
+</div>
+<h3>Example connected class rows (first 12)</h3><div class="scroll"><table><thead><tr><th>Class code</th><th>Class name</th><th>Matched students</th></tr></thead><tbody>{% for c in preview.examples %}<tr><td>{{ c.code }}</td><td>{{ c.name }}</td><td>{{ c.count }}</td></tr>{% endfor %}</tbody></table></div>
+{% if preview.stats.unmapped_codes %}<p class="note">Unmapped staff codes ({{ preview.stats.unmapped_codes|length }}): {{ preview.stats.unmapped_codes|join:", " }}. Their lessons stay admin-only.</p>{% endif %}
+<p class="note">Review skipped pairs and legend-only classes. PDF-only classes have no scheduled lesson and are admin-only. This snapshot does not include relief changes, assemblies or non-line lesson times. No attendance is written.</p>
+<input type="hidden" name="digest" value="{{ preview.digest }}">
+<label><input type="checkbox" name="confirm" value="yes">I reviewed these source batches, lesson times, dates, unmatched items and verified mappings and approve publishing this snapshot.</label>
+<button type="submit" name="action" value="publish">Publish school data</button>
+{% endif %}
+</form></section>
+{% if publication %}<div class="panel"><h2>Published school data</h2><div class="actions"><a class="btn" href="{% url 'connected-classes' %}">Class directory</a><a class="btn" href="{% url 'connected-master' %}">Master timetable</a></div><a href="{% url 'management-class-directory' %}?manual=1">Legacy manual classes (unchanged)</a> · <a href="{% url 'management-timetable' %}?manual=1">Legacy manual timetable</a></div>{% endif %}
+{% elif mode == 'classes' %}
+<h1>Published class directory</h1><p>{% if publication.snapshot.source == "dated" %}Classes, subjects, years and teaching allocations from the dated OneSchool export; rosters from the reviewed student membership reports.{% else %}Class names from approved staff legends; weekly slots and rosters from the reviewed import set.{% endif %}</p>
+<section class="panel"><form method="get"><label for="q">Search classes</label><input id="q" name="q" value="{{ query }}" placeholder="Class code or name"><button>Search</button></form>
+<p>{{ classes.paginator.count }} matching classes</p><div class="scroll"><table><thead><tr><th>Class</th><th>Name</th><th>Years in publication</th><th>Published student links</th><th></th></tr></thead><tbody>
+{% for c in classes %}<tr><td>{{ c.code }}</td><td>{{ c.name }}</td><td>{{ c.years|join:", "|default:"—" }}</td><td>{{ c.students|length }}</td><td><a href="{% url 'connected-admin-roster' c.code %}">View roster</a></td></tr>{% empty %}<tr><td colspan="5">No matching classes.</td></tr>{% endfor %}
+</tbody></table></div><nav>{% if classes.has_previous %}<a href="?q={{ query|urlencode }}&amp;page={{ classes.previous_page_number }}">Previous</a>{% endif %}Page {{ classes.number }} of {{ classes.paginator.num_pages }}{% if classes.has_next %}<a href="?q={{ query|urlencode }}&amp;page={{ classes.next_page_number }}">Next</a>{% endif %}</nav></section>
+{% elif mode == 'master' or mode == 'teacher' %}
+<h1>{% if mode == 'master' %}School master timetable{% else %}Daily Schedule{% endif %}</h1>
+{% if no_mapping %}<p class="note">Your account has no currently verified mapping in this publication. Ask your administrator to verify the staff ID/code and publish again.</p>{% endif %}
+<form method="get"><label for="date">Choose a date in the published term</label><div class="rf-page-actions"><input id="date" name="date" type="date" value="{{ day|date:'Y-m-d' }}" min="{{ publication.starts|date:'Y-m-d' }}" max="{{ publication.ends|date:'Y-m-d' }}"><button type="submit">View date</button>
+<a class="btn" href="?date={{ previous_date|date:'Y-m-d' }}">Previous {% if week_view %}week{% else %}day{% endif %}</a>
+<a class="btn" href="?date={{ next_date|date:'Y-m-d' }}">Next {% if week_view %}week{% else %}day{% endif %}</a>
+</div></form>
+{% if mode == 'teacher' and native_cards %}
+<div data-rf-native-timetable data-rf-selected="{{ day|date:'Y-m-d' }}" data-rf-initial="{% if week_view %}week{% else %}day{% endif %}" class="days">
+{% for d in days %}<section class="day" data-rf-native-day="{{ d.date|date:'Y-m-d' }}" aria-label="{{ d.date|date:'l j F Y' }}">
+<div class="day-head"><h2>{{ d.date|date:"l j F" }}</h2><a class="btn" href="{% url 'teacher-timetable' %}?date={{ d.date|date:'Y-m-d' }}">Day view</a></div>
+<div class="day-body">{% for row in d.rows %}
+<div class="lesson" data-rf-native-card data-rf-period="{{ row.period_label }}" data-rf-code="{{ row.code }}" data-rf-key="{{ d.date|date:'Y-m-d' }}|{{ row.period }}|{{ row.code }}|{{ row.start }}|{{ row.end }}">
+<span class="time">{{ row.period_label }} · {{ row.start }}–{{ row.end }}</span><div data-rf-shared-lesson data-date="{{ d.date|date:'Y-m-d' }}" data-code="{{ row.code }}" data-period="{{ row.period_label }}" data-time="{{ row.start }}–{{ row.end }}"><strong>{{ row.name }}</strong><small>{{ row.code }}</small></div><small>Room {{ row.room|default:"Unassigned" }}</small>
+<a href="{% url 'connected-teacher-roster' row.code %}?date={{ d.date|date:'Y-m-d' }}">My class roster</a></div>
+{% empty %}<p class="muted">No scheduled lessons for this date.</p>{% endfor %}</div></section>{% endfor %}
+</div>{% load static %}{{ shared_schedule|json_script:"rf-shared-schedule" }}<script src="{% static 'rf-shared/schedule-core.js' %}"></script><script src="{% static 'rf-shared/schedule-mount.js' %}"></script>{% include "weekly_cards.html" %}
+{% else %}
+{% if mode == 'teacher' %}<div class="rf-page-actions"><a class="btn primary" href="{% url 'teacher-week' %}?date={{ day|date:'Y-m-d' }}">Week view</a></div>{% endif %}
+{% for d in days %}<section class="panel"><h2>{{ d.date|date:"l j F" }}</h2><div class="scroll"><table><thead><tr><th>Period</th><th>Time</th><th>Class</th><th>Subject / class name</th><th>Room</th>{% if mode == 'master' %}<th>Source staff code</th>{% endif %}<th></th></tr></thead><tbody>
+{% for row in d.rows %}<tr><td>{{ row.period_label }}</td><td>{{ row.start }}–{{ row.end }}</td><td>{{ row.code }}</td><td>{{ row.name }}</td><td>{{ row.room|default:"Unassigned" }}</td>{% if mode == 'master' %}<td>{{ row.staff_code|default:row.staff|default:"Unassigned" }}</td>{% endif %}<td>{% if mode == 'master' %}<a href="{% url 'connected-admin-roster' row.code %}">Class roster</a>{% else %}<a href="{% url 'connected-teacher-roster' row.code %}?date={{ d.date|date:'Y-m-d' }}">My class roster</a>{% endif %}</td></tr>
+{% empty %}<tr><td colspan="7">No scheduled lessons for this date. It may be a weekend, closure, outside term or an unassigned day.</td></tr>{% endfor %}
+</tbody></table></div></section>{% endfor %}
+{% endif %}
+{% elif mode == 'roster' %}
+<h1>{{ record.code }} · {{ record.name }}</h1><p>Read-only roster of currently active students in the published class. Central attendance marking is not enabled.</p>
+{% if publication.snapshot.source == "dated" and not publication.snapshot.stats.rosters_ready %}<p class="note">Student rosters are not yet published. Ask your administrator to apply both roster reports and republish.</p>{% endif %}<section class="panel"><h2>Students ({{ students.paginator.count }})</h2><table><thead><tr><th>Student</th><th>Year</th>{% if admin_roster %}<th>EQID</th>{% endif %}</tr></thead><tbody>
+{% for stu in students %}<tr><td>{{ stu.last_name }}, {{ stu.preferred_name|default:stu.first_name }}</td><td>{{ stu.year_level }}</td>{% if admin_roster %}<td>{{ stu.student_id }}</td>{% endif %}</tr>{% empty %}<tr><td colspan="3">No current students in this roster.</td></tr>{% endfor %}
+</tbody></table><nav>{% if students.has_previous %}<a href="?page={{ students.previous_page_number }}&amp;date={{ roster_date|urlencode }}">Previous</a>{% endif %}Page {{ students.number }} of {{ students.paginator.num_pages }}{% if students.has_next %}<a href="?page={{ students.next_page_number }}&amp;date={{ roster_date|urlencode }}">Next</a>{% endif %}</nav></section>
+{% endif %}
+</main><script>
+(function(){
+  'use strict';
+  const csv=document.getElementById('id_times'), mount=document.getElementById('visual-times');
+  if(!csv||!mount)return;
+  const weekdays=['Monday','Tuesday','Wednesday','Thursday','Friday'];
+  const values=new Map();
+  for(const line of csv.value.split(/\r?\n/)){
+    const fields=line.split(',');
+    if(fields.length===4)values.set(fields[0]+':'+fields[1],fields.slice(2));
+  }
+  const intro=document.createElement('p');
+  intro.className='rf-page-intro';
+  intro.textContent='Edit the start and end time for each period. Times detected from the PDF are suggestions; please check every day before publishing.';
+  mount.appendChild(intro);
+  const wrap=document.createElement('div');
+  wrap.className='rf-time-grid';
+  const table=document.createElement('table');
+  const caption=document.createElement('caption');
+  caption.textContent='Teaching period start and finish times';
+  caption.style.cssText='text-align:left;font-weight:700;padding:8px 0';
+  table.appendChild(caption);
+  const head=table.createTHead().insertRow();
+  ['Period',...weekdays].forEach(name=>{
+    const th=document.createElement('th');th.scope='col';th.textContent=name;head.appendChild(th);
+  });
+  const rows=table.createTBody(),entries=[];
+  for(let period=1;period<=4;period++){
+    const tr=rows.insertRow(),first=document.createElement('th');
+    first.scope='row';first.textContent='P'+period;tr.appendChild(first);
+    const record=[];entries.push(record);
+    for(const day of weekdays){
+      const cell=tr.insertCell(),pair=document.createElement('div'),inputs=[];
+      pair.className='rf-time-pair';
+      const current=values.get(day+':'+period)||['',''];
+      ['Start','End'].forEach((label,i)=>{
+        const el=document.createElement('input');
+        el.type='time';el.required=true;el.value=current[i]||'';
+        el.id='period-'+period+'-'+day.toLowerCase()+'-'+label.toLowerCase();
+        el.setAttribute('aria-label',day+' period '+period+' '+label.toLowerCase()+' time');
+        const group=document.createElement('label');
+        group.htmlFor=el.id;group.textContent=label;group.appendChild(el);
+        pair.appendChild(group);inputs.push(el);
+        el.addEventListener('input',sync);
+      });
+      cell.appendChild(pair);record.push(inputs);
+    }
+  }
+  wrap.appendChild(table);mount.appendChild(wrap);
+  const toolbar=document.createElement('div');toolbar.className='rf-time-toolbar';
+  const copy=document.createElement('button');copy.type='button';
+  copy.className='secondary';copy.textContent='Copy Tuesday times to Wednesday–Friday';
+  copy.addEventListener('click',()=>{entries.forEach(row=>{for(let col=2;col<5;col++)
+    row[col].forEach((el,i)=>{el.value=row[1][i].value;});});sync();});
+  toolbar.appendChild(copy);
+  const toggle=document.createElement('button');toggle.type='button';
+  toggle.className='secondary';toggle.setAttribute('aria-controls','id_times');
+  const field=csv.parentElement;
+  let open=Boolean(field.querySelector('.errorlist'));
+  function setOpen(value){open=value;field.hidden=!open;toggle.textContent=open?'Hide CSV editor':'Show advanced CSV editor';
+    toggle.setAttribute('aria-expanded',String(open));}
+  setOpen(open);
+  toggle.addEventListener('click',()=>setOpen(!open));
+  toolbar.appendChild(toggle);mount.appendChild(toolbar);
+  function sync(){csv.value=weekdays.flatMap((day,d)=>[1,2,3,4].map((period,p)=>
+    [day,period,...entries[p][d].map(el=>el.value)].join(','))).join('\n');}
+  // Keep the underlying existing PublishForm field, validation and digest unchanged.
+  csv.form.addEventListener('submit',sync);
+})();
+</script></body></html>

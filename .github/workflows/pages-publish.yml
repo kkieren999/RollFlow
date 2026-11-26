@@ -1,0 +1,61 @@
+name: Publish allowlisted RollFlow demo
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, integration/shared-core]
+    paths:
+      - index.html
+      - design-system.html
+      - 'shared/**'
+      - 'styles/**'
+      - deployment/public_assets.py
+      - deployment/build_pages.py
+      - '.github/workflows/pages-publish.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/pages-publish.yml'
+      - deployment/public_assets.py
+      - deployment/build_pages.py
+permissions:
+  contents: read
+  pages: read
+jobs:
+  publishing-boundary:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require workflow-based Pages source before promotion
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mode=$(gh api "repos/${{ github.repository }}/pages" --jq '.build_type')
+          echo "Current Pages build type: $mode"
+          if [ "$mode" != workflow ]; then
+            echo '::error::Switch Settings > Pages > Source to GitHub Actions before merging the shared source tree.'
+            exit 1
+          fi
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m deployment.build_pages --output public-site
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public-site
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: [build, publishing-boundary]
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Deploy public artifact only
+        id: deployment
+        uses: actions/deploy-pages@v4

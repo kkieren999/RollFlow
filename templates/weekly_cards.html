@@ -1,0 +1,129 @@
+{# Progressive enhancement of teacher-authorised weekly rows only. No extra data or network calls. #}
+<style>
+.rf-native-toolbar{display:flex;align-items:center;gap:8px;justify-content:flex-end;margin:12px 0;flex-wrap:wrap}
+.rf-page .rf-native-toolbar button[aria-pressed="true"]{background:#193a80;color:white;border-color:#193a80}
+.rf-native-scroll{overflow-x:auto;max-width:100%;overscroll-behavior-x:contain}
+.rf-native-grid{display:grid!important;grid-template-columns:80px repeat(5,minmax(145px,1fr));grid-template-rows:auto repeat(var(--native-rows),minmax(82px,auto));gap:6px;min-width:850px;background:#fff;padding:8px;border:1px solid #dbe4e6;border-radius:10px}
+.rf-native-grid>.day,.rf-native-grid>.rf-native-labels{display:grid!important;grid-row:1/span calc(var(--native-rows) + 1);grid-template-rows:subgrid;gap:6px;min-width:0;background:none;border:0;box-shadow:none;overflow:visible;margin:0;padding:0}
+.rf-native-grid .day-body{display:contents}
+.rf-native-grid .day-head,.rf-native-head{background:#193a80;color:white;border-radius:7px;padding:10px 6px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:3px;min-height:64px}
+.rf-native-grid .day-head h2,.rf-native-grid .day-head small{color:white;font-size:13px;margin:0}
+.rf-native-grid .day-head .btn{display:none}
+.rf-native-grid .day-head[data-selected="true"]{background:#0076a8;box-shadow:inset 0 -3px #ffc928}
+.rf-page .rf-native-grid .day-head button{background:transparent;color:white;border:none;font:inherit;padding:2px;min-height:30px}
+.rf-native-label{background:#eef3f6;border-radius:6px;text-align:center;display:grid;place-items:center;font-weight:700;color:#243a48}
+.rf-native-slot{background:#f4f6f8;border:1px solid #e2e7ec;border-radius:7px;padding:4px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.rf-page [data-rf-native-card]{padding:9px 10px;border:1px solid var(--card-edge,#557fae);border-left:4px solid var(--card-edge,#557fae);border-radius:8px;background:var(--card-bg,#e4edf9);color:#243a48;min-width:0;margin:0;overflow-wrap:anywhere}
+.rf-page [data-rf-native-card] small,.rf-page [data-rf-native-card] .time{color:#455d6b;display:block;font-size:11px}
+.rf-page [data-rf-native-card] strong{display:block;font-size:14px;margin:3px 0}
+.rf-page [data-rf-native-card] a{display:inline-block;font-size:11px;margin-top:5px;color:#193a80}
+.rf-native-grid [data-rf-native-card]{flex:1;padding:7px}
+.rf-native-grid [data-rf-native-card] strong:before{content:"▤ ";color:var(--card-edge)}
+.rf-native-day-mode{display:block!important;min-width:0}
+.rf-native-day-mode>.day[hidden]{display:none!important}
+.rf-native-day-mode>.day{display:block;overflow:hidden;padding:12px;background:#fff;border:1px solid #dbe4e6;border-radius:10px}
+.rf-native-day-mode .day-head{background:#f9fbfb;color:#243a48;padding:12px;margin-bottom:8px}
+.rf-native-day-mode .day-head button{display:none}
+.rf-native-day-mode .day-body{display:grid;gap:7px;padding:4px}
+.rf-native-day-mode [data-rf-native-card]{min-height:72px;display:grid;grid-template-columns:minmax(105px,150px) minmax(120px,1fr);align-content:center;gap:4px 12px}
+.rf-native-day-mode [data-rf-native-card] strong{margin:0}
+.rf-native-day-mode [data-rf-native-card] a{grid-column:2}
+.rf-native-day-mode .rf-native-slot{display:contents}
+@media(max-width:600px){.rf-native-day-mode [data-rf-native-card]{grid-template-columns:1fr}.rf-native-day-mode [data-rf-native-card] a{grid-column:auto}}
+
+.rf-native-toolbar .rf-spring-segment{position:relative;display:grid;grid-template-columns:1fr 1fr;gap:2px;padding:3px;border:1px solid #cdd9e2;background:#e6edf3;border-radius:9px;isolation:isolate}
+.rf-native-toolbar .rf-toggle-thumb{position:absolute;z-index:-1;top:3px;bottom:3px;left:3px;width:calc(50% - 4px);background:#fff;border-radius:6px;box-shadow:0 1px 4px #193a8024;pointer-events:none}
+.rf-native-toolbar [data-rf-view="week"]>.rf-toggle-thumb{left:calc(50% + 1px)}
+.rf-page .rf-native-toolbar .rf-spring-segment button{position:relative;z-index:0;background:transparent;border:0;box-shadow:none;color:#526777;border-radius:6px;min-width:64px;padding:7px 14px;line-height:1.25;font-weight:700;min-height:32px}
+.rf-page .rf-native-toolbar .rf-spring-segment button[aria-pressed="true"]{background:transparent;color:#193a80;box-shadow:none}
+.rf-page [data-rf-native-card]{position:relative}
+@media(prefers-reduced-motion:reduce){.rf-toggle-thumb{animation:none!important;transition:none!important}}
+
+
+/* Compact neutral school-branded cards, matching the Windows offline workspace. */
+.rf-native-grid{min-width:700px;grid-template-columns:70px repeat(5,minmax(110px,1fr));grid-template-rows:auto repeat(var(--native-rows),minmax(56px,1fr));padding:10px;gap:8px}
+.rf-native-grid>.day,.rf-native-grid>.rf-native-labels{gap:8px}
+.rf-native-grid .day-head,.rf-native-head{min-height:42px;padding:5px;background:var(--school-primary,#193a80)}
+.rf-native-grid .day-head[data-selected="true"]{background:var(--school-secondary,#0076a8)}
+.rf-native-grid .rf-native-slot{background:transparent;border:0;padding:0;gap:4px}
+.rf-native-grid .rf-native-slot:empty{background:#f2f5f7;border:1px solid #e2e7ec}
+.rf-page [data-rf-native-card]{background:#fff;border:1px solid #dbe4e6;border-left:3px solid #b7c8d7;color:#243a48;box-shadow:none}
+.rf-native-grid [data-rf-native-card]{padding:6px 8px;min-height:56px}
+.rf-native-grid [data-rf-native-card] strong{font-size:13px;margin:0 0 3px}
+.rf-native-grid [data-rf-native-card] strong:before{content:none}
+.rf-native-grid [data-rf-native-card] small,.rf-native-grid [data-rf-native-card] .time{font-size:10px;line-height:1.3}
+.rf-page .rf-native-grid [data-rf-native-card] a{border:1px solid #193a8040;border-radius:5px;padding:4px 6px;display:inline-flex;align-items:center;min-height:28px;margin-top:4px;font-size:11px;color:#193a80;text-decoration:none}
+.rf-native-day-mode [data-rf-native-card]{min-height:56px}
+.rf-native-flight-layer{position:fixed;inset:0;pointer-events:none;z-index:1150;overflow:hidden;contain:layout paint style}
+.rf-native-flight{position:absolute;left:0;top:0;box-sizing:border-box;overflow:hidden;pointer-events:none;background:white;border:1px solid #dbe4e6;border-left:3px solid #b7c8d7;border-radius:8px;isolation:isolate}
+.rf-native-flight .rf-native-flight-copy{position:absolute;top:0;left:0;box-sizing:border-box;pointer-events:none;overflow:hidden}
+@media(max-height:850px){.rf-native-grid{gap:5px;padding:6px}.rf-native-grid>.day,.rf-native-grid>.rf-native-labels{gap:5px}.rf-native-grid [data-rf-native-card]{padding:4px 6px;min-height:52px}}
+@media(pointer:coarse){.rf-page .rf-native-grid [data-rf-native-card] a{min-height:36px}.rf-native-toolbar select{min-height:44px}}
+
+</style>
+<script>
+(function(){
+ const root=document.querySelector('[data-rf-native-timetable]');if(!root)return;
+ const days=[...root.querySelectorAll('[data-rf-native-day]')];if(!days.length)return;
+ const cards=days.map(day=>[...day.querySelectorAll('[data-rf-native-card]')]);
+ const periods=[...new Set(cards.flat().map(el=>el.dataset.rfPeriod))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
+ if(!periods.length)periods.push('—');
+ const labels=document.createElement('div');labels.className='rf-native-labels';
+ for(const name of ['Period',...periods]){const el=document.createElement('div');el.className=name==='Period'?'rf-native-head':'rf-native-label';el.textContent=name;labels.append(el);}
+ const toolbar=document.createElement('div');toolbar.className='rf-native-toolbar';toolbar.setAttribute('aria-label','Timetable view');
+ const dayButton=document.createElement('button'),weekButton=document.createElement('button'),picker=document.createElement('select');dayButton.type=weekButton.type='button';dayButton.textContent='Day';weekButton.textContent='Week';picker.setAttribute('aria-label','Selected day');
+ let selected=days.some(d=>d.dataset.rfNativeDay===root.dataset.rfSelected)?root.dataset.rfSelected:days[0].dataset.rfNativeDay;
+ for(const day of days){const opt=document.createElement('option');opt.value=day.dataset.rfNativeDay;opt.textContent=day.getAttribute('aria-label')||opt.value;picker.append(opt);}
+ picker.value=selected;
+ const segment=document.createElement('div'),thumb=document.createElement('span');segment.className='rf-spring-segment';thumb.className='rf-toggle-thumb';thumb.setAttribute('aria-hidden','true');segment.append(thumb,dayButton,weekButton);toolbar.append(picker,segment);root.before(toolbar);
+ const scroll=document.createElement('div');scroll.className='rf-native-scroll';root.before(scroll);scroll.append(root);
+ days.forEach((day,i)=>{const head=day.querySelector('.day-head'),body=day.querySelector('.day-body'),btn=document.createElement('button');btn.type='button';btn.textContent='Expand day';btn.setAttribute('aria-label','Expand '+day.getAttribute('aria-label'));btn.addEventListener('click',()=>{selected=day.dataset.rfNativeDay;picker.value=selected;setMode('day')});head.append(btn);
+  const empty=body.querySelector('.muted');if(empty){empty.remove();head.append(empty);empty.style.fontSize='11px';}
+  body.replaceChildren(...periods.map(p=>{const slot=document.createElement('div');slot.className='rf-native-slot';slot.append(...cards[i].filter(card=>card.dataset.rfPeriod===p));return slot;}));});
+ root.prepend(labels);root.style.setProperty('--native-rows',periods.length);
+// Damped spring sampled into compositor-friendly keyframes (no layout changes per frame).
+function rfSpringMove(el,from,to,duration=640){
+ if(!el?.animate||!from||!to||!to.width||!to.height)return;
+ const dx=from.left+from.width/2-to.left-to.width/2,dy=from.top+from.height/2-to.top-to.height/2;
+ const sx=from.width/to.width,sy=from.height/to.height;
+ const clamp=(v,min,max)=>Math.min(max,Math.max(min,v));
+ const frames=Array.from({length:41},(_,i)=>{
+  const t=i/40,q=i===40?0:Math.exp(-9*t)*(Math.cos(14.5*t)+(9/14.5)*Math.sin(14.5*t));
+  const x=q<0?clamp(dx*q,-18,18):dx*q,y=q<0?clamp(dy*q,-15,15):dy*q;
+  const w=q<0?clamp(1+(sx-1)*q,.93,1.07):Math.max(.05,1+(sx-1)*q);
+  const h=q<0?clamp(1+(sy-1)*q,.93,1.07):Math.max(.05,1+(sy-1)*q);
+  return {offset:t,transformOrigin:'center',transform:'translate('+x+'px,'+y+'px) scale('+w+','+h+')',zIndex:el.classList?.contains('rf-toggle-thumb')?-1:5};
+ });
+ return el.animate(frames,{duration,easing:'linear'});
+}
+function rfSpringEnter(el,index){
+ if(!el?.animate)return;
+ return el.animate([{opacity:0,transform:'translateY(12px) scale(.94)'},{offset:.7,opacity:1,transform:'translateY(-2px) scale(1.015)'},{opacity:1,transform:'none'}],{duration:340,delay:Math.min(100,index*9),easing:'cubic-bezier(.2,.65,.25,1)',fill:'backwards'});
+}
+
+
+
+let flightLayer=null,flights=new Map();
+function clearFlights(){for(const [card,flight] of flights){card.style.visibility=flight.visibility;flight.el.remove()}flights.clear();flightLayer?.remove();flightLayer=null}
+function flightRect(el){const r=el.getBoundingClientRect();return {left:r.left,top:r.top,width:r.width,height:r.height}}
+function flightCopy(card){const clone=card.cloneNode(true),all=[card,...card.querySelectorAll('*')],copies=[clone,...clone.querySelectorAll('*')];all.forEach((el,i)=>{const st=getComputedStyle(el);for(const prop of ['display','font-size','font-weight','font-family','line-height','color','padding','margin','gap','grid-template-columns','grid-column','align-items','white-space','border','border-radius','text-decoration','box-sizing'])copies[i].style.setProperty(prop,st.getPropertyValue(prop));copies[i].removeAttribute('id');copies[i].removeAttribute('href');copies[i].removeAttribute('data-rf-native-card');copies[i].removeAttribute('data-rf-key');});clone.className='rf-native-flight-copy';const r=flightRect(card);Object.assign(clone.style,{width:r.width+'px',height:r.height+'px',border:'0',margin:'0',visibility:'visible',background:'transparent'});clone.inert=true;return clone}
+function flightFrames(a,b){return Array.from({length:51},(_,i)=>{const t=i/50,q=i===50?0:Math.exp(-5.8*t)*(Math.cos(6.8*t)+(5.8/6.8)*Math.sin(6.8*t)),mix=(x,y,cap)=>y+(q<0?Math.max(-cap,Math.min(cap,(x-y)*q)):(x-y)*q),w=Math.max(1,mix(a.width,b.width,18)),h=Math.max(1,mix(a.height,b.height,12)),x=mix(a.left+a.width/2,b.left+b.width/2,18)-w/2,y=mix(a.top+a.height/2,b.top+b.height/2,12)-h/2;return{offset:t,transform:'translate('+x+'px,'+y+'px)',width:w+'px',height:h+'px'}})}
+function flyCard(card,old){const b=flightRect(card),el=document.createElement('div'),newCopy=flightCopy(card);el.className='rf-native-flight';el.append(old.copy,newCopy);flightLayer.append(el);const visibility=card.style.visibility;card.style.visibility='hidden';const entry={el,visibility};flights.set(card,entry);const move=el.animate(flightFrames(old.rect,b),{duration:760,fill:'forwards',easing:'linear'});old.copy.animate([{opacity:1},{offset:.18,opacity:1},{offset:.55,opacity:0},{opacity:0}],{duration:760,fill:'forwards'});newCopy.animate([{opacity:0},{offset:.28,opacity:0},{offset:.65,opacity:1},{opacity:1}],{duration:760,fill:'forwards'});move.finished.then(()=>{if(flights.get(card)!==entry)return;card.style.visibility=visibility;flights.delete(card);el.remove();if(!flights.size){flightLayer?.remove();flightLayer=null}}).catch(()=>{})}
+window.addEventListener('resize',clearFlights);
+
+ let mode='week',activeDate=null;
+ function setMode(next,animate=true){
+ if(animate&&next===mode&&activeDate===selected)return;
+ const old=new Map();for(const card of cards.flat()){const r=flightRect(flights.get(card)?.el||card);if(r.width&&r.height)old.set(card.dataset.rfKey,{rect:r,copy:flightCopy(card)});} clearFlights();
+ const oldThumb=thumb.getBoundingClientRect();
+ // Rapid toggles begin from the currently painted geometry, not a stale start position.
+ for(const el of [...cards.flat(),thumb])for(const a of el.getAnimations?.()||[])a.cancel();
+ mode=next;activeDate=selected;const week=mode==='week';root.classList.toggle('rf-native-grid',week);root.classList.toggle('rf-native-day-mode',!week);labels.hidden=!week;days.forEach(d=>{d.hidden=!week&&d.dataset.rfNativeDay!==selected;d.querySelector('.day-head').dataset.selected=String(d.dataset.rfNativeDay===selected)});
+ segment.dataset.rfView=mode;dayButton.setAttribute('aria-pressed',String(!week));weekButton.setAttribute('aria-pressed',String(week));
+ if(!week)scroll.scrollLeft=0;if(!animate||matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+ flightLayer=document.createElement('div');flightLayer.className='rf-native-flight-layer';flightLayer.setAttribute('aria-hidden','true');flightLayer.inert=true;document.body.append(flightLayer);let i=0;for(const card of cards.flat()){const a=old.get(card.dataset.rfKey),b=card.getBoundingClientRect();if(!b.width||!b.height)continue;if(a)flyCard(card,a);else rfSpringEnter(card,i++);}if(!flights.size){flightLayer.remove();flightLayer=null}
+ rfSpringMove(thumb,oldThumb,thumb.getBoundingClientRect(),480);
+ }
+ picker.addEventListener('change',()=>{selected=picker.value;setMode(mode)});dayButton.addEventListener('click',()=>setMode('day'));weekButton.addEventListener('click',()=>setMode('week'));setMode(root.dataset.rfInitial==='day'?'day':'week',false);
+})();
+</script>

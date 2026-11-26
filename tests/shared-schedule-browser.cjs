@@ -1,0 +1,52 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const http=require('node:http');
+const {chromium}=require('playwright-core');
+const html=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
+const handler=require('./static-demo-server.cjs')(html);
+(async()=>{
+ const server=http.createServer(handler);
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ const url='http://127.0.0.1:'+server.address().port+'/';
+ let browser;
+ try{
+  browser=await chromium.launch({executablePath:process.env.CHROME_BIN||'/usr/bin/google-chrome',headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
+  const context=await browser.newContext({viewport:{width:1440,height:1000}});
+  const page=await context.newPage(),errors=[];
+  page.on('pageerror',e=>errors.push(String(e)));
+  await page.goto(url);
+  assert.equal(await page.evaluate(()=>window.RollFlowSchedule?.VERSION),1);
+  await page.locator('#demo-username').fill('teacher');
+  await page.locator('#demo-password').fill('teacher');
+  await page.locator('#demo-login-form button[type="submit"]').click();
+  await page.locator('.nav-primary [data-nav="timetable"]').click();
+  await page.locator('[data-date]').fill('2026-11-25');
+  await page.locator('[data-timetable-class] .rf-shared-lesson-title').first().waitFor();
+  assert.equal(await page.locator('[data-timetable-class]').count(),4);
+  assert.equal(await page.locator('[data-timetable-class] .rf-shared-lesson-title').count(),4);
+  assert.equal(await page.locator('[data-timetable-class] [data-open-report]').count(),4);
+  await page.locator('[data-timetable-view="week"]').click();
+  await page.locator('.rf-week-grid [data-timetable-class] .rf-shared-lesson-title').first().waitFor();
+  assert.equal(await page.locator('.rf-week-grid [data-timetable-class]').count(),await page.locator('.rf-week-grid [data-timetable-class] .rf-shared-lesson-title').count());
+  assert.deepEqual(errors,[]);
+  console.log('PASS: shared schedule renderer used by actual day/week cards; roll actions preserved');
+  await context.close();
+  // Exercise the actual staff schedule with a delegated teaching account.
+  const staffContext=await browser.newContext({viewport:{width:1440,height:1000}});
+  const staff=await staffContext.newPage(),staffErrors=[];
+  staff.on('pageerror',e=>staffErrors.push(String(e)));
+  await staff.goto(url);
+  await staff.locator('#demo-username').fill('learning');
+  await staff.locator('#demo-password').fill('learning');
+  await staff.locator('#demo-login-form button[type="submit"]').click();
+  await staff.locator('.nav-primary [data-rfu-page="schedule"]').click();
+  await staff.locator('[data-rf-unified-filter="date"]').fill('2026-11-25');
+  const cards=staff.locator('.rf-unified-schedule .rf-timetable-card .rf-shared-lesson-title');
+  await cards.first().waitFor({timeout:10000});
+  assert((await cards.count())>0);
+  assert.deepEqual(staffErrors,[]);
+  console.log('PASS: shared schedule renderer used by actual staff schedule');
+  await staffContext.close();
+ }finally{await browser?.close();await new Promise(resolve=>server.close(resolve))}
+})().catch(error=>{console.error(error);process.exitCode=1});

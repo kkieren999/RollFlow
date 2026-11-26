@@ -26,10 +26,7 @@ console.log('PASS: semester and enrolment boundaries, late counted present, unsu
 
 function startServer() {
   return new Promise((resolve, reject) => {
-    const server = http.createServer((_req, res) => {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(html);
-    });
+    const server = http.createServer(require('./static-demo-server.cjs')(html));
     server.once('error', reject);
     server.listen(0, '127.0.0.1', () => {
       resolve({ server, url: 'http://127.0.0.1:' + server.address().port + '/' });
@@ -59,7 +56,7 @@ async function openRoute(page,attr,route){
  }
  if(teacher&&route==='alerts'){await page.locator('.rf-compact-header-action').click();return;}
  if(teacher&&route==='home')route='timetable';
- const parents=teacher?{'classroom-management':'finder','seating-plans':'finder','class-lists':'finder','follow-ups':'student-support'}:{'student-actions':'students','master':'timetable','classes':'timetable','roles':'accounts','audit':'security','data':'oneschool'};
+ const parents=teacher?{'follow-ups':'student-support'}:{'student-actions':'students','master':'timetable','classes':'timetable','roles':'accounts','audit':'security','data':'oneschool'};
  const primary=parents[route]||route;
  const nav=page.locator('.nav-primary ['+attr+'="'+primary+'"]');
  if(!await nav.isVisible())await page.locator('[data-rf-portal-menu]').click();
@@ -140,16 +137,40 @@ async function test() {
     await page.locator('[data-rf-classroom-picker]').click();
     await page.locator('#review-dialog [data-rf-student-action="late"]').click();
     assert(await page.locator('#rf-student-incident-form [name="time"]').isVisible());
-    await page.locator('#rf-student-incident-form [name="type"]').selectOption('Late arrival');
-    await page.locator('#rf-student-incident-form [name="response"]').selectOption('Refer to admin support');
-    await page.locator('#rf-student-incident-form button[type="submit"]').click();
+    // Quick incidents use a date/time and an authorised scheduled class, not a response selector.
+    const incident=page.locator('#rf-student-incident-form');
+    assert.equal(await incident.locator('[name="type"],[name="response"]').count(),0);
+    let selectedClass='';
+    for(const date of ['2026-11-23','2026-11-24','2026-11-25','2026-11-26']){
+      await incident.locator('[name="date"]').fill(date);
+      for(const time of ['08:55','09:10','10:20','11:10','12:15','14:00']){
+        await incident.locator('[name="time"]').fill(time);
+        const options=await incident.locator('[name="classCode"] option').evaluateAll(xs=>xs.map(x=>x.value).filter(Boolean));
+        if(options.length){selectedClass=options[0];await incident.locator('[name="classCode"]').selectOption(selectedClass);break}
+      }
+      if(selectedClass)break;
+    }
+    assert(selectedClass,'Fictional student has an authorised lesson on the fixed date');
+    await incident.locator('button[type="submit"]').click();
     assert.equal(await page.locator('#review-dialog').count(),0);
+    const savedQuick=await page.evaluate(()=>JSON.parse(localStorage.getItem('rollflow_student_incidents_v1')).filter(r=>r.actionId==='late').at(-1));
+    assert.equal(savedQuick.studentId,'S7001');assert.equal(savedQuick.classCode,selectedClass);assert.equal(savedQuick.response,'Record only');assert.equal(savedQuick.refer,false);
+    // Explicit referral remains a distinct action and must reach the same admin queue.
+    await page.locator('#overlay [data-rf-student-action="support"]').click();
+    await incident.locator('[name="type"]').selectOption('Attendance concern');
+    await incident.locator('[name="response"]').selectOption('Request admin follow-up');
+    await incident.locator('[name="notes"]').fill('QA shared referral round trip');
+    await incident.locator('button[type="submit"]').click();
+    assert.equal(await page.locator('#review-dialog').count(),0);
+    const referral=await page.evaluate(()=>JSON.parse(localStorage.getItem('rollflow_student_incidents_v1')).find(r=>r.notes==='QA shared referral round trip'));
+    assert(referral?.refer&&!referral.resolved);
     await page.locator('#overlay [data-action="closeDrawer"]').click();
     await signOut(page);
     await logIn(page,'admin','admin','.v31-admin');
     await openRoute(page,'data-admin-page','student-actions');
     assert.match(await page.locator('.v31-content main').innerText(),/Awaiting support/);
-    await page.locator('[data-rf-resolve-referral]').first().click();
+    await page.locator('[data-rf-resolve-referral="'+referral.id+'"]').click();
+    assert(await page.evaluate(id=>JSON.parse(localStorage.getItem('rollflow_student_incidents_v1')).find(r=>r.id===id)?.resolved,referral.id),'Exact referral resolved');
     assert.match(await page.locator('.v31-content main').innerText(),/Resolved/);
     await page.locator('[data-rf-action-config="new"]').click();
     await page.locator('#rf-action-config-form [name="name"]').fill('Classroom follow-up');
@@ -171,46 +192,44 @@ async function test() {
     console.log('PASS: student profiles, semester attendance action, incidents, admin referrals and configurable choices.');
 
     // Newly approved classroom modules and local teacher tools.
-    for(const route of ['attendance-overview','classroom-management','student-support','follow-ups','seating-plans','class-lists']){
+    for(const route of ['attendance-overview','classroom-management','student-support','follow-ups']){
       await openRoute(page,'data-nav',''+route+'');
       assert(await page.locator('.rf-module-root').isVisible(),'Module failed to render: '+route);
     }
     await openRoute(page,'data-nav','follow-ups');
     await page.locator('#rf-followup-form [name="title"]').fill('Fictional follow-up');
     await page.locator('#rf-followup-form button[type="submit"],#rf-followup-form button').first().click();
-    assert.match(await page.locator('.rf-module-task').innerText(),/Fictional follow-up/);
-    await page.locator('[data-rf-followup-toggle]').first().click();
-    assert.match(await page.locator('[data-rf-followup-toggle]').first().innerText(),/Reopen/);
-    await openRoute(page,'data-nav','seating-plans');
-    const seats=page.locator('[data-rf-seat-id]');
-    if(await seats.count()>1){
-      const first=await seats.nth(0).getAttribute('data-rf-seat-id'),second=await seats.nth(1).getAttribute('data-rf-seat-id');
-      await seats.nth(0).click();await seats.nth(1).click();
-      assert.equal(await seats.nth(0).getAttribute('data-rf-seat-id'),second);
-      assert.equal(await seats.nth(1).getAttribute('data-rf-seat-id'),first);
-    }
+    assert.match(await page.locator('.rf-module-task').filter({hasText:'Fictional follow-up'}).innerText(),/Fictional follow-up/);
+    const task=page.locator('.rf-module-task').filter({hasText:'Fictional follow-up'});
+    await task.locator('[data-rf-followup-toggle]').click();
+    assert.match(await task.locator('[data-rf-followup-toggle]').innerText(),/Reopen/);
+    // These obsolete menu destinations were intentionally removed; Class Finder remains standalone.
+    await openRoute(page,'data-nav','finder');
+    assert.equal(await page.locator('.rf-compact-tabs').count(),0);
+    assert.equal(await page.locator('[data-nav="seating-plans"],[data-nav="class-lists"]').count(),0);
     await signOut(page);
     await logIn(page,'admin','admin','.v31-admin');
     await openRoute(page,'data-admin-page','teacher-modules');
-    await page.locator('[data-rf-module-toggle="class-lists"]').click();
+    await page.locator('[data-rf-module-toggle="classroom-management"]').click();
     await openRoute(page,'data-admin-page','timetable');
-    await page.locator('.rf-scheduling-manage summary').first().click();
+    const exceptionManager=page.locator('details.rf-scheduling-manage').filter({has:page.locator('#rf-exception-form')});
+    if(!await exceptionManager.locator('#rf-exception-form').isVisible())await exceptionManager.locator(':scope > summary').click();
     await page.locator('#rf-exception-form [name="title"]').fill('Fictional assembly');
     await page.locator('#rf-exception-form [name="category"]').selectOption('Assembly');
     await page.locator('#rf-exception-form [name="date"]').fill('2026-01-01');
     await page.locator('#rf-exception-form [name="end"]').fill('2027-12-31');
     await page.locator('#rf-exception-form button[type="submit"]').click();
-    assert.match(await page.locator('.rf-scheduling-manage').innerText(),/Fictional assembly/);
+    assert.match(await exceptionManager.innerText(),/Fictional assembly/);
     await signOut(page);
     await logIn(page,'swilliams','swilliams');
-    assert.equal(await page.locator('[data-nav="class-lists"]').count(),0);
-    await openRoute(page,'data-nav');
-    assert.match(await page.locator('.rf-module-root').innerText(),/Fictional assembly/);
-    console.log('PASS: teacher modules, follow-up completion, seating swaps, admin visibility and contextual scheduling exceptions.');
+    assert.equal(await page.locator('[data-nav="classroom-management"]').count(),0);
+    await openRoute(page,'data-nav','timetable');
+    assert.match(await page.locator('.rf-scheduling-notices').innerText(),/Fictional assembly/);
+    console.log('PASS: teacher modules, follow-up completion, intentional standalone navigation, admin visibility and contextual scheduling exceptions.');
     await signOut(page);
     await logIn(page,'admin','admin','.v31-admin');
     await openRoute(page,'data-admin-page','teacher-modules');
-    await page.locator('[data-rf-module-toggle="class-lists"]').click();
+    await page.locator('[data-rf-module-toggle="classroom-management"]').click();
     await signOut(page);
     await logIn(page,'swilliams','swilliams');
 
@@ -234,77 +253,60 @@ async function test() {
         'Each full timetable weekday needs one preparation period');
     }
 
-    // The actual lesson card travels from the day geometry to its matching week slot.
+    // Weekly grid hardening (41bd56588) intentionally retired travelling cards.
+    // Assert immediate, lossless transitions in both directions for either motion preference.
     await page.setViewportSize({width:1920,height:1200});
-    await page.emulateMedia({reducedMotion:'reduce'});
-    await page.locator('[data-timetable-view="day"]').click();
-    await page.emulateMedia({reducedMotion:'no-preference'});
-    const morphResult = await page.evaluate(() => {
-      const card = document.querySelector('.rf-timetable-workspace .rf-timetable-card[data-timetable-class="ENG071A"]');
-      const key = card.dataset.rfMotion;
-      const rect = el => { const r=el.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height}; };
-      const source = rect(card);
-      document.querySelector('[data-timetable-view="week"]').click();
-      const flight = [...document.querySelectorAll('.rf-morph-card[data-rf-motion]')].find(el=>el.dataset.rfMotion===key);
-      const target = [...document.querySelectorAll('.rf-timetable-workspace .rf-timetable-card')].find(el=>el.dataset.rfMotion===key);
-      if(!flight||!target)return {missing:true};
-      const animation=flight.getAnimations()[0];animation.pause();
-      animation.currentTime=0;const first=rect(flight);
-      animation.currentTime=115;const middle=rect(flight);
-      animation.currentTime=760;const last=rect(flight);
-      return {source,first,middle,last,destination:rect(target),hidden:target.style.visibility,key};
-    });
-    assert(!morphResult.missing, 'Expected travelling card outside timetable grid');
-    const near = (a,b) => ['x','y','w','h'].every(k=>Math.abs(a[k]-b[k])<2);
-    assert(near(morphResult.source,morphResult.first), 'Morph starts at exact day card geometry');
-    assert(morphResult.middle.w < morphResult.first.w && morphResult.middle.w > morphResult.destination.w, 'Card physically shrinks in flight');
-    assert(near(morphResult.last,morphResult.destination), 'Morph ends in exact weekly slot');
-    assert.equal(morphResult.hidden,'hidden','Destination stays hidden until the card lands');
-    await page.evaluate(async()=>{const layer=document.querySelector('.rf-morph-layer');if(layer){const animations=layer.getAnimations({subtree:true});for(const a of animations)a.finish();await Promise.allSettled(animations.map(a=>a.finished));}});
-    await page.locator('.rf-morph-layer').waitFor({state:'detached'});
-    const reverse = await page.evaluate(key => {
-      const source = [...document.querySelectorAll('.rf-timetable-workspace .rf-timetable-card')].find(el=>el.dataset.rfMotion===key);
-      const width=source.getBoundingClientRect().width;
-      document.querySelector('[data-timetable-view="day"]').click();
-      const flight=[...document.querySelectorAll('.rf-morph-card[data-rf-motion]')].find(el=>el.dataset.rfMotion===key);
-      if(!flight)return {missing:true};
-      const a=flight.getAnimations()[0];a.pause();a.currentTime=115;const middle=flight.getBoundingClientRect().width;
-      a.currentTime=760;const end=flight.getBoundingClientRect().width;
-      return {width,middle,end};
-    },morphResult.key);
-    assert(!reverse.missing && reverse.middle>reverse.width && reverse.end>reverse.middle,'Week card expands into Day view');
-    await page.evaluate(async()=>{const layer=document.querySelector('.rf-morph-layer');if(layer){const animations=layer.getAnimations({subtree:true});for(const a of animations)a.finish();await Promise.allSettled(animations.map(a=>a.finished));}});
-    await page.locator('.rf-morph-layer').waitFor({state:'detached'});
-    await page.emulateMedia({reducedMotion:'reduce'});
-    await page.locator('[data-timetable-view="week"]').click();
-    assert.equal(await page.locator('.rf-morph-layer').count(),0,'Reduced motion bypasses travelling cards');
+    for(const reducedMotion of ['no-preference','reduce']){
+      await page.emulateMedia({reducedMotion});
+      await page.locator('[data-timetable-view="day"]').click();
+      const card=page.locator('.rf-timetable-workspace [data-timetable-class="ENG071A"]');
+      await card.waitFor({state:'visible'});
+      const key=await card.getAttribute('data-rf-motion');
+      const label=await card.locator('.lesson-title h3').innerText();
+      await page.locator('[data-timetable-view="week"]').click();
+      const weekly=page.locator('.rf-week-grid [data-rf-motion="'+key+'"]');
+      assert.equal(await weekly.count(),1,'Same lesson in exactly one week slot');
+      assert.equal(await weekly.locator('.lesson-title h3').innerText(),label);
+      assert.equal(await weekly.getAttribute('data-rf-morph-hidden'),null);
+      assert(await weekly.isVisible());
+      assert.equal(await page.locator('.rf-morph-layer').count(),0,'No overlay across the stable weekly grid');
+      assert.equal(await page.locator('[data-timetable-view="week"]').getAttribute('aria-pressed'),'true');
+      await page.locator('[data-timetable-view="day"]').click();
+      const daily=page.locator('.rf-timetable-workspace [data-rf-motion="'+key+'"]');
+      assert.equal(await daily.count(),1);
+      assert(await daily.isVisible());
+      assert.equal(await daily.locator('.lesson-title h3').innerText(),label);
+      assert.equal(await page.locator('.rf-morph-layer').count(),0);
+      assert.equal(await page.locator('[data-timetable-view="day"]').getAttribute('aria-pressed'),'true');
+    }
+    console.log('PASS: immediate lossless timetable switching with and without reduced motion.');
 
-    // The full five-day grid and six-session day fit ordinary laptop and desktop viewports.
-    // Turn motion off for geometry measurements so transient transforms do not affect overflow.
+    // Stable weekly grids deliberately scroll internally; do not shrink or clip lessons to fit.
+    // Exercise both layouts at all supported viewport sizes and verify first/last lesson reachability.
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    for (const size of [{ width: 1920, height: 1200 }, { width: 1440, height: 900 }, { width: 1280, height: 720 }, { width: 1180, height: 820 }, { width: 1024, height: 768 }, { width: 820, height: 1180 }, { width: 768, height: 1024 }]) {
+    for (const size of [{width:1920,height:1200},{width:1440,height:900},{width:1280,height:720},{width:1180,height:820},{width:1024,height:768},{width:820,height:1180},{width:768,height:1024}]) {
       await page.setViewportSize(size);
-      for (const mode of ['week', 'day']) {
-        await page.locator('[data-timetable-view="' + mode + '"]').click();
-        const geometry = await page.locator('.rf-timetable-workspace').evaluate(workspace => {
-          const main = workspace.closest('main');
-          const scroll = workspace.querySelector('.rf-week-scroll');
-          const bounds = main.getBoundingClientRect();
-          const cards = [...workspace.querySelectorAll('.rf-timetable-card')];
-          return {
-            cardCount: cards.length,
-            verticalOverflow: main.scrollHeight - main.clientHeight,
-            horizontalOverflow: scroll ? scroll.scrollWidth - scroll.clientWidth : 0,
-            bottomOverflow: Math.max(...cards.map(card => card.getBoundingClientRect().bottom)) - bounds.bottom
-          };
-        });
-        assert.equal(geometry.cardCount, mode === 'week' ? 30 : 6);
-        assert(geometry.verticalOverflow <= 3 && geometry.bottomOverflow <= 3,
-          mode + ' must fit vertically at ' + JSON.stringify(size) + ': ' + JSON.stringify(geometry));
-        assert(geometry.horizontalOverflow <= 3,
-          mode + ' must fit horizontally at ' + JSON.stringify(size) + ': ' + JSON.stringify(geometry));
+      for(const mode of ['week','day']){
+        await page.locator('[data-timetable-view="'+mode+'"]').click();
+        const geometry=await page.locator('.rf-timetable-workspace').evaluate((workspace,mode)=>{
+          const main=workspace.closest('main'),scroll=workspace.querySelector('.rf-week-scroll');
+          const cards=[...workspace.querySelectorAll('.rf-timetable-card')];
+          const rect=el=>el.getBoundingClientRect();
+          const mainBounds=rect(main),wsBounds=rect(workspace);
+          const inside=(card,parent)=>{const r=rect(card),p=rect(parent);return r.left>=p.left-2&&r.right<=p.right+2&&r.top>=p.top-2&&r.bottom<=p.bottom+2};
+          const cellsOk=mode==='week'?cards.every(c=>inside(c,c.closest('.rf-week-slot'))):cards.every(c=>c.offsetWidth>0&&c.offsetHeight>0);
+          main.scrollTop=0;if(scroll)scroll.scrollTo(0,0);
+          const first=cards[0],last=cards.at(-1);
+          const reachable=el=>{el.scrollIntoView({block:'nearest',inline:'nearest'});const r=rect(el),m=rect(main),v=scroll?rect(scroll):m;return r.right<=Math.min(m.right,v.right)+3&&r.bottom<=Math.min(m.bottom,v.bottom)+3&&r.left>=Math.max(m.left,v.left)-3&&r.top>=Math.max(m.top,v.top)-3};
+          const firstReachable=reachable(first),lastReachable=reachable(last);
+          return {cardCount:cards.length,cellsOk,firstReachable,lastReachable,mainWithinViewport:mainBounds.left>=-3&&mainBounds.right<=innerWidth+3&&mainBounds.bottom<=innerHeight+3,workspaceWithinMain:wsBounds.left>=mainBounds.left-3&&wsBounds.right<=mainBounds.right+3,outerHorizontalOverflow:main.scrollWidth-main.clientWidth,bodyHorizontalOverflow:document.documentElement.scrollWidth-innerWidth};
+        },mode);
+        assert.equal(geometry.cardCount,mode==='week'?30:6);
+        assert(geometry.cellsOk&&geometry.firstReachable&&geometry.lastReachable,mode+' all lessons must remain reachable and contained '+JSON.stringify({size,geometry}));
+        assert(geometry.mainWithinViewport&&geometry.workspaceWithinMain&&geometry.outerHorizontalOverflow<=3&&geometry.bodyHorizontalOverflow<=3,mode+' no outer horizontal overflow '+JSON.stringify({size,geometry}));
       }
     }
+    console.log('PASS: timetable geometry and lesson reachability across all seven viewport sizes.');
     await page.emulateMedia({ reducedMotion: 'no-preference' });
 
     // Term starts in January and historical dates remain navigable.
@@ -396,7 +398,7 @@ async function test() {
       'Back to Daily Schedule must sit inside the green header');
     await backButton.click();
     assert.equal((await page.locator('.page-bar h1').innerText()).trim(), 'Daily Schedule');
-    assert.match(await page.locator('#dayScheduleTitle').innerText(), /Lessons for selected date/,
+    assert.match(await page.locator('#dayScheduleTitle').innerText(), /Schedule for selected date/,
       'Historical daily schedule heading should not say Today');
     assert.equal(await page.locator('input[data-date]').first().inputValue(), '2026-03-09',
       'Back navigation must preserve the selected historical date');
@@ -418,8 +420,8 @@ async function test() {
       'Currently out, Returned and Total passes summaries are required');
     assert.equal(await page.locator('#movementStudentSearch').count(), 1,
       'Existing student autocomplete must remain on the new page');
-    assert.equal(await page.locator('#movementDestination').count(), 1);
-    assert.equal(await page.locator('#movementIssueButton').count(), 1);
+    assert.equal(await page.locator('.rf-move-wiz [aria-current="step"]').innerText().then(t=>t.trim().endsWith('Select student')),true);
+    assert.equal(await page.locator('#movementIssueButton').count(),0,'Issue control appears only after destination selection');
     assert.equal(await page.locator('#rfMovementView').count(), 1,
       'Movement status filter must remain usable');
 
@@ -471,8 +473,10 @@ async function test() {
 
     await page.locator('#movementStudentSearch').fill('S7001');
     await page.locator('[data-movement-choice="S7001"]').click();
+    assert.equal(await page.locator('.rf-move-wiz [aria-current="step"]').innerText().then(t=>t.trim().endsWith('Choose destination')),true);
+    await page.locator('[data-rf-move-dest="Library"]').click();
+    assert.equal(await page.locator('#movementDestination').inputValue(),'Library');
     assert(await page.locator('#movementIssueButton').isEnabled());
-    await page.locator('#movementDestination').selectOption('Library');
     await page.locator('#movementIssueButton').click();
     assert.equal(await page.locator('.rf-movement-stat-out strong').innerText(), '1');
     assert.equal(Number(await page.locator('.rf-movement-stat-total strong').innerText()), initialTotal + 1);
@@ -520,9 +524,10 @@ async function test() {
     await page.locator('#rf-movements-date').dispatchEvent('change');
     await page.locator('#movementStudentSearch').fill('S7001');
     await page.locator('[data-movement-choice="S7001"]').click();
+    await page.locator('[data-rf-move-dest="Library"]').click();
     assert(await page.locator('#movementIssueButton').isDisabled(),
       'Historical dates must not allow new live movement passes');
-    assert.match(await page.locator('#movementFeedback').innerText(), /selected/);
+    assert.match(await page.locator('.rf-move-wiz .rf-wiz-person').first().innerText(),/S7001/);
 
     // A read-only student day template sits below the main movement log.
     const studentDaySection = page.locator('.rf-day-review');
@@ -690,14 +695,12 @@ async function test() {
     await openRoute(page,'data-nav','movements');
     await page.locator('#rf-movements-date').fill(today);
     await page.locator('#rf-movements-date').dispatchEvent('change');
-    assert(await page.locator('#movementDestination option[value="Wellbeing Centre"]').count(),
-      'Teacher should see the new administrator destination');
     assert.equal(await page.locator('[data-rf-remove-movement-destination]').count(), 0,
       'Teacher page must not expose admin removal controls');
-
     await page.locator('#movementStudentSearch').fill('S7001');
     await page.locator('[data-movement-choice="S7001"]').click();
-    await page.locator('#movementDestination').selectOption('Wellbeing Centre');
+    assert.equal(await page.locator('[data-rf-move-dest="Wellbeing Centre"]').count(),1,'Teacher sees the new administrator destination');
+    await page.locator('[data-rf-move-dest="Wellbeing Centre"]').click();
     await page.locator('#movementIssueButton').click();
     assert.equal(await page.locator('.rf-movement-return-button').count(), 1,
       'New destination needs to work with the existing live pass action');
@@ -722,18 +725,13 @@ async function test() {
     await openRoute(page,'data-nav','movements');
     await page.locator('#rf-movements-date').fill(today);
     await page.locator('#rf-movements-date').dispatchEvent('change');
-    assert.equal(await page.locator('#movementDestination option[value="Wellbeing Centre"]').count(), 0,
-      'Removed destination must not be selectable for new passes');
     assert.match(await page.locator('.rf-movement-table tbody').innerText(), /Wellbeing Centre/,
       'Previously returned passes must keep their destination after deletion');
-
     await page.locator('#movementStudentSearch').fill('S7001');
     await page.locator('[data-movement-choice="S7001"]').click();
-    await page.evaluate(() => {
-      const select = document.getElementById('movementDestination');
-      select.add(new Option('Wellbeing Centre', 'Wellbeing Centre'));
-      select.value = 'Wellbeing Centre';
-    });
+    assert.equal(await page.locator('[data-rf-move-dest="Wellbeing Centre"]').count(),0,'Removed destination cannot be selected');
+    await page.locator('[data-rf-move-dest="Library"]').click();
+    await page.evaluate(()=>{document.getElementById('movementDestination').value='Wellbeing Centre'});
     const beforeInvalid = await page.locator('.rf-movement-stat-total strong').innerText();
     await page.locator('#movementIssueButton').click();
     assert.equal(await page.locator('.rf-movement-stat-total strong').innerText(), beforeInvalid,
@@ -753,7 +751,7 @@ async function test() {
     const deviceSizes = [{width:1920,height:1200},{width:1024,height:768},{width:768,height:1024},{width:820,height:1180}];
     for (const size of deviceSizes) {
       await page.setViewportSize(size);
-      for (const route of ['home','timetable','master','finder','search','movements','alerts','profile','preferences','help','attendance-overview','classroom-management','student-support','follow-ups','seating-plans','class-lists']) {
+      for (const route of ['home','timetable','master','finder','search','movements','alerts','profile','preferences','help','attendance-overview','classroom-management','student-support','follow-ups']) {
         await openRoute(page,'data-nav',route);
         await assertWorkspaceFits('Teacher '+route+' '+JSON.stringify(size), '.content-shell>.main');
       }
