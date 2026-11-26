@@ -213,7 +213,7 @@ async function test() {
     await page.locator('[data-rf-module-toggle="classroom-management"]').click();
     await openRoute(page,'data-admin-page','timetable');
     const exceptionManager=page.locator('details.rf-scheduling-manage').filter({has:page.locator('#rf-exception-form')});
-    if(!await exceptionManager.locator('#rf-exception-form').isVisible())await exceptionManager.locator('summary').click();
+    if(!await exceptionManager.locator('#rf-exception-form').isVisible())await exceptionManager.locator(':scope > summary').click();
     await page.locator('#rf-exception-form [name="title"]').fill('Fictional assembly');
     await page.locator('#rf-exception-form [name="category"]').selectOption('Assembly');
     await page.locator('#rf-exception-form [name="date"]').fill('2026-01-01');
