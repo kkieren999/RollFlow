@@ -3680,6 +3680,183 @@ render=function(){
  if(demoRole==='teacher')app.querySelector('.nav-primary')?.insertAdjacentHTML('beforeend',rfuTeacherButtons());
 };
 
+
+/* Compact navigation: group existing authorised routes; never grant new access. */
+const rfCompactStyle=document.createElement('style');
+rfCompactStyle.id='rf-compact-navigation';
+rfCompactStyle.textContent=`
+.rf-compact-tabs{display:flex;gap:4px;align-items:center;overflow-x:auto;flex:0 0 auto;padding:3px 14px;background:var(--rf-surface,#fff);border-bottom:1px solid var(--rf-border,#d9e0e5);min-height:38px;scrollbar-width:thin}
+.rf-compact-tabs button{flex:0 0 auto;border:0;background:transparent;color:var(--rf-text,#243a48);padding:8px 11px;min-height:32px;border-radius:4px;font-weight:600;font-size:12px;white-space:nowrap}
+.rf-compact-tabs button:hover{background:var(--rf-canvas,#eaf0f3)}
+.rf-compact-tabs button[aria-current="page"]{color:var(--school-secondary,#168a38);box-shadow:inset 0 -2px var(--school-secondary,#168a38)}
+.rf-compact-tabs button:focus-visible,.rf-compact-account summary:focus-visible,.rf-compact-header-action:focus-visible{outline:2px solid #e8b63e;outline-offset:1px}
+.rf-compact-account{position:relative;flex:0 0 auto;color:inherit}
+.rf-compact-account summary{display:flex;align-items:center;gap:8px;cursor:pointer;list-style:none;padding:5px;border-radius:4px;white-space:nowrap}
+.rf-compact-account summary::-webkit-details-marker{display:none}
+.rf-compact-account-panel{position:absolute;right:0;top:calc(100% + 6px);z-index:95;min-width:200px;background:var(--rf-surface,#fff);border:1px solid var(--rf-border,#d9e0e5);border-radius:8px;padding:5px;box-shadow:0 8px 22px #0003;color:var(--rf-text,#243a48)}
+.rf-compact-account-panel button{display:flex;align-items:center;gap:8px;width:100%;min-height:36px;padding:7px 10px;text-align:left;border:0;background:transparent;color:inherit;border-radius:4px;font-size:13px}
+.rf-compact-account-panel button:hover{background:var(--rf-canvas,#eaf0f3)}
+.rf-compact-account-panel button[aria-current="page"]{font-weight:bold;background:var(--rf-canvas,#eaf0f3)}
+.rf-compact-header-action{display:inline-flex;align-items:center;justify-content:center;gap:6px;color:inherit;border:0;background:transparent;min-height:36px;padding:5px 8px;border-radius:4px}
+.rf-compact-header-action svg,.rf-compact-account summary svg,.rf-compact-account-panel svg{width:17px;height:17px;flex:0 0 17px}
+.rf-compact-header-action:hover,.rf-compact-account summary:hover{background:#ffffff20}
+.rf-compact-shell .side-foot,.rf-compact-shell .nav-utility{display:none!important}
+.rf-compact-shell .top-green{overflow:visible;position:relative;z-index:24}
+.rf-compact-shell .top-user{gap:8px}
+@media(max-width:640px){.rf-compact-tabs{padding:2px 8px}.rf-compact-account summary{font-size:12px}.rf-compact-header-action{padding:5px}.rf-compact-account-panel{max-width:calc(100vw - 24px)}}
+`;
+document.head.appendChild(rfCompactStyle);
+
+// Each group has a preferred landing route and optional companion routes.
+// Only buttons supplied by the existing permission-filtered renderer are used.
+function rfCompactGroups(kind,ids,roles=[]){
+ const has=id=>ids.includes(id),group=(section,label,...routes)=>({section,label,routes});
+ let defs;
+ if(kind==='teacher'){
+  defs=[
+   group('TEACHING','Daily Schedule','timetable','school-calendar','supervision'),
+   group('TEACHING','Master Timetable','master'),
+   group('TEACHING','Class Finder','finder','classroom-management'),
+   group('TEACHING','Student Search','search'),
+   group('TEACHING','Attendance Overview','attendance-overview'),
+   group('STUDENT MANAGEMENT','Student Movements','movements'),
+   group('STUDENT MANAGEMENT','Student Support','student-support','observations','referrals','follow-ups')
+  ];
+ }else if(kind==='admin'){
+  defs=[
+   group('SCHOOL MANAGEMENT','Dashboard','dashboard'),
+   group('SCHOOL MANAGEMENT','Staff Management','staff'),
+   group('SCHOOL MANAGEMENT','Student Management','students','student-actions'),
+   group('SCHOOL MANAGEMENT','Timetable Management','timetable','master','classes'),
+   group('OPERATIONS','Attendance Overview','attendance'),
+   group('OPERATIONS','Student Movements','movements'),
+   group('SYSTEM','Account Management','accounts','roles'),
+   group('SYSTEM','Audit & Activity','security','audit'),
+   group('SYSTEM','OneSchool Import Centre','oneschool','data'),
+   group('SYSTEM','Settings','teacher-modules')
+  ];
+ }else{
+  const leader=roles.some(r=>['principal','deputy','ylc','office'].includes(r));
+  const faculty=roles.includes('hod')&&!roles.some(r=>['principal','deputy','business','office'].includes(r));
+  const schedule=has('schedule'),workforce=has('workforce'),master=has('master');
+  const attachCalendar=workforce?'workforce':schedule?'schedule':master?'master':'dashboard';
+  const attachSupervision=workforce?'workforce':schedule?'schedule':master?'master':'dashboard';
+  const extras=id=>[...(attachCalendar===id?['calendar']:[]),...(attachSupervision===id?['supervision']:[])];
+  const approvalInSchedule=schedule&&!has('attendance');
+  defs=[
+   ...(schedule?[group('WORKSPACE','Daily Schedule','schedule','dashboard',...extras('schedule'),...(approvalInSchedule?['approvals']:[]))]:[group('WORKSPACE','Dashboard','dashboard',...extras('dashboard'))]),
+   group('WORKSPACE','Master Timetable','master',...(leader?['classes']:[]),...(faculty?['staff']:[]),...extras('master')),
+   ...(!leader||!master?[group('WORKSPACE','Class Finder','classes')]:[]),
+   group('WORKSPACE','Student Search','students'),
+   ...(!faculty||!master?[group('WORKSPACE','Staff Directory','staff')]:[]),
+   group('STUDENT MANAGEMENT',has('attendance')?'Attendance Overview':'Attendance Review','attendance',...(!approvalInSchedule?['approvals']:[])),
+   group('STUDENT MANAGEMENT','Student Movements','movements'),
+   group('STUDENT MANAGEMENT','Student Support','observations','tasks','referrals','followups'),
+   group('OPERATIONS','Workforce Allocations','workforce','availability',...extras('workforce')),
+   group('OPERATIONS','Relief Management','relief'),
+   group('REPORTING','Reports','reports','department','yearlevel'),
+   group('SYSTEM','Account Management','accounts'),
+   group('SYSTEM','Security Audit','security'),
+   group('SYSTEM','Timetable Management','timetable'),
+   group('SYSTEM','OneSchool Imports','imports'),
+   group('SYSTEM','Settings','settings')
+  ];
+ }
+ const seen=new Set(),result=[];
+ for(const g of defs){
+  const routes=g.routes.filter(id=>has(id)&&!seen.has(id));
+  routes.forEach(id=>seen.add(id));
+  if(routes.length)result.push({...g,routes});
+ }
+ // Future modules and unusual role combinations must not lose any authorised route.
+ for(const id of ids)if(!seen.has(id)&&!(kind==='teacher'&&id==='alerts'))result.push(group('OTHER',null,id));
+ return result;
+}
+function rfCompactNavigation(){
+ const side=app.querySelector('.permanent-sidebar'),primary=side?.querySelector('.nav-primary'),utility=side?.querySelector('.nav-utility'),content=side?.nextElementSibling;
+ if(!primary||!content||!demoRole)return;
+ const kind=demoRole,attr=kind==='admin'?'data-admin-page':kind==='staff'?'data-rfu-page':null;
+ const route=b=>attr?b.getAttribute(attr):b.getAttribute('data-nav')||b.getAttribute('data-rfu-page');
+ const buttons=[...primary.querySelectorAll('button')].filter(b=>route(b)),byId=new Map(buttons.map(b=>[route(b),b]));
+ const active=kind==='admin'?adminPage:kind==='staff'?rfuPage:rfuTeacherExtra?rfuPage:state.page==='class-detail'?'finder':state.page==='home'?'timetable':state.page;
+ const groups=rfCompactGroups(kind,[...byId.keys()],kind==='staff'?rfuConfig().roles:[]);
+ const name=b=>b.querySelector('.nav-text')?.textContent.trim()||b.textContent.trim();
+ const shell=side.parentElement;shell.classList.add('rf-compact-shell');
+ const heading=section=>{const el=document.createElement('div');el.className='nav-group-label';el.textContent=section;return el};
+ const setActive=(b,yes)=>{b.classList.toggle('active',yes);if(yes)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')};
+ const copy=(id,label,selected)=>{const b=byId.get(id).cloneNode(true);setActive(b,selected);if(label){const t=b.querySelector('.nav-text');if(t)t.textContent=label;b.title=label;b.setAttribute('aria-label',label)}return b};
+ let section='';
+ primary.replaceChildren();
+ for(const g of groups){
+  if(section!==g.section){section=g.section;primary.append(heading(section))}
+  const selected=g.routes.includes(active);
+  primary.append(copy(g.routes[0],g.label,selected));
+ }
+ const current=groups.find(g=>g.routes.includes(active));
+ if(current&&current.routes.length>1){
+  const bar=document.createElement('nav');bar.className='rf-compact-tabs';bar.setAttribute('aria-label',(current.label||'Workspace')+' sections');
+  for(const id of current.routes){
+   const b=copy(id,name(byId.get(id)),id===active);
+   b.className='rf-compact-tab';b.textContent=name(byId.get(id));bar.append(b);
+  }
+  const main=content.querySelector('main');if(main)content.insertBefore(bar,main);
+ }
+ const top=content.querySelector('.top-user');
+ if(top){
+  if(kind==='teacher'&&byId.has('alerts')){
+   const b=copy('alerts','Alerts & Notices',active==='alerts');
+   b.className='rf-compact-header-action';b.innerHTML=navSvg('bell');b.setAttribute('aria-label','Alerts & Notices');top.prepend(b);
+  }
+  const personal=[...utility?.querySelectorAll('button')||[]];
+  if(personal.length){
+   const details=document.createElement('details');details.className='rf-compact-account';
+   const summary=document.createElement('summary');summary.setAttribute('aria-label','Account menu');summary.title='Account menu';
+   const avatar=top.querySelector('.circle-user');if(avatar)summary.append(avatar);
+   summary.insertAdjacentHTML('beforeend',navSvg('chevrons-up-down'));
+   const panel=document.createElement('div');panel.className='rf-compact-account-panel';
+   for(const original of personal){
+    const b=original.cloneNode(true);b.className='rf-compact-personal-action';b.textContent=name(original);panel.append(b);
+   }
+   details.append(summary,panel);top.append(details);utility.replaceChildren();
+  }
+ }
+ // Keep dashboard shortcuts in sync with the compact sidebar.
+ if(kind==='staff'&&rfuPage==='dashboard'){
+  const grid=content.querySelector('.rfa-quick-grid');
+  if(grid){
+   const links=[...grid.querySelectorAll('[data-rfu-page]')];
+   grid.replaceChildren();
+   for(const g of groups){
+    const id=g.routes.find(x=>x!=='dashboard');if(!id)continue;
+    const source=links.find(b=>b.dataset.rfuPage===id);if(!source)continue;
+    const b=source.cloneNode(true),label=b.querySelector('strong');if(label&&g.label)label.textContent=g.label;grid.append(b);
+   }
+  }
+ }
+ rfKeepPortalNavVisible();
+}
+document.addEventListener('click',e=>{
+ for(const menu of document.querySelectorAll('.rf-compact-account[open]'))if(!menu.contains(e.target))menu.open=false;
+});
+document.addEventListener('keydown',e=>{
+ if(e.key!=='Escape')return;
+ const menu=document.querySelector('.rf-compact-account[open]');if(menu){menu.open=false;menu.querySelector('summary')?.focus()}
+});
+// Schedule-based staff land on their actual schedule, not a duplicate dashboard.
+// Track identity changes so deliberately opening the dashboard remains possible.
+let rfCompactLastActor=null;
+const rfCompactPreviousRender=render;
+render=function(){
+ const identity=demoRole?demoRole+':'+rfuActor:null;
+ if(identity!==rfCompactLastActor){
+  rfCompactLastActor=identity;
+  if(demoRole==='staff'&&rfuCan('schedule')&&rfuPage==='dashboard')rfuPage='schedule';
+ }
+ rfCompactPreviousRender();
+ rfCompactNavigation();
+};
+
+
 window.visualViewport?.addEventListener('resize',()=>requestAnimationFrame(fitGrid));
 window.addEventListener('resize',rfClearTimetableMorph);
 window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener?.('change',rfClearTimetableMorph);
