@@ -2,7 +2,7 @@ name: V3 foundation tests
 on:
   workflow_dispatch:
   push:
-    branches: [feature/v3.7-staff-access, windows-release, v3.0-foundation, feature/v3.6.5-connected-school-data, feature/v3.6.6-automated-school-setup, feature/v3.6.7-unified-ui, feature/v3.6.7-student-movements-dashboard, feature/v3.6.7-varied-fictional-movements, feature/admin-movement-destinations-windows, feature/v3.6.7-movement-student-day-template, feature/v3.6.7-log-services-into-day-template]
+    branches: [feature/v3.8-windows-rebuild, feature/v3.7-staff-access, windows-release, v3.0-foundation, feature/v3.6.5-connected-school-data, feature/v3.6.6-automated-school-setup, feature/v3.6.7-unified-ui, feature/v3.6.7-student-movements-dashboard, feature/v3.6.7-varied-fictional-movements, feature/admin-movement-destinations-windows, feature/v3.6.7-movement-student-day-template, feature/v3.6.7-log-services-into-day-template]
   pull_request:
     branches: [windows-release, main, v3.0-foundation, integration/v3.6.1-windows-teacher-portal, feature/v3.6.2-oneschool-import-centre, feature/v3.6.4-real-oneschool-format-support, fix/v3.6.4-oneschool-unknown-worksheet-size, fix/v3.6.4.2-empty-staff-pdf-legends, fix/v3.6.4.3-cross-line-alignment, feature/v3.6.5-connected-school-data, feature/v3.6.6-automated-school-setup, feature/v3.6.7-unified-ui]
 permissions:
@@ -28,7 +28,7 @@ jobs:
       - name: Validate bundled website source and permissions
         run: |
           python deployment/sync_training.py --check
-          python -m unittest deployment.test_training -v
+          python -m unittest deployment.test_training deployment.test_windows_launchers -v
           node training/tests/teaching-permissions-logic.cjs
           node training/tests/calendar-logic.cjs
           node training/tests/classroom-management-logic.cjs
@@ -52,7 +52,8 @@ jobs:
       - run: python deployment/ci_smoke.py
 
   windows-offline-bundle:
-    if: github.ref == 'refs/heads/feature/v3.7-staff-access' || github.event_name == 'pull_request' || github.ref == 'refs/heads/windows-release' || github.ref == 'refs/heads/v3.0-foundation' || github.ref == 'refs/heads/feature/v3.6.5-connected-school-data' || github.ref == 'refs/heads/feature/v3.6.6-automated-school-setup' || github.ref == 'refs/heads/feature/v3.6.7-unified-ui' || github.ref == 'refs/heads/feature/v3.6.7-student-movements-dashboard' || github.ref == 'refs/heads/feature/v3.6.7-varied-fictional-movements' || github.ref == 'refs/heads/feature/admin-movement-destinations-windows' || github.ref == 'refs/heads/feature/v3.6.7-movement-student-day-template' || github.ref == 'refs/heads/feature/v3.6.7-log-services-into-day-template'
+    needs: [tests, postgres-and-native]
+    if: github.ref == 'refs/heads/feature/v3.8-windows-rebuild' || github.ref == 'refs/heads/feature/v3.7-staff-access' || github.event_name == 'pull_request' || github.ref == 'refs/heads/windows-release' || github.ref == 'refs/heads/v3.0-foundation' || github.ref == 'refs/heads/feature/v3.6.5-connected-school-data' || github.ref == 'refs/heads/feature/v3.6.6-automated-school-setup' || github.ref == 'refs/heads/feature/v3.6.7-unified-ui' || github.ref == 'refs/heads/feature/v3.6.7-student-movements-dashboard' || github.ref == 'refs/heads/feature/v3.6.7-varied-fictional-movements' || github.ref == 'refs/heads/feature/admin-movement-destinations-windows' || github.ref == 'refs/heads/feature/v3.6.7-movement-student-day-template' || github.ref == 'refs/heads/feature/v3.6.7-log-services-into-day-template'
     runs-on: windows-2025
     timeout-minutes: 25
     steps:
@@ -94,14 +95,17 @@ jobs:
           $state = "$env:RUNNER_TEMP/rf-test-state"
           # Regression: the actual Windows shortcuts must not silently reuse
           # a previous version's default RollFlow-Staging instance.
-          $setupLauncher = Get-Content (Join-Path $bundle 'First Setup.cmd') -Raw
-          $startLauncher = Get-Content (Join-Path $bundle 'Start RollFlow.cmd') -Raw
+          $setupLauncher = Get-Content (Join-Path $bundle 'First Setup Fresh.cmd') -Raw
+          $startLauncher = Get-Content (Join-Path $bundle 'Start Fresh Protected.cmd') -Raw
+          $existingLauncher = Get-Content (Join-Path $bundle 'Start Existing Protected.cmd') -Raw
+          $websiteLauncher = Get-Content (Join-Path $bundle 'Start RollFlow.cmd') -Raw
           foreach ($launcher in @($setupLauncher, $startLauncher)) {
-            if ($launcher -notmatch 'RollFlow-V3641-Staging') { throw 'V3.6.1 shortcuts must have a dedicated instance state' }
+            if ($launcher -notmatch 'RollFlow-V38-Fresh-Staging') { throw 'Fresh shortcuts must use isolated instance state' }
             if ($launcher -notmatch '--state') { throw 'Shortcut state override missing' }
           }
-          if ($setupLauncher -notmatch '--db-port 55437 --web-port 18085') { throw 'V3.6.1 setup must use independent database and web ports' }
-          if ($startLauncher -notmatch 'start') { throw 'Start shortcut must use configured V3.6.1 state' }
+          if ($setupLauncher -notmatch '--db-port 55438 --web-port 18087') { throw 'Fresh setup must use independent ports' }
+          if ($existingLauncher -notmatch 'RollFlow-V3641-Staging') { throw 'Existing state path changed' }
+          if ($websiteLauncher -notmatch 'deployment.training' -or $websiteLauncher -match 'deployment.native') { throw 'Default launch must open the complete website' }
           & "$bundle/python/python.exe" -m deployment.native --state $state init --no-admin
           if ($LASTEXITCODE -ne 0) { throw 'Native setup failed' }
           if (Test-Path (Join-Path $state 'initial-password.txt')) { throw 'Temporary initdb password was not deleted' }
@@ -140,9 +144,21 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'V3.6.6 setup schema or route unavailable' }
           & "$bundle/python/python.exe" -m deployment.native --state $state manage shell -c "from django.template.loader import get_template; from django.conf import settings; from pathlib import Path; expected=['ui_system.html','ui_header.html','staff_portal.html','connected_school.html','automated_setup.html','teacher_week.html','teacher_timetable.html','oneschool_documents.html']; assert all(get_template(x) for x in expected); text=(Path(settings.BASE_DIR)/'index.html').read_text(encoding='utf-8'); assert text.count('<!-- ROLLFLOW_SERVER_BOOTSTRAP -->')==1 and '--green:#147f38' in text"
           if ($LASTEXITCODE -ne 0) { throw 'V3.6.7 unified design system, portal template or legacy teacher bootstrap missing' }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check the actual packaged website in Chrome
+        shell: pwsh
+        run: |
+          npm install --no-save --no-audit --no-fund playwright-core@1.56.1
+          if ($LASTEXITCODE -ne 0) { throw 'Browser test dependency installation failed' }
+          $env:RF_PYTHON = "$env:RUNNER_TEMP/RollFlow/python/python.exe"
+          $env:NODE_PATH = "$(Get-Location)/node_modules"
+          node "$env:RUNNER_TEMP/RollFlow/app/deployment/windows_workspace_smoke.cjs"
+          if ($LASTEXITCODE -ne 0) { throw 'Packaged website role/navigation smoke failed' }
       - uses: actions/upload-artifact@v4
         with:
-          name: RollFlow-V3.7.0-Staff-Access-Windows-x64-STAGING
+          name: RollFlow-V3.8.0-Windows-x64-STAGING
           path: ${{ runner.temp }}/RollFlow/
           if-no-files-found: error
           retention-days: 14
