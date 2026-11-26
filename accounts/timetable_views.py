@@ -18,7 +18,7 @@ def event(request, action, subject):
     SecurityEvent.objects.create(actor=request.user,event=action,subject=str(subject)[:150])
 
 def active_slots():
-    return TimetableSlot.objects.filter(active=True,period__active=True,school_class__active=True,room__active=True,teacher__is_active=True,teacher__is_staff=False,teacher__is_superuser=False,teacher__groups__name="Teacher").select_related("school_class","teacher","room","period").distinct()
+    return TimetableSlot.objects.filter(active=True,period__active=True,school_class__active=True,room__active=True,teacher__in=teachers()).select_related("school_class","teacher","room","period").distinct()
 
 @administrator
 @require_http_methods(["GET"])

@@ -22,7 +22,7 @@ from .models import (
 from .oneschool_documents import parse_students
 from .oneschool_class_csv import parse_student_classes
 from .oneschool_source_review import read_batch_sources
-from .views import role_for
+from .permissions import can_teach
 
 DAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday")
 
@@ -61,7 +61,7 @@ def canonical(value):
 
 
 def eligible_profile(profile):
-    if not profile or role_for(profile.user) != "teacher" or not profile.timetable_link_verified:
+    if not profile or not can_teach(profile.user) or not profile.timetable_link_verified:
         return False
     key = canonical(profile.staff_id)
     return bool(key and StaffProfile.objects.filter(staff_id__iexact=key).count() == 1)
@@ -209,7 +209,7 @@ def build_candidate(name, starts, ends, times, closures):
 
 def personal_codes(publication, user):
     """Verify current role, mapping and original published attestation every request."""
-    if role_for(user) != "teacher":
+    if not can_teach(user):
         return set()
     mapping = ConnectedStaffMapping.objects.select_related("profile__user").filter(profile__user=user).first()
     if not mapping or not mapping_valid(mapping):

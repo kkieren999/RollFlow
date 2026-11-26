@@ -16,6 +16,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 from .models import SecurityEvent, StaffProfile, Student, SchoolClass, TimetableSlot
 from .staff_forms import StaffForm, ResetPasswordForm, StaffImportForm
 from .views import role_for
+from .permissions import can_teach, teaching_users
 
 NAVIGATION = (
     ("SCHOOL MANAGEMENT", (("dashboard", "Dashboard"), ("staff", "Staff Management"), ("students", "Student Management"), ("classes", "Class Management"), ("timetable", "Timetable Management"), ("master", "Master Timetable"), ("relief", "Relief & Supervision"))),
@@ -87,7 +88,7 @@ def dashboard(request):
     return page(request, "dashboard", connected_publication=connected, published_import=version, coverage_warning=coverage_message(version,timezone.localdate()) if version else "", imported_stats=imported_stats, stats=[
         ("Staff accounts", users.count()),
         ("Active staff", users.filter(is_active=True).count()),
-        ("Teachers", users.filter(groups__name="Teacher", is_staff=False, is_superuser=False).distinct().count()),
+        ("Teachers", teaching_users().count()),
         ("Administrators", users.filter(is_staff=True, is_superuser=True).count()),
         ("Enrolled students", Student.objects.filter(status=Student.Status.ACTIVE).count()),
         ("Student records", Student.objects.count()),
@@ -124,7 +125,7 @@ def section(request, section):
         elif status == "inactive":
             users = users.filter(is_active=False)
         elif status == "teacher":
-            users = users.filter(groups__name="Teacher", is_staff=False, is_superuser=False).distinct()
+            users = users.filter(pk__in=teaching_users().values("pk"))
         elif status == "admin":
             users = users.filter(is_staff=True, is_superuser=True)
         from django.core.paginator import Paginator
@@ -174,11 +175,15 @@ def staff_edit(request, pk=None):
                         and previous_id == c["staff_id"]
                     )
                 )
+                permission = c.get("teaching_permission")
+                teaching_enabled = {"allow": True, "deny": False, "default": None}.get(
+                    permission, existing_profile.teaching_enabled if existing_profile else None)
                 StaffProfile.objects.update_or_create(user=user, defaults={
+                    "teaching_enabled": teaching_enabled,
                     "staff_id": c["staff_id"], "faculty": c["faculty"], "campus": c["campus"],
                     "class_codes": c["class_codes"], "timetable_link_verified": link_verified,
                 })
-                if existing_profile and (previous_id != c["staff_id"] or not link_verified or c["role"] != "teacher" or not user.is_active):
+                if existing_profile and (previous_id != c["staff_id"] or not link_verified or not can_teach(user) or not user.is_active):
                     from .models import ConnectedStaffMapping
                     if ConnectedStaffMapping.objects.filter(profile=existing_profile).delete()[0]:
                         SecurityEvent.objects.create(actor=request.user, event="connected_mapping_revoked", subject=user.username)
@@ -192,6 +197,8 @@ def staff_edit(request, pk=None):
                     )
                 if target and user.pk != request.user.pk and (old_active != user.is_active or old_role != (user.is_staff, user.is_superuser)):
                     revoke_sessions(user)
+                if teaching_enabled != (existing_profile.teaching_enabled if existing_profile else None):
+                    SecurityEvent.objects.create(actor=request.user, event="teaching_permission_changed", subject=user.username)
                 log(request, "staff_updated" if target else "staff_created", user)
             messages.success(request, "Staff details saved.")
             return redirect("management-section", section="staff")

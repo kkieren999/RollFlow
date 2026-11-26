@@ -4,7 +4,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from .models import StaffProfile
 
-ROLE_CHOICES = [("teacher", "Teacher"), ("admin", "Administrator")]
+ROLE_CHOICES = [("teacher", "Teacher (legacy default)"), ("staff", "Staff (no default teaching)"), ("admin", "Administrator")]
 
 class StaffForm(forms.Form):
     staff_id = forms.CharField(label="Staff ID", max_length=40, required=False)
@@ -19,6 +19,10 @@ class StaffForm(forms.Form):
     faculty = forms.CharField(max_length=100, required=False)
     campus = forms.CharField(max_length=100, required=False)
     role = forms.ChoiceField(choices=ROLE_CHOICES)
+    teaching_permission = forms.ChoiceField(required=False, choices=[
+        ("default", "Use legacy role default"), ("allow", "Allow assigned teaching"),
+        ("deny", "No teaching access")], initial="default",
+        help_text="Independent of account role. Teaching never grants system administration or another staff member's classes.")
     class_codes = forms.CharField(label="Draft class allocations", max_length=300, required=False,
         help_text="Planning only. Does not grant class access until the central class system exists.")
     active = forms.BooleanField(required=False, initial=True)
@@ -33,7 +37,8 @@ class StaffForm(forms.Form):
                 "staff_id": p.staff_id if p else "", "faculty": p.faculty if p else "",
                 "campus": p.campus if p else "", "class_codes": p.class_codes if p else "",
                 "username": target.username, "first_name": target.first_name, "last_name": target.last_name,
-                "role": "admin" if target.is_staff and target.is_superuser else "teacher",
+                "role": "admin" if target.is_staff and target.is_superuser else "teacher" if target.groups.filter(name="Teacher").exists() else "staff",
+                "teaching_permission": "allow" if p and p.teaching_enabled is True else "deny" if p and p.teaching_enabled is False else "default",
                 "active": target.is_active,
             })
         super().__init__(*args, **kwargs)

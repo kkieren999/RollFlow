@@ -25,6 +25,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 from .models import ImportedTimetable, ImportedTimetableDay, SecurityEvent
 from .staff_views import administrator, page
 from .views import role_for
+from .permissions import can_teach
 from .oneschool_csv import parse, HEADER, MAX_BYTES
 from .teacher_schedule import staff_identity, assigned_rows
 
@@ -125,7 +126,7 @@ def dated(request, personal=False,admin_only=False):
     role=role_for(request.user)
     if role is None:
         return redirect("teacher-login")
-    if role not in ("teacher","admin") or (personal and role!="teacher") or (admin_only and role!="admin"):
+    if role not in ("teacher","admin") or (personal and not can_teach(request.user)) or (admin_only and role!="admin"):
         return HttpResponseForbidden("Staff access required.")
     version=current_version()
     if not version:

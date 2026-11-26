@@ -6,6 +6,8 @@ class StaffProfile(models.Model):
     staff_id = models.CharField(max_length=40, blank=True, unique=True, null=True)
     # Only an administrator's explicit identity verification grants live timetable access.
     timetable_link_verified = models.BooleanField(default=False)
+    # None preserves the legacy Teacher group default; explicit decisions take precedence.
+    teaching_enabled = models.BooleanField(null=True, blank=True, default=None)
     faculty = models.CharField(max_length=100, blank=True)
     campus = models.CharField(max_length=100, blank=True)
     class_codes = models.CharField(max_length=300, blank=True)

@@ -7,11 +7,12 @@ administrator verification; old migrated links are deliberately unverified.
 """
 from django.conf import settings
 from .models import StaffProfile
+from .permissions import can_teach
 
 
 def staff_identity(user):
     """Return (normalised OneSchool ID or None, user-friendly reason)."""
-    if not user.is_authenticated or not user.is_active:
+    if not can_teach(user):
         return None, "An active teacher account is required."
     profile = StaffProfile.objects.filter(user_id=user.pk).first()
     if not profile or not profile.staff_id or not profile.staff_id.strip():

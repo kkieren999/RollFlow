@@ -4,7 +4,8 @@ from django.db.models import Q
 from .models import SchoolClass, ClassEnrolment, Student, Room, SchoolPeriod, TimetableSlot
 
 def teachers():
-    return User.objects.filter(is_active=True,is_staff=False,is_superuser=False,groups__name="Teacher").order_by("last_name","first_name","username").distinct()
+    from .permissions import teaching_users
+    return teaching_users().order_by("last_name","first_name","username")
 
 def normalize_code(value):
     value = value.strip().upper()

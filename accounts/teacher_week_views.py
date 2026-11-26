@@ -10,6 +10,7 @@ from .models import ImportedTimetableDay
 from .oneschool_views import MIN_DAY, MAX_DAY, current_version, shift_date, coverage_message
 from .teacher_schedule import staff_identity, assigned_rows
 from .views import role_for
+from .permissions import can_teach
 
 
 @never_cache
@@ -18,7 +19,7 @@ def week(request):
     role = role_for(request.user)
     if role is None:
         return redirect("teacher-login")
-    if role != "teacher":
+    if not can_teach(request.user):
         return HttpResponseForbidden("Teacher access required.")
 
     from .connected_school import current

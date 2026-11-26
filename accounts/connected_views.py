@@ -15,6 +15,7 @@ from .connected_school import (build_candidate, canonical, current, eligible_pro
 from .models import ConnectedSchoolPublication, ConnectedStaffMapping, StaffProfile, SecurityEvent, Student
 from .staff_views import administrator
 from .views import role_for
+from .permissions import can_teach
 
 
 class PublishForm(forms.Form):
@@ -192,7 +193,7 @@ def teacher_schedule(request, week=False):
     role = role_for(request.user)
     if role is None:
         return redirect("teacher-login")
-    if role != "teacher":
+    if not can_teach(request.user):
         return HttpResponseForbidden("Teacher access required.")
     publication = publication_or_404()
     codes = personal_codes(publication, request.user)
@@ -209,7 +210,7 @@ def roster(request, code, admin_only=False):
     role = role_for(request.user)
     if role is None:
         return redirect("admin-login" if admin_only else "teacher-login")
-    if role != ("admin" if admin_only else "teacher"):
+    if (admin_only and role != "admin") or (not admin_only and not can_teach(request.user)):
         return HttpResponseForbidden("Access denied.")
     publication = publication_or_404()
     code = canonical(code)

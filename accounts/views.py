@@ -11,15 +11,19 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods, require_POST
 from django.middleware.csrf import get_token
 from .models import LoginWindow, SecurityEvent
+from .permissions import can_teach
 
 def role_for(user):
     if not user.is_authenticated or not user.is_active:
         return None
     if user.is_staff and user.is_superuser:
         return "admin"
-    if not user.is_staff and user.groups.filter(name="Teacher").exists():
+    if can_teach(user):
         return "teacher"
     return None
+
+def portal_allowed(user, mode):
+    return role_for(user) == "admin" if mode == "admin" else can_teach(user)
 
 def limit_key(request, username):
     return salted_hmac("rollflow-login", request.META.get("REMOTE_ADDR", "") + "|" + username.casefold(), algorithm="sha256").hexdigest()
@@ -39,7 +43,7 @@ def consume_attempt(key):
 @never_cache
 @require_http_methods(["GET", "POST"])
 def portal_login(request, mode="teacher"):
-    if request.method == "GET" and role_for(request.user) == mode:
+    if request.method == "GET" and portal_allowed(request.user, mode):
         return redirect("management-dashboard" if mode == "admin" else "teacher")
     error = ""
     if request.method == "POST":
@@ -50,7 +54,7 @@ def portal_login(request, mode="teacher"):
         if not consume_attempt(ip_key) or not consume_attempt(key):
             return render(request, "login.html", {"live_timetable": settings.ROLLFLOW_LIVE_TIMETABLE, "mode": mode, "error": "Too many attempts. Try again in 15 minutes."}, status=429)
         user = authenticate(request, username=username, password=password)
-        if user is not None and role_for(user) == mode:
+        if user is not None and portal_allowed(user, mode):
             login(request, user)
             LoginWindow.objects.filter(key=key).delete()
             SecurityEvent.objects.create(actor=user, event="login", subject=mode)
@@ -64,8 +68,8 @@ def teacher(request):
     role = role_for(request.user)
     if role is None:
         return redirect("teacher-login")
-    if role != "teacher":
-        return HttpResponseForbidden("Use a teacher account to open the Teacher Portal.")
+    if not can_teach(request.user):
+        return HttpResponseForbidden("Teaching permission is required.")
     from .connected_school import current
     if current() or settings.ROLLFLOW_LIVE_TIMETABLE:
         return redirect("teacher-timetable")
@@ -102,7 +106,7 @@ def teacher_timetable(request):
     role = role_for(request.user)
     if role is None:
         return redirect("teacher-login")
-    if role != "teacher":
+    if not can_teach(request.user):
         return HttpResponseForbidden("Teacher access required.")
     from .connected_school import current
     if current():
