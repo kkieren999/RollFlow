@@ -10,10 +10,10 @@
 **Latest cumulative development branch:** `feature/v4.0-accounts-roles-security`, head `963bf058d32ff67d8173caf69ce7bd96a5631e51`, draft PR #37 https://github.com/kkieren999/RollFlow/pull/37 (base windows-release; includes prior drafts). Do not restart from main, windows-release or V3.9 for subsequent development. Recheck actual branch head before edits. Sections below retain the earlier roadmap/history; this checkpoint supersedes older statements of current phase.
 
 ### Verified build state
-- V3.9 repair d3940a8: run #304 https://github.com/kkieren999/RollFlow/actions/runs/45892929577 — tests and PostgreSQL/native succeeded; Windows browser passed and artifact upload was running at last inspection. PR run #305 same status. Verify completion and actual artifact before reporting download.
+- V3.9 repair d3940a8: run #304 https://github.com/kkieren999/RollFlow/actions/runs/45892929577 — tests and PostgreSQL/native succeeded; Windows job now confirmed completed success, including package and browser gate. PR run #305 was still uploading at prior inspection. Verify artifact availability/expiry before reporting download.
 - V4.0 first commit 082e5fec: tests failed on unrelated flaky year-scope assertion: the random CSRF token contained substring Y8, not a leaked table cell. Confirmed exact match in log job 140160972140. Repaired in 963bf058 using exact authorised projection and rendered HTML cells, retaining no-private-staff-code assertion.
-- V4.0 second commit 6cbbfbad: standard tests job 140161285080 in run #307 succeeded; PostgreSQL/native in progress at last inspection.
-- Latest exact-commit run #309 https://github.com/kkieren999/RollFlow/actions/runs/45893460694 and PR run #310 https://github.com/kkieren999/RollFlow/actions/runs/45893468770 are in progress. Windows package name RollFlow-V4.0.0-Accounts-Roles-Security-Windows-x64-STAGING. No verified V4.0 artifact yet.
+- V4.0 second commit 6cbbfbad: standard tests job 140161285080 and PostgreSQL/native succeeded in run #307; Windows packaging in progress.
+- Latest exact-commit run #309 https://github.com/kkieren999/RollFlow/actions/runs/45893460694 and PR run #310 https://github.com/kkieren999/RollFlow/actions/runs/45893468770 are in progress; #309 standard tests passed, PostgreSQL/native running. Windows package name RollFlow-V4.0.0-Accounts-Roles-Security-Windows-x64-STAGING. No verified V4.0 artifact yet.
 
 ### Implemented
 - Additive migrations 0016/0017, RoleTemplate and AccessAudit, optional grant start/expiry, source template provenance, temporary publication-bound class metadata scope.
