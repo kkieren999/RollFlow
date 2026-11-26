@@ -92,7 +92,28 @@ async function run(){
      const order=await page.locator('.rf-week-grid .timetable-day').first().locator('.rf-week-slot').evaluateAll(xs=>xs.map(x=>x.dataset.rfPeriod));
      assert(order.indexOf('2')<order.indexOf('duty:11:25')&&order.indexOf('duty:11:25')<order.indexOf('3'),'Duty at 11:25 between Period 2 and 3');
      assert(order.indexOf('3')<order.indexOf('duty:12:45')&&order.indexOf('duty:12:45')<order.indexOf('4'),'Duty at 12:45 between Period 3 and 4');
-     await capture(page,'teacher-semester2-week');
+     for(const width of [1440,1366,1100,1024,820,600,390]){
+      await page.setViewportSize({width,height:900});
+      await page.locator('.rf-week-grid').evaluate(el=>{el.closest('.rf-week-scroll').scrollTo(0,0)});
+      await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+      const geometry=await page.locator('.rf-week-grid').evaluate(grid=>{
+       const box=x=>{const r=x.getBoundingClientRect();return {l:r.left,r:r.right,t:r.top,b:r.bottom,w:r.width,h:r.height}};
+       const heads=[...grid.querySelectorAll('.day-panel-heading')],days=[...grid.querySelectorAll('.timetable-day')];
+       const headerRects=heads.map(box),slots=days.map(d=>[...d.querySelectorAll('.rf-week-slot')].map(box));
+       const overlap=slots.some((rows,i)=>rows.some((r,j)=>r.l<headerRects[i].l-2||r.r>headerRects[i].r+2||j>0&&r.t<rows[j-1].b-2));
+       const scroll=grid.closest('.rf-week-scroll'),scrollBox=box(scroll);
+       scroll.scrollLeft=scroll.scrollWidth;scroll.scrollTop=80;
+       const last=box(heads.at(-1)),first=box(heads[0]);
+       return {overlap,labels:heads.map(h=>h.querySelector('button strong').textContent),headerY:headerRects.map(r=>r.t),scrollWidth:scroll.scrollWidth,clientWidth:scroll.clientWidth,scrollBox,last,first};
+      });
+      assert.deepEqual(geometry.labels,['Monday','Tuesday','Wednesday','Thursday','Friday']);
+      assert(geometry.headerY.every(y=>Math.abs(y-geometry.headerY[0])<2),'Weekday header alignment '+width);
+      assert(!geometry.overlap,'Overlapping grid cells '+width);
+      assert(geometry.last.r<=geometry.scrollBox.r+3,'Friday reachable by scrolling '+width);
+      assert(geometry.last.t>=geometry.scrollBox.t-3,'Header stays visible when scrolling '+width);
+      await capture(page,'teacher-semester2-week-'+width);
+     }
+     await page.setViewportSize({width:1440,height:1000});
      await page.locator('[data-timetable-view="day"]').click();
      for(const date of ['2026-07-13','2026-08-03','2026-09-14','2026-10-06','2026-11-25']){
       await page.locator('[data-date]').fill(date);
@@ -167,7 +188,29 @@ async function run(){
    await page.locator('#rf-duty-form [name="detail"]').fill('Junior courtyard');
    await page.locator('#rf-duty-form button[type="submit"]').click();
    assert.match(await page.locator('.rf-duty-management').innerText(),/QA allocated playground duty/);
+   await page.locator('.nav-primary [data-rfu-page="relief"]').click();
+   await page.locator('.rf-morning-cover summary').click();
+   const form=page.locator('#rf-morning-cover-form');
+   await form.locator('[name="owner"]').selectOption('teacher');
+   const options=await form.locator('[name="classCode"] option').evaluateAll(xs=>xs.map(x=>x.value).filter(Boolean));
+   let assigned=null;
+   if(options.length){
+    const period=await form.locator('[name="period"]').inputValue();
+    assigned={code:options[0],period};
+    await form.locator('[name="classCode"]').selectOption(assigned.code);
+    await form.locator('button[type="submit"]').click();
+    assert.match(await page.locator('.rf-morning-cover').innerText(),new RegExp(assigned.code));
+   }else console.log('No eligible morning cover on current school date');
    await logout();await login('teacher');await page.locator('.nav-primary [data-nav="timetable"]').click();
+   if(assigned){
+    const card=page.locator('[data-timetable-class="'+assigned.code+'"][data-rf-period="'+assigned.period+'"]');
+    assert.equal(await card.count(),1,'Supervision replaces spare in assigned period');
+    assert.match(await card.innerText(),/SUPERVISION/);
+    await page.locator('[data-timetable-view="week"]').click();
+    const weekCard=page.locator('.rf-week-slot[data-rf-period="'+assigned.period+'"] [data-timetable-class="'+assigned.code+'"] .rf-admin-supervision-badge');
+    assert(await weekCard.count()>0,'Supervision is in teaching period in weekly view');
+    await page.locator('[data-timetable-view="day"]').click();
+   }
    assert.match(await page.locator('[data-rf-duty]').allInnerTexts().then(x=>x.join(' ')),/QA allocated playground duty/);
    await logout();await login('swilliams');await page.locator('.nav-primary [data-nav="timetable"]').click();
    assert(!await page.locator('[data-rf-duty]').allInnerTexts().then(x=>x.join(' ').includes('QA allocated playground duty')));
