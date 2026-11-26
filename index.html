@@ -1190,7 +1190,7 @@ function fitGrid(){
  grid.style.minHeight=layout.minHeight+'px';
 }
 function roll(){const c=getClass(),counts=classCounts(c),locked=isSubmitted();const labels={'?':'Unmarked',P:'Present',A:'Absent',L:'Late',X:'Legacy activity'};const cards=c.ids.map(id=>{const p=getPerson(id),s=statusFor(id);return `<article class="student-card minimal-photo-card ${s!=='?'?'is-'+s.toLowerCase():''}" data-mark="${esc(id)}"><button type="button" class="photo-mark" data-photo-mark="${esc(id)}" aria-label="${esc(p.name)}, ${labels[s]||'Unmarked'}. ${locked?'Submitted.':'Tap to change attendance.'}" ${locked?'disabled':''}><span class="portrait-area"><span class="photo-frame"><img src="${photo(p)}" alt=""><span class="photo-letter" aria-hidden="true">${esc(s)}</span></span></span></button><button type="button" class="tile-name student-name-action" data-more="${esc(id)}" aria-label="Open student details for ${esc(p.name)}" title="Student details">${esc(p.name)}</button></article>`}).join('');const body=`<section class="rf-example1-panel" aria-labelledby="attendance-page-title"><header class="rf-example1-hero ${scheduledRollOverdue(c)?'roll-overdue':''}"><div class="rf-example1-hero-main"><div class="rf-example1-hero-copy"><h1 id="attendance-page-title">Take Attendance</h1><div class="rf-example1-meta" aria-label="Lesson details"><span class="rf-example1-lesson-date">${esc(niceDate())}</span><span>${esc(c.period)}</span><span>Room ${esc(c.room)}</span><span>${esc(c.time)}</span></div></div><div class="rf-example1-actions"><button type="button" class="rf-example1-back" data-roll-back aria-label="Back to Daily Schedule">← Back to Daily Schedule</button></div></div></header><div class="rf-example1-class-row"><div class="rf-example1-class-heading"><h2 id="attendance-class-title">${esc(c.id)} — ${esc(c.name)}</h2><div class="rf-example1-class-status"><span class="tag ${locked?'done':scheduledRollOverdue(c)?'overdue-tag':'started'}">${locked?'✓ Submitted':scheduledRollOverdue(c)?'Roll overdue':'Attendance in progress'}</span></div></div></div></section>${isPinned(c.id)?`<div class="roll-supervision-banner">${supervisionLabel()}<span>Manually added to today’s timetable · clears tomorrow</span></div>`:''}<section class="sheet attendance-sheet"><div class="photo-roll-caption"><strong>${c.ids.length} students</strong><span>${locked?'Roll submitted':(c.ids.length-counts['?'])+' of '+c.ids.length+' marked'}</span></div><div class="attendance-toolbar"><div class="summary-stats"><div class="counter"><span class="digit" id="count-q">${counts['?']}</span><span>Unmarked</span></div><div class="counter green"><span class="digit" id="count-p">${counts.P}</span><span>Present</span></div><div class="counter red"><span class="digit" id="count-a">${counts.A}</span><span>Absent</span></div><div class="counter amber"><span class="digit" id="count-l">${counts.L}</span><span>Late</span></div>${counts.X?'<div class="counter blue"><span class="digit" id="count-x">'+counts.X+'</span><span>Legacy</span></div>':''}</div><div class="teacher-hint" style="${state.prefs.showHints?'':'display:none'}">Tap photo: ? → P → A → L → ? <br><span>Tap name for student details</span></div></div><div class="student-grid-wrap"><div class="student-grid">${cards}</div></div><div class="attendance-footer"><div class="footer-message" id="footerMsg">${locked?'<strong>✓ Roll submitted</strong> · Attendance is locked':counts['?']?`<strong>${counts['?']} students</strong> still need marking`:'<strong>All students marked.</strong> Ready to save.'}</div><div class="footer-actions"><button class="btn green" data-action="save" ${counts['?']||locked?'disabled':''}>${locked?'✓ Saved':'Save'}</button></div></div></section>`;return shell(body,'Take Attendance',niceDate(),'',true)}
-function render(){const savedScroll=0;const views={home,timetable,master:masterTeacherPage,roll,classes:classOverview,finder:finderPage,'class-detail':finderDetail,search:studentSearchPage,movements:movementsPage,alerts:alertsPage,preferences:preferencesPage,help:helpPage,'attendance-overview':rfModuleAttendancePage,'classroom-management':()=>rfModuleRecordsPage(false),'student-support':()=>rfModuleRecordsPage(true),'follow-ups':rfModuleFollowups,'seating-plans':rfModuleSeats,'class-lists':rfModuleClassLists,'school-calendar':rfModuleCalendar};app.innerHTML=(views[state.page]||home)();if(state.page==='roll'){requestAnimationFrame(fitGrid)}if(state.drawer)drawDrawer();if(state.modal)drawModal()}
+function render(){const savedScroll=0;const views={home,timetable,master:masterTeacherPage,roll,classes:classOverview,finder:finderPage,'class-detail':finderDetail,search:studentSearchPage,movements:movementsPage,alerts:alertsPage,preferences:preferencesPage,help:helpPage,'attendance-overview':rfModuleAttendancePage,'classroom-management':()=>rfModuleRecordsPage(false),'student-support':()=>rfModuleRecordsPage(true),'follow-ups':rfModuleFollowups,'seating-plans':rfModuleSeats,'class-lists':rfModuleClassLists};app.innerHTML=(views[state.page]||home)();if(state.page==='roll'){requestAnimationFrame(fitGrid)}if(state.drawer)drawDrawer();if(state.modal)drawModal()}
 function changeMark(id,target=null){if(demoTeacherUsername==='swilliams'&&getClass().myClass&&!sarahScheduledClasses(state.date).some(c=>c.id===state.classId))return;if(isSubmitted()||!getClass().ids.includes(id))return;const k=bucket();state.marks[k]??={};const old=state.marks[k][id]||'?';let next=target||({'?':'P',P:'A',A:'L',L:'?',X:'P'}[old]||'?');if(old===next)return;state.history.push({k,id,old,next});state.marks[k][id]=next;state.dirty=true;persist();render()}
 function openClass(id){if(!schoolClasses.some(c=>c.id===id))return;if(demoTeacherUsername==='swilliams'&&classes.some(c=>c.id===id)&&!sarahScheduledClasses(state.date).some(c=>c.id===id)){state.page='timetable';render();showToast(sarahSchoolStatus(state.date)||'That class has no scheduled lesson on this date.');return}state.rollOrigin=['finder','class-detail','home','classes','reports','cover'].includes(state.page)?state.page:state.page==='roll'?state.rollOrigin:'timetable';state.classId=id;state.page='roll';state.rollSidebarExpanded=true;state.history=[];state.drawer=null;state.modal=null;state.mobileNav=false;state.dirty=false;render()}
 function undo(){const last=state.history.pop();if(!last)return;if(isSubmitted())return;state.marks[last.k]??={};state.marks[last.k][last.id]=last.old;state.dirty=true;persist();render();showToast('Last attendance change undone')}
@@ -1381,7 +1381,7 @@ finderDetail=function(){const id=state.finderSelected;if(id&&schoolClasses.some(
 const allFilteredClasses=filteredSchoolClasses;
 filteredSchoolClasses=function(){return allFilteredClasses().filter(cls=>!workspace.settings.assignedOnly||cls.myClass)};
 const fullRender=render;
-render=function(){fullRender();const groups=[['TEACHING',['timetable','master','finder','search','attendance-overview']],['STUDENT MANAGEMENT',['movements','classroom-management','seating-plans','class-lists','student-support']],['PLANNING',['follow-ups','school-calendar','alerts']]].map(([label,routes])=>[label,routes.filter(id=>rfModuleVisible(id))]).filter(([,routes])=>routes.length);const primary=document.querySelector('.nav-primary');if(primary)primary.innerHTML=groups.map(([title,routes])=>`<div class="nav-group-label">${title}</div>${routes.map(route=>sideButton(navPrimary.find(row=>row[0]===route))).join('')}`).join(''); if(state.page==='roll'){const grid=document.querySelector('.student-grid');grid?.classList.toggle('v2-list',workspace.settings.classView==='list')}if(state.page==='finder'&&workspace.settings.assignedOnly){document.querySelectorAll('[data-finder-view]').forEach(button=>{const cls=schoolClasses.find(c=>c.id===button.dataset.finderView);if(cls&&!cls.myClass)button.closest('tr,.finder-card')?.setAttribute('hidden','')});}document.querySelectorAll('.profile-text small').forEach(el=>el.textContent=workspace.profile.role);const popover=document.querySelector('.profile-popover strong');if(popover)popover.textContent=workspace.profile.name};
+render=function(){fullRender();const groups=[['TEACHING',['timetable','master','finder','search','attendance-overview']],['STUDENT MANAGEMENT',['movements','classroom-management','seating-plans','class-lists','student-support']],['PLANNING',['follow-ups','alerts']]].map(([label,routes])=>[label,routes.filter(id=>rfModuleVisible(id))]).filter(([,routes])=>routes.length);const primary=document.querySelector('.nav-primary');if(primary)primary.innerHTML=groups.map(([title,routes])=>`<div class="nav-group-label">${title}</div>${routes.map(route=>sideButton(navPrimary.find(row=>row[0]===route))).join('')}`).join(''); if(state.page==='roll'){const grid=document.querySelector('.student-grid');grid?.classList.toggle('v2-list',workspace.settings.classView==='list')}if(state.page==='finder'&&workspace.settings.assignedOnly){document.querySelectorAll('[data-finder-view]').forEach(button=>{const cls=schoolClasses.find(c=>c.id===button.dataset.finderView);if(cls&&!cls.myClass)button.closest('tr,.finder-card')?.setAttribute('hidden','')});}document.querySelectorAll('.profile-text small').forEach(el=>el.textContent=workspace.profile.role);const popover=document.querySelector('.profile-popover strong');if(popover)popover.textContent=workspace.profile.name};
 function completeSubmission(){if(demoTeacherUsername==='swilliams'&&getClass().myClass&&!sarahScheduledClasses(state.date).some(c=>c.id===state.classId))return;if(classCounts(getClass())['?']||isSubmitted())return;const key=bucket();state.submitted[key]={by:workspace.profile.name,at:new Date().toISOString()};if(!persist()){delete state.submitted[key];state.dirty=true;closeModal();render();return}state.dirty=false;state.history=[];closeModal();const audited=recordAudit('Roll submitted',key+' · '+JSON.stringify(classCounts(getClass())));render();showSubmissionReceipt();if(!audited)showToast('Roll saved, but the local history entry could not be saved. Retry when storage is available.')}
 document.addEventListener('click',event=>{const action=event.target.closest('[data-action]');if(action?.dataset.action==='confirmSubmit'){event.stopImmediatePropagation();if(state.modal==='submit'&&document.getElementById('certifyCheck')?.checked&&!action.disabled)completeSubmission();return}const button=event.target.closest('[data-extra]');if(!button)return;switch(button.dataset.extra){case 'reset':if(!confirm('Reset your personal preferences? Attendance, notes and cover plans will be kept.'))return;workspace.settings={...workflowDefaults,...fixedTeacherSettings,theme:'Light',font:'Standard',landing:'home',contrast:false,motion:false,coverNotifications:true};state.prefs={showPortraits:true,showHints:true};persist();break;case 'deleteLink':workspace.links=workspace.links.filter(item=>item.id!==button.dataset.id);break;case 'deleteCover':workspace.coverPlans=workspace.coverPlans.filter(item=>item.id!==button.dataset.id);recordAudit('Cover removed',button.dataset.id);break;case 'correct':{const key=button.dataset.id;if(!state.submitted[key])return;const reason=prompt('Reason for reopening this roll:');if(!reason?.trim())return;const [date,id]=key.split('|'),old=state.submitted[key];delete state.submitted[key];if(!persist()){state.submitted[key]=old;return}recordAudit('Roll reopened',key+' · '+reason.trim()+' · previous marks '+JSON.stringify(state.marks[key]||{}));state.date=date;openClass(id);return}}saveWorkspace();render()},true);
 document.addEventListener('submit',event=>{if(!event.target.id.startsWith('extra-'))return;event.preventDefault();const values=Object.fromEntries(new FormData(event.target));if(event.target.id==='extra-link'){try{const url=new URL(values.url);if(!['http:','https:'].includes(url.protocol))throw Error();workspace.links.push({...values,url:url.href,id:crypto.randomUUID()})}catch{showToast('Enter an http or https web address');return}}else{workspace.coverPlans.push({...values,id:crypto.randomUUID()});recordAudit('Cover allocation saved',values.date+' · '+values.classId)}saveWorkspace();render()});
@@ -1705,7 +1705,7 @@ const demoStaffSeed=[
 ];
 let previewStaff=demoStaffSeed.map(x=>({...x})),previewAudit=[],adminPage='dashboard',adminQuery='',adminFilter='all',adminFaculty='',adminEdit=null,adminMessage='';
 try{const saved=JSON.parse(localStorage.getItem(ADMIN_PREVIEW_KEY)||'null');if(Array.isArray(saved?.staff)&&Array.isArray(saved?.audit)){previewStaff=saved.staff;previewAudit=saved.audit}}catch{}
-const adminSections=[['SCHOOL MANAGEMENT',[['dashboard','Dashboard','house'],['staff','Staff Management','users'],['students','Student Management','users'],['classes','Class Management','clipboard-check'],['timetable','Timetable Management','calendar-days'],['master','Master Timetable','calendar-days']]],['OPERATIONS',[['attendance','Attendance Overview','clipboard-check'],['movements','Student Movements','arrow-left-right'],['student-actions','Student Actions','clipboard-check'],['teacher-modules','Teacher Modules & Calendar','settings']]],['SYSTEM',[['roles','Roles & Permissions','settings'],['accounts','Account Management','users'],['security','Security Audit','clipboard-check'],['data','Data Management','list-filter'],['oneschool','OneSchool Import Centre','list-filter'],['audit','Activity History','clipboard-check']]]];
+const adminSections=[['SCHOOL MANAGEMENT',[['dashboard','Dashboard','house'],['staff','Staff Management','users'],['students','Student Management','users'],['classes','Class Management','clipboard-check'],['timetable','Timetable Management','calendar-days'],['master','Master Timetable','calendar-days']]],['OPERATIONS',[['attendance','Attendance Overview','clipboard-check'],['movements','Student Movements','arrow-left-right'],['student-actions','Student Actions','clipboard-check'],['teacher-modules','Teacher Modules','settings']]],['SYSTEM',[['roles','Roles & Permissions','settings'],['accounts','Account Management','users'],['security','Security Audit','clipboard-check'],['data','Data Management','list-filter'],['oneschool','OneSchool Import Centre','list-filter'],['audit','Activity History','clipboard-check']]]];
 function savePreview(action,subject){
  const event={at:new Date().toISOString(),action,subject};
  previewAudit.unshift(event);previewAudit=previewAudit.slice(0,250);
@@ -2947,7 +2947,7 @@ const rfModuleDefs=[
  ['follow-ups','list-filter','My Follow-ups'],
  ['seating-plans','clipboard-check','Seating Plans'],
  ['class-lists','users','Class Lists'],
- ['school-calendar','calendar-days','School Calendar']
+ 
 ];
 const RF_MODULE_VISIBILITY='rollflow_module_visibility_v1',RF_CALENDAR_KEY='rollflow_calendar_v1';
 const rfModuleActor=()=>demoTeacherUsername;
@@ -3177,8 +3177,8 @@ function rfModuleCalendar(){
  return shell('<div class="rf-module-root">'+rfModulePanel('School calendar',controls+grid)+rfModulePanel('Events',events.map(e=>'<article class="rf-module-task"><div><strong>'+esc(e.title)+'</strong><small>'+esc(e.date+(e.time?' · '+e.time:'')+' · '+e.category)+'</small><small>'+esc(e.notes||'')+'</small></div></article>').join('')||rfModuleEmpty('No school events recorded this month.'))+'</div>','School Calendar','','');
 }
 function rfModuleAdmin(){
- const hidden=rfReadStudentLocal(RF_MODULE_VISIBILITY,[]),events=rfCalendarEvents().slice().sort((a,b)=>a.date.localeCompare(b.date));
- return '<section class="v31-panel"><h2>Teacher menu visibility</h2><div class="rf-admin-action-list">'+rfModuleDefs.map(([id,,name])=>'<article><strong>'+esc(name)+'</strong><button class="v31-btn" data-rf-module-toggle="'+id+'">'+(hidden.includes(id)?'Enable':'Hide')+'</button></article>').join('')+'</div></section><section class="v31-panel"><h2>School calendar</h2><form id="rf-calendar-admin" class="v31-form"><label>Event title<input name="title" required maxlength="100"></label><label>Date<input name="date" type="date" required value="'+brisbaneToday()+'"></label><label>Time (optional)<input type="time" name="time"></label><label>Category<select name="category">'+rfModuleOptions(['Assembly','Excursion','Assessment','School event','Closure','Other'].map(x=>[x,x]),'School event')+'</select></label><label>Details<textarea name="notes" maxlength="500" rows="2"></textarea></label><div class="v31-form-actions"><button class="v31-btn primary">Add event</button></div></form><div class="rf-admin-action-list">'+events.map(e=>'<article><div><strong>'+esc(e.title)+'</strong><small>'+esc(e.date+' · '+e.category)+'</small></div><button class="v31-btn" data-rf-calendar-delete="'+esc(e.id)+'">Remove</button></article>').join('')+'</div></section>';
+ const hidden=rfReadStudentLocal(RF_MODULE_VISIBILITY,[]);
+ return '<section class="v31-panel"><h2>Teacher menu visibility</h2><div class="rf-admin-action-list">'+rfModuleDefs.map(([id,,name])=>'<article><strong>'+esc(name)+'</strong><button class="v31-btn" data-rf-module-toggle="'+id+'">'+(hidden.includes(id)?'Enable':'Hide')+'</button></article>').join('')+'</div></section>';
 }
 function rfModuleActionPicker(p,support=false){
  const actions=rfStudentActions().filter(a=>a.active&&a.kind==='incident'&&(support?!!a.refer:!a.refer));
@@ -3485,7 +3485,7 @@ window.addEventListener('resize',rfPortalResize,{passive:true});
 
 const RFU_ACCOUNT_KEY='rollflow_unified_accounts_v1',RFU_DATA_KEY='rollflow_unified_records_v1',RFU_AUDIT_KEY='rollflow_unified_audit_v1';
 const RFU_MODULES=[
- ['dashboard','Dashboard','house','WORKSPACE'],['schedule','My Daily Schedule','calendar-days','WORKSPACE'],['master','Master Timetable','calendar-days','WORKSPACE'],['classes','Class Finder','list-filter','WORKSPACE'],['students','Student Search','search','WORKSPACE'],['staff','Staff Directory','users','WORKSPACE'],['attendance','Attendance Overview','clipboard-check','STUDENT MANAGEMENT'],['movements','Student Movements','arrow-left-right','STUDENT MANAGEMENT'],['observations','Learning Observations','clipboard-check','STUDENT MANAGEMENT'],['tasks','Learning Support Tasks','list-filter','STUDENT MANAGEMENT'],['referrals','Student Referrals','users','STUDENT MANAGEMENT'],['followups','Follow-ups','list-filter','STUDENT MANAGEMENT'],['approvals','Attendance Review','clipboard-check','STUDENT MANAGEMENT'],['workforce','Workforce Allocations','users','OPERATIONS'],['availability','Staff Availability','calendar-days','OPERATIONS'],['relief','Relief Management','calendar-days','OPERATIONS'],['supervision','Supervision Schedule','calendar-days','OPERATIONS'],['calendar','School Calendar','calendar-days','OPERATIONS'],['department','Department Overview','clipboard-check','REPORTING'],['yearlevel','Year Level Overview','clipboard-check','REPORTING'],['reports','School Reports','clipboard-check','REPORTING'],['accounts','Account Management','users','SYSTEM'],['security','Security Audit','settings','SYSTEM'],['timetable','Timetable Management','calendar-days','SYSTEM'],['imports','OneSchool Imports','list-filter','SYSTEM'],['settings','System Settings','settings','SYSTEM']
+ ['dashboard','Dashboard','house','WORKSPACE'],['schedule','My Daily Schedule','calendar-days','WORKSPACE'],['master','Master Timetable','calendar-days','WORKSPACE'],['classes','Class Finder','list-filter','WORKSPACE'],['students','Student Search','search','WORKSPACE'],['staff','Staff Directory','users','WORKSPACE'],['attendance','Attendance Overview','clipboard-check','STUDENT MANAGEMENT'],['movements','Student Movements','arrow-left-right','STUDENT MANAGEMENT'],['observations','Learning Observations','clipboard-check','STUDENT MANAGEMENT'],['tasks','Learning Support Tasks','list-filter','STUDENT MANAGEMENT'],['referrals','Student Referrals','users','STUDENT MANAGEMENT'],['followups','Follow-ups','list-filter','STUDENT MANAGEMENT'],['approvals','Attendance Review','clipboard-check','STUDENT MANAGEMENT'],['workforce','Workforce Allocations','users','OPERATIONS'],['availability','Staff Availability','calendar-days','OPERATIONS'],['relief','Relief Management','calendar-days','OPERATIONS'],['supervision','Supervision Schedule','calendar-days','OPERATIONS'],['calendar','Scheduling exceptions','calendar-days','OPERATIONS'],['department','Department Overview','clipboard-check','REPORTING'],['yearlevel','Year Level Overview','clipboard-check','REPORTING'],['reports','School Reports','clipboard-check','REPORTING'],['accounts','Account Management','users','SYSTEM'],['security','Security Audit','settings','SYSTEM'],['timetable','Timetable Management','calendar-days','SYSTEM'],['imports','OneSchool Imports','list-filter','SYSTEM'],['settings','System Settings','settings','SYSTEM']
 ];
 let rfuPage='dashboard',rfuQuery='',rfuEditAccount='',rfuRolePreview='aide',rfuMessage='',rfuTeacherExtra=false;
 // Initialise temporary relief access once, rather than silently renewing it on every sign-in.
@@ -3618,12 +3618,12 @@ function rfuContent(){
  if(rfuPage==='schedule')return rfuSchedule();
  if(['attendance','department','yearlevel','reports'].includes(rfuPage))return rfuAttendance(rfuPage);
  if(rfuPage==='movements')return rfuMovements();
- if(rfuPage==='calendar')return rfuCalendar();
+ if(rfuPage==='calendar')return rfuPanel('Scheduling information','<p>Scheduling exceptions are available in existing timetable and operational workspaces.</p>');
  if(['accounts','security','timetable','imports','settings'].includes(rfuPage))return rfuPanel('Protected administration',rfuEmpty('This technical workflow remains available through the administrator training identity. No production access is granted by this demo.'));
  return rfuRecordsPage(rfuPage);
 }
 function rfuWorkspace(){
- const actor=rfuIdentity(rfuActor),allowed=RFU_MODULES.filter(m=>rfuCan(m[0]));
+ const actor=rfuIdentity(rfuActor),allowed=RFU_MODULES.filter(m=>m[0]!=='calendar'&&rfuCan(m[0]));
  if(!allowed.some(m=>m[0]===rfuPage)&&rfuPage!=='dashboard')rfuPage='dashboard';
  const groups=[...new Set(allowed.map(m=>m[3]))],nav=groups.map(group=>'<div class="nav-group-label">'+esc(group)+'</div>'+allowed.filter(m=>m[3]===group).map(([id,label,icon])=>'<button type="button" class="nav-item '+(id===rfuPage?'active':'')+'" data-rfu-page="'+id+'" '+(id===rfuPage?'aria-current="page"':'')+'><span class="nav-icon">'+navSvg(icon)+'</span><span class="nav-text">'+esc(label)+'</span></button>').join('')).join('');
  const role=rfuRoleText(),name=actor?.name||'Training user',initials=name.split(' ').map(x=>x[0]).slice(0,2).join(''),title=RFU_MODULES.find(m=>m[0]===rfuPage)?.[1]||'Dashboard';
@@ -3647,7 +3647,7 @@ document.addEventListener('click',e=>{
  if(demoRole==='admin'&&account&&adminPage==='accounts'){e.preventDefault();e.stopImmediatePropagation();rfuEditAccount=account.dataset.rfuAccount;render();return}
  if(demoRole==='teacher'&&page&&['observations','supervision','referrals'].includes(page.dataset.rfuPage)&&rfuCan(page.dataset.rfuPage)){e.preventDefault();e.stopImmediatePropagation();rfuTeacherExtra=true;rfuPage=page.dataset.rfuPage;rfuQuery='';rfuMessage='';render();return}
  if(demoRole!=='staff'&&!(demoRole==='teacher'&&rfuTeacherExtra))return;
- if(page){e.preventDefault();e.stopImmediatePropagation();const id=page.dataset.rfuPage;if(id!=='dashboard'&&!rfuCan(id))return;rfuPage=id;rfuQuery='';rfuMessage='';if(id==='master')rfMasterReset();render();return}
+ if(page){e.preventDefault();e.stopImmediatePropagation();const id=page.dataset.rfuPage;if(id==='calendar'||id!=='dashboard'&&!rfuCan(id))return;rfuPage=id;rfuQuery='';rfuMessage='';if(id==='master')rfMasterReset();render();return}
  if(theme){e.preventDefault();e.stopImmediatePropagation();rfAdminDark=!rfAdminDark;try{localStorage.setItem('rollflow_admin_theme',rfAdminDark?'dark':'light')}catch{}render();return}
  if(change){e.preventDefault();e.stopImmediatePropagation();const rows=rfuRecords(),r=rows.find(r=>r.id===change.dataset.rfuChange&&r.module===rfuPage);if(!r||!rfuCanChange(rfuPage,r))return;const status=rfuPage==='approvals'?(rfuRecordAllowed(rfuPage,r,rfuActor,['approve'])?'Approved':'Reviewed'):rfuPage==='relief'?'Allocated':rfuPage==='referrals'?'Reviewed':'Complete';if(rfuWrite(RFU_DATA_KEY,rows.map(x=>x.id===r.id?{...x,status}:x))){rfuAudit('Updated '+rfuPage,r.id);rfuMessage='Demo record updated.'}render()}
 },true);
@@ -3677,7 +3677,7 @@ render=function(){
   app.classList.remove('demo-auth-active');document.body.dataset.theme=workspace.settings.theme;
   const title=RFU_MODULES.find(m=>m[0]===rfuPage)?.[1]||'Support';
   app.innerHTML=shell('<div class="rf-admin-modern rfu-teacher-extra">'+(rfuMessage?'<p class="v31-message" role="status">'+esc(rfuMessage)+'</p>':'')+rfuContent()+'</div>',esc(title),'Assigned students and duties','');
-  const primary=app.querySelector('.nav-primary');if(primary){primary.innerHTML=[['TEACHING',['timetable','master','finder','search','attendance-overview']],['STUDENT MANAGEMENT',['movements','classroom-management','seating-plans','class-lists','student-support']],['PLANNING',['follow-ups','school-calendar','alerts']]].map(([label,ids])=>'<div class="nav-group-label">'+label+'</div>'+ids.filter(id=>rfModuleVisible(id)).map(id=>sideButton(navPrimary.find(x=>x[0]===id))).join('')).join('')+rfuTeacherButtons(rfuPage);primary.querySelectorAll('[data-nav].active').forEach(x=>{x.classList.remove('active');x.removeAttribute('aria-current')})}
+  const primary=app.querySelector('.nav-primary');if(primary){primary.innerHTML=[['TEACHING',['timetable','master','finder','search','attendance-overview']],['STUDENT MANAGEMENT',['movements','classroom-management','seating-plans','class-lists','student-support']],['PLANNING',['follow-ups','alerts']]].map(([label,ids])=>'<div class="nav-group-label">'+label+'</div>'+ids.filter(id=>rfModuleVisible(id)).map(id=>sideButton(navPrimary.find(x=>x[0]===id))).join('')).join('')+rfuTeacherButtons(rfuPage);primary.querySelectorAll('[data-nav].active').forEach(x=>{x.classList.remove('active');x.removeAttribute('aria-current')})}
   const utility=app.querySelector('.nav-utility');utility?.insertAdjacentHTML('beforeend','<button type="button" class="nav-item" data-demo-signout><span class="nav-icon">↪</span><span class="nav-text">Sign out</span></button>');
   app.querySelectorAll('.top-user > span,.profile-text b').forEach(el=>el.textContent=workspace.profile.name);app.querySelectorAll('.profile-avatar,.circle-user').forEach(el=>el.textContent=teacherInitials(workspace.profile));rfKeepPortalNavVisible();return;
  }
@@ -3719,7 +3719,7 @@ function rfCompactGroups(kind,ids,roles=[]){
  let defs;
  if(kind==='teacher'){
   defs=[
-   group('TEACHING','Daily Schedule','timetable','school-calendar','supervision'),
+   group('TEACHING','Daily Schedule','timetable','supervision'),
    group('TEACHING','Master Timetable','master'),
    group('TEACHING','Class Finder','finder','classroom-management','seating-plans','class-lists'),
    group('TEACHING','Student Search','search'),
@@ -3744,9 +3744,8 @@ function rfCompactGroups(kind,ids,roles=[]){
   const leader=roles.some(r=>['principal','deputy','ylc','office'].includes(r));
   const faculty=roles.includes('hod')&&!roles.some(r=>['principal','deputy','business','office'].includes(r));
   const schedule=has('schedule'),workforce=has('workforce'),master=has('master');
-  const attachCalendar=workforce?'workforce':schedule?'schedule':master?'master':'dashboard';
   const attachSupervision=workforce?'workforce':schedule?'schedule':master?'master':'dashboard';
-  const extras=id=>[...(attachCalendar===id?['calendar']:[]),...(attachSupervision===id?['supervision']:[])];
+  const extras=id=>attachSupervision===id?['supervision']:[];
   const approvalInSchedule=schedule&&!has('attendance');
   defs=[
    ...(schedule?[group('WORKSPACE','Daily Schedule','schedule','dashboard',...extras('schedule'),...(approvalInSchedule?['approvals']:[]))]:[group('WORKSPACE','Dashboard','dashboard',...extras('dashboard'))]),
@@ -3774,7 +3773,7 @@ function rfCompactGroups(kind,ids,roles=[]){
   if(routes.length)result.push({...g,routes});
  }
  // Future modules and unusual role combinations must not lose any authorised route.
- for(const id of ids)if(!seen.has(id)&&!(kind==='teacher'&&id==='alerts'))result.push(group('OTHER',null,id));
+ for(const id of ids)if(!seen.has(id)&&!['calendar','school-calendar'].includes(id)&&!(kind==='teacher'&&id==='alerts'))result.push(group('OTHER',null,id));
  return result;
 }
 function rfCompactNavigation(){
@@ -3863,7 +3862,7 @@ function rfPersonalSave(p){
 function rfPersonalHomeOptions(){
  const opts=[['default','Default workspace']];
  if(demoRole==='admin')return [...opts,...adminSections.flatMap(x=>x[1]).map(([id,label])=>[id,label])];
- return [...opts,...RFU_MODULES.filter(m=>rfuCan(m[0])).map(([id,label])=>[id,label])];
+ return [...opts,...RFU_MODULES.filter(m=>m[0]!=='calendar'&&rfuCan(m[0])).map(([id,label])=>[id,label])];
 }
 function rfPersonalOpen(id){
  if(!['admin','staff'].includes(demoRole)||!['profile','preferences','help'].includes(id))return;
@@ -3890,7 +3889,7 @@ function rfPersonalPreferences(){
 }
 function rfPersonalHelp(){
  const faq=(q,a)=>'<details><summary>'+esc(q)+'</summary><p>'+esc(a)+'</p></details>';
- const modules=demoRole==='admin'?adminSections.flatMap(x=>x[1]).map(([id,label])=>({id,label,attr:'data-admin-page'})):RFU_MODULES.filter(m=>rfuCan(m[0])).map(([id,label])=>({id,label,attr:'data-rfu-page'}));
+ const modules=demoRole==='admin'?adminSections.flatMap(x=>x[1]).map(([id,label])=>({id,label,attr:'data-admin-page'})):RFU_MODULES.filter(m=>m[0]!=='calendar'&&rfuCan(m[0])).map(([id,label])=>({id,label,attr:'data-rfu-page'}));
  const shortcuts=rfCompactGroups(demoRole==='admin'?'admin':'staff',modules.map(m=>m.id),demoRole==='staff'?rfuConfig().roles:[]);
  const categories=[...new Set(shortcuts.map(g=>g.section))];
  const groups=[
@@ -4174,8 +4173,8 @@ rfuDashboard=function(){
  const today=brisbaneToday(),modules=['approvals','referrals','followups','tasks','relief','supervision','workforce'].filter(id=>rfuCan(id)),queues=modules.map(id=>({id,label:RFU_MODULES.find(m=>m[0]===id)[1],rows:rfuRows(id).filter(r=>['Open','Awaiting review','In review','Allocated'].includes(r.status))}));
  const metrics=queues.slice(0,4).map(q=>[q.rows.length,q.label]);if(!metrics.length)metrics.push([rfuCan('students')?rfuStudents('students').length:0,'Authorised students']);
  const tasks=queues.filter(q=>q.rows.length).map(q=>'<section class="sheet rf-module-panel"><div class="sheet-head">'+esc(q.label)+'</div><div class="rf-module-body">'+rfUnifiedRecordList(q.id,q.rows.slice(0,3),false)+rfUnifiedButton('Open '+q.label.toLowerCase(),'data-rfu-page="'+q.id+'"')+'</div></section>').join('');
- const events=rfuCan('calendar')?rfCalendarEvents().filter(e=>e.date>=today).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,4):[];
- return rfUnifiedRoot('<section class="sheet day-schedule"><div class="day-panel-heading"><h2>'+esc(rfUnifiedDate(today))+'</h2><p>'+esc(rfuRoleText())+' · Your work at a glance</p></div></section>'+rfUnifiedMetrics(metrics)+(tasks||rfUnifiedPanel('Outstanding work',rfUnifiedEmpty('No outstanding items in your assigned workspaces.')))+(rfuCan('calendar')?rfUnifiedPanel('Upcoming school events',events.length?events.map(e=>'<article class="rf-module-task"><div><strong>'+esc(e.title)+'</strong><small>'+esc(e.date+' · '+e.category)+'</small></div></article>').join(''):rfUnifiedEmpty('No upcoming school events.')):''));
+ 
+ return rfUnifiedRoot('<section class="sheet day-schedule"><div class="day-panel-heading"><h2>'+esc(rfUnifiedDate(today))+'</h2><p>'+esc(rfuRoleText())+' · Your work at a glance</p></div></section>'+rfUnifiedMetrics(metrics)+(tasks||rfUnifiedPanel('Outstanding work',rfUnifiedEmpty('No outstanding items in your assigned workspaces.'))));
 };
 const rfUnifiedStyle=document.createElement('style');
 rfUnifiedStyle.textContent=`
@@ -4298,6 +4297,83 @@ window.addEventListener('click',e=>{
 },true);
 const rfFinishingRender=render;
 render=function(){rfFinishingRender();rfPlaceAccountHeader()};
+
+
+/* Scheduling exceptions are contextual notices, not a general-purpose calendar.
+   The existing browser-local records and permission key remain intact. */
+const RF_SCHEDULE_TYPES=['Public holiday','Term dates','Pupil-free day','School closure','Timetable disruption','Assembly','Excursion','Staff coverage'];
+function rfScheduleExceptions(){
+ const legacy={Closure:'School closure',Assembly:'Assembly',Excursion:'Excursion'};
+ return rfCalendarEvents().filter(e=>e&&studentDateValid(e.date)&&e.date&&(RF_SCHEDULE_TYPES.includes(e.category)||legacy[e.category])).map(e=>({...e,category:legacy[e.category]||e.category,end:studentDateValid(e.end)&&e.end>=e.date?e.end:e.date,impact:e.impact||(['Closure','Public holiday','Pupil-free day','School closure'].includes(e.category)?'non-teaching':['Excursion','Staff coverage'].includes(e.category)?'coverage':'timetable')})).sort((a,b)=>a.date.localeCompare(b.date)||(a.time||'').localeCompare(b.time||''));
+}
+function rfScheduleAllowed(manage=false){
+ if(demoRole==='admin')return true;
+ if(!['teacher','staff'].includes(demoRole))return false;
+ return rfuCan('calendar',manage?['manage']:null);
+}
+function rfScheduleHost(){
+ if(demoRole==='admin')return adminPage==='timetable';
+ if(demoRole!=='staff')return false;
+ const target=['master','workforce','schedule','dashboard'].find(id=>rfuCan(id));
+ return rfuPage===target;
+}
+function rfScheduleRange(from,to,context){
+ return rfScheduleExceptions().filter(e=>e.date<=to&&e.end>=from&&(context==='staff'?['coverage','non-teaching','timetable'].includes(e.impact):context==='attendance'?['non-teaching','term'].includes(e.impact):true));
+}
+function rfScheduleDateLabel(e){return e.date+(e.end!==e.date?' – '+e.end:'')+(e.time?' · '+e.time:'')}
+function rfScheduleImpactLabel(impact){return ({'non-teaching':'Non-teaching day','term':'Term dates','coverage':'Staff coverage','timetable':'Lesson disruption'})[impact]||'Scheduling information'}
+function rfScheduleNotice(rows){
+ if(!rows.length)return '';
+ return '<section class="rf-scheduling-notices sheet" aria-label="Scheduling exceptions"><div class="sheet-head">Scheduling exceptions</div><div class="rf-scheduling-list">'+rows.map(e=>'<article><div><strong>'+esc(e.title)+'</strong><small>'+esc(rfScheduleDateLabel(e))+' · '+esc(e.category)+'</small>'+(e.notes&&e.notes!=='Fictional demo event'?'<small>'+esc(e.notes)+'</small>':'')+'</div><span class="rf-unified-badge '+(e.impact==='non-teaching'?'watch':'')+'">'+esc(rfScheduleImpactLabel(e.impact))+'</span></article>').join('')+'</div><p class="rf-scheduling-note">Planning notices only. Check the published timetable before changing lessons, coverage or attendance.</p></section>';
+}
+function rfScheduleManagePanel(){
+ const today=brisbaneToday(),rows=rfScheduleExceptions(),active=rows.filter(e=>e.end>=today),past=rows.filter(e=>e.end<today).reverse();
+ const list=items=>items.length?items.map(e=>'<article><div><strong>'+esc(e.title)+'</strong><small>'+esc(rfScheduleDateLabel(e))+' · '+esc(rfScheduleImpactLabel(e.impact))+'</small></div><button type="button" class="btn small" data-rf-exception-remove="'+esc(e.id)+'">Remove</button></article>').join(''):'<p class="quiet">No scheduling exceptions.</p>';
+ return '<details class="sheet rf-scheduling-manage"><summary class="sheet-head">Scheduling exceptions <span class="rf-unified-badge">'+active.length+' current / upcoming</span></summary><div class="rf-module-body"><p class="rf-scheduling-note">Record term dates, non-teaching days and events that affect lessons or staffing. Ordinary school events remain outside RollFlow. These notices do not automatically change published timetables, roll submissions or attendance calculations.</p><form id="rf-exception-form" class="rf-module-form"><label>Title<input name="title" maxlength="100" required placeholder="e.g. Pupil-free day"></label><label>Category<select name="category">'+planOpt(RF_SCHEDULE_TYPES.map(x=>[x,x]),'Timetable disruption')+'</select></label><label>Start date<input type="date" name="date" required value="'+today+'"></label><label>End date (optional)<input type="date" name="end" min="'+today+'"></label><label>Time (optional)<input type="time" name="time"></label><label>Operational impact<select name="impact">'+planOpt([['timetable','Lesson disruption'],['coverage','Staff coverage'],['non-teaching','Non-teaching day'],['term','Term dates']],'timetable')+'</select></label><label class="rf-student-wide">Scheduling details<textarea name="notes" maxlength="500" rows="2" placeholder="Explain how lessons or staffing are affected."></textarea></label><div class="rf-student-wide"><button class="btn green" type="submit">Add scheduling exception</button></div><p class="rf-student-wide" role="status" data-rf-exception-message></p></form><div class="rf-scheduling-list">'+list(active)+'</div>'+(past.length?'<details><summary>Past exceptions ('+past.length+')</summary><div class="rf-scheduling-list">'+list(past)+'</div></details>':'')+'</div></details>';
+}
+let rfScheduleManagerOpen=false;
+document.addEventListener('toggle',e=>{if(e.target.matches?.('.rf-scheduling-manage'))rfScheduleManagerOpen=e.target.open},true);
+document.addEventListener('submit',e=>{
+ const f=e.target;if(f.id!=='rf-exception-form')return;e.preventDefault();e.stopImmediatePropagation();
+ if(!rfScheduleAllowed(true)||!rfScheduleHost())return;
+ const d=new FormData(f),title=String(d.get('title')||'').trim().slice(0,100),category=String(d.get('category')||''),date=String(d.get('date')||''),end=String(d.get('end')||date),time=String(d.get('time')||''),impact=String(d.get('impact')||''),notes=String(d.get('notes')||'').trim().slice(0,500);
+ const msg=f.querySelector('[data-rf-exception-message]');
+ if(!title||!RF_SCHEDULE_TYPES.includes(category)||!osDateValid(date)||!osDateValid(end)||end<date||time&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)||!['timetable','coverage','non-teaching','term'].includes(impact)){msg.textContent='Check the title, dates and scheduling impact.';return}
+ if(!rfuWrite(RF_CALENDAR_KEY,[...rfCalendarEvents(),{id:rfModuleId(),title,category,date,end,time,impact,notes}])){msg.textContent='Could not save in this browser.';return}
+ rfuAudit('Added scheduling exception',title);rfScheduleManagerOpen=true;render();
+},true);
+document.addEventListener('click',e=>{
+ const b=e.target.closest('[data-rf-exception-remove]');if(!b)return;e.preventDefault();e.stopImmediatePropagation();
+ if(!rfScheduleAllowed(true)||!rfScheduleHost()||!rfScheduleExceptions().some(x=>x.id===b.dataset.rfExceptionRemove))return;
+ if(confirm('Remove this scheduling exception?')&&rfuWrite(RF_CALENDAR_KEY,rfCalendarEvents().filter(x=>x.id!==b.dataset.rfExceptionRemove))){rfuAudit('Removed scheduling exception',b.dataset.rfExceptionRemove);rfScheduleManagerOpen=true;render()}
+},true);
+function rfScheduleContext(){
+ if(!rfScheduleAllowed()||typeof rfPersonalPage!=='undefined'&&rfPersonalPage)return;
+ const main=app.querySelector('.content-shell>main');if(!main)return;
+ const route=demoRole==='admin'?adminPage:demoRole==='teacher'&&!rfuTeacherExtra?state.page:rfuPage,today=brisbaneToday();
+ const schedule=['timetable','schedule'].includes(route),ops=['workforce','relief','availability','supervision'].includes(route),attendance=['attendance','attendance-overview','approvals'].includes(route),dashboard=route==='dashboard'&&demoRole==='staff'&&!rfuCan('schedule')&&!rfuCan('master');
+ if(schedule&&demoRole!=='admin'||ops||attendance||dashboard){
+  const date=demoRole==='teacher'?state.date||today:rfUnifiedState.date||today;
+  const week=schedule&&(demoRole==='teacher'?workspace.settings.timetableView==='week':rfUnifiedState.view==='week');
+  const monday=dateOffset(date,-((new Date(date+'T12:00:00Z').getUTCDay()+6)%7));
+  const from=week?monday:ops?today:date,to=week?dateOffset(monday,4):ops?dateOffset(today,14):date;
+  const html=rfScheduleNotice(rfScheduleRange(from,to,ops?'staff':attendance?'attendance':'schedule'));
+  if(html)main.insertAdjacentHTML('afterbegin',html);
+ }
+ if(rfScheduleAllowed(true)&&rfScheduleHost()){
+  main.insertAdjacentHTML(demoRole==='admin'?'afterbegin':'beforeend',rfScheduleManagePanel());
+  if(rfScheduleManagerOpen)main.querySelector('.rf-scheduling-manage').open=true;
+ }
+}
+const rfScheduleBeforeRender=render;
+render=function(){
+ if(demoRole==='teacher'&&state.page==='school-calendar')state.page='timetable';
+ if(demoRole==='staff'&&rfuPage==='calendar')rfuPage=rfuCan('schedule')?'schedule':rfuCan('master')?'master':'dashboard';
+ rfScheduleBeforeRender();rfScheduleContext();
+};
+const rfScheduleCSS=document.createElement('style');
+rfScheduleCSS.textContent='.rf-scheduling-notices,.rf-scheduling-manage{width:100%;min-width:0;max-width:100%;margin:0 0 12px;background:var(--rf-surface);color:var(--rf-text);border:1px solid var(--rf-border);border-radius:12px;flex:none}.rf-scheduling-manage>summary{cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}.rf-scheduling-list{padding:8px 16px;display:grid;gap:0}.rf-scheduling-list article{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--rf-border);min-width:0;flex-wrap:wrap}.rf-scheduling-list article:last-child{border:0}.rf-scheduling-list article>div{min-width:0;flex:1}.rf-scheduling-list small{display:block;color:var(--rf-muted);margin-top:4px;overflow-wrap:anywhere}.rf-scheduling-note{font-size:12px;color:var(--rf-muted);padding:8px 16px;line-height:1.5}.rf-scheduling-manage .rf-module-form{padding:12px 0}.rf-scheduling-manage .rf-module-form input,.rf-scheduling-manage .rf-module-form select,.rf-scheduling-manage .rf-module-form textarea{min-width:0;max-width:100%;background:var(--rf-surface);color:var(--rf-text);border:1px solid var(--rf-border);border-radius:6px;padding:8px}.rf-scheduling-manage .rf-module-body{padding:12px 16px}@media(max-width:700px){.rf-scheduling-manage .rf-module-form{grid-template-columns:1fr}}';
+document.head.appendChild(rfScheduleCSS);
 
 window.visualViewport?.addEventListener('resize',()=>requestAnimationFrame(fitGrid));
 window.addEventListener('resize',rfClearTimetableMorph);
