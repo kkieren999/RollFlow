@@ -3841,59 +3841,123 @@ function rfCompactNavigation(){
  rfKeepPortalNavVisible();
 }
 
-/* Personal account tools for every non-teacher access type. Teacher tools keep their existing routes. */
-const rfPersonalStyle=document.createElement('style');
-rfPersonalStyle.textContent=`
-.rf-personal-dialog{width:min(520px,calc(100vw - 32px));max-height:calc(100dvh - 40px);overflow:auto;padding:0;border:1px solid var(--rf-border,#d9e0e5);border-radius:12px;background:var(--rf-surface,#fff);color:var(--rf-text,#243a48);box-shadow:0 16px 48px #0004;font:inherit}
-.rf-personal-dialog::backdrop{background:#101d2c88}
-.rf-personal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 20px;border-bottom:1px solid var(--rf-border,#d9e0e5)}
-.rf-personal-head h2{font-size:20px;margin:0}
-.rf-personal-head button,.rf-personal-body button{border:1px solid var(--rf-border,#d9e0e5);border-radius:6px;background:var(--rf-surface,#fff);color:inherit;padding:8px 12px;min-height:36px;cursor:pointer}
-.rf-personal-body{padding:20px;display:grid;gap:15px;line-height:1.5}
-.rf-personal-body dl{margin:0;display:grid;grid-template-columns:minmax(100px,1fr) 2fr;gap:10px 14px}
-.rf-personal-body dt{font-weight:600}.rf-personal-body dd{margin:0;overflow-wrap:anywhere}
-.rf-personal-body label{display:grid;gap:6px;font-weight:600}
-.rf-personal-body select{background:var(--rf-surface,#fff);color:inherit;border:1px solid var(--rf-border,#d9e0e5);border-radius:6px;padding:9px;font:inherit}
-.rf-personal-body details{border-top:1px solid var(--rf-border,#d9e0e5);padding-top:10px}
-.rf-personal-body summary{cursor:pointer;font-weight:600}.rf-personal-body details p{margin:8px 0 0}
-.rf-personal-body .rf-personal-save{background:var(--school-primary,#168a38);color:var(--school-on-brand,#fff);border-color:transparent;justify-self:start;font-weight:600}
-`;
-document.head.appendChild(rfPersonalStyle);
+/* Shared full-page account tools use the teacher portal's layout and components. */
 const rfPersonalThemeKey=()=> 'rollflow_personal_theme_v1_'+rfuActor;
+const rfPersonalDataKey=()=> 'rollflow_personal_settings_v2_'+rfuActor;
+let rfPersonalPage='',rfPersonalEditing=false,rfPersonalStatus='';
+function rfPersonalData(){
+ const actor=rfuIdentity(rfuActor),defaults={name:actor?.name||'Workspace user',avatar:'',font:'Standard',contrast:false,motion:false,landing:'default'};
+ const saved=rfuRead(rfPersonalDataKey(),{});
+ return {...defaults,...saved,theme:rfAdminDark?'Dark':'Light'};
+}
+function rfPersonalSave(p){
+ const {theme,...rest}=p;
+ try{localStorage.setItem(rfPersonalDataKey(),JSON.stringify(rest));localStorage.setItem(rfPersonalThemeKey(),theme==='Dark'?'dark':'light');rfAdminDark=theme==='Dark';rfPersonalStatus='Saved automatically';return true}
+ catch{rfPersonalStatus='Could not save in this browser.';return false}
+}
+function rfPersonalHomeOptions(){
+ const opts=[['default','Default workspace']];
+ if(demoRole==='admin')return [...opts,...adminSections.flatMap(x=>x[1]).map(([id,label])=>[id,label])];
+ return [...opts,...RFU_MODULES.filter(m=>rfuCan(m[0])).map(([id,label])=>[id,label])];
+}
 function rfPersonalOpen(id){
  if(!['admin','staff'].includes(demoRole)||!['profile','preferences','help'].includes(id))return;
- document.querySelector('.rf-personal-dialog')?.remove();
- const actor=rfuIdentity(rfuActor),cfg=rfuConfig(),role=rfuRoleText(),titles={profile:'My Profile',preferences:'My Preferences',help:'Help & Support'};
- const dialog=document.createElement('dialog');dialog.className='rf-personal-dialog';dialog.setAttribute('aria-labelledby','rf-personal-title');
- const field=(label,value)=>'<dt>'+esc(label)+'</dt><dd>'+esc(value||'Not specified')+'</dd>';
- let body='';
- if(id==='profile'){
-  body='<dl>'+field('Name',actor?.name)+field('Username',actor?.id)+field('Access type',role)+field('Access expiry',cfg.expires||'No expiry')+'</dl><p>Your assigned roles and account access are managed by the workspace administrator.</p>';
- }else if(id==='preferences'){
-  body='<form id="rf-personal-preferences" class="rf-personal-body" style="padding:0"><label>Appearance<select name="theme"><option value="light" '+(!rfAdminDark?'selected':'')+'>Light mode</option><option value="dark" '+(rfAdminDark?'selected':'')+'>Dark mode</option></select></label><p>Your display preference is saved for this account in this browser.</p><button type="submit" class="rf-personal-save">Save preferences</button></form>';
- }else{
-  body='<p>Use the sidebar to open the workspaces assigned to your account. Related features are grouped into tabs at the top of each workspace.</p>'+
-  '<details open><summary>How do I return to my workspace?</summary><p>Select the RollFlow logo or a sidebar menu option.</p></details>'+
-  '<details><summary>Why can’t I see a menu or record?</summary><p>Access depends on your assigned roles, duties and account restrictions. Contact your workspace administrator if you need a change.</p></details>'+
-  '<details><summary>How do I change my display settings?</summary><p>Open the account menu and select My Preferences.</p></details>'+
-  '<details><summary>Who can help with access or technical issues?</summary><p>Contact your school IT support or workspace administrator. Do not share passwords or real student records in this public demonstration.</p></details>';
- }
- dialog.innerHTML='<div class="rf-personal-head"><h2 id="rf-personal-title">'+titles[id]+'</h2><button type="button" data-rf-personal-close aria-label="Close '+titles[id]+'">Close</button></div><div class="rf-personal-body">'+body+'</div>';
- app.append(dialog);
- dialog.querySelector('[data-rf-personal-close]').addEventListener('click',()=>dialog.close());
- dialog.addEventListener('close',()=>{dialog.remove();app.querySelector('.rf-compact-account summary')?.focus()},{once:true});
- dialog.querySelector('form')?.addEventListener('submit',e=>{
-  e.preventDefault();const theme=new FormData(e.currentTarget).get('theme');if(!['light','dark'].includes(theme))return;
-  try{localStorage.setItem(rfPersonalThemeKey(),theme)}catch{const p=dialog.querySelector('form p');p.textContent='This browser could not save your preference.';return}
-  rfAdminDark=theme==='dark';dialog.close();render();app.querySelector('.rf-compact-account summary')?.focus();
- });
- dialog.showModal();dialog.querySelector('[data-rf-personal-close]')?.focus();
+ rfPersonalPage=id;rfPersonalEditing=false;rfPersonalStatus='';render();
+ const title=app.querySelector('.page-bar h1');if(title){title.tabIndex=-1;title.focus({preventScroll:true})}
 }
-document.addEventListener('click',e=>{
- const b=e.target.closest('[data-rf-personal]');if(!b||!['admin','staff'].includes(demoRole))return;
- e.preventDefault();e.stopImmediatePropagation();const menu=b.closest('details');if(menu)menu.open=false;rfPersonalOpen(b.dataset.rfPersonal);
+function rfPersonalProfile(){
+ const p=rfPersonalData(),actor=rfuIdentity(rfuActor),cfg=rfuConfig(),role=rfuRoleText();
+ const initials=teacherInitials(p);
+ const personal=rfPersonalEditing?'<div class="teacher-profile-fields"><label class="teacher-profile-field"><span>Display name</span><input name="name" value="'+esc(p.name)+'" maxlength="80" required><small>The name shown in your workspace.</small></label><label class="teacher-profile-field"><span>Avatar initials</span><input name="avatar" value="'+esc(p.avatar)+'" maxlength="4"><small>Leave blank for automatic initials.</small></label></div>':'<dl class="teacher-profile-details">'+profileDetail('Display name',p.name)+profileDetail('Avatar initials',initials)+'</dl>';
+ const account='<dl class="teacher-profile-details">'+profileDetail('Account name',actor?.name)+profileDetail('Username',actor?.id)+profileDetail('Assigned roles',role)+profileDetail('School or campus','Rivergum State High School')+profileDetail('Access expiry',cfg.expires||'No expiry')+'</dl>';
+ const sections=profileSection('Personal details','How you appear in your workspace.',personal)+profileSection('Account information','Your assigned roles and school information are managed by the workspace administrator.',account);
+ return '<div class="teacher-profile-page"><section class="teacher-profile-hero"><div class="teacher-profile-brand-strip" aria-hidden="true"></div><div class="teacher-profile-identity"><div class="teacher-profile-avatar" aria-hidden="true">'+esc(initials)+'</div><div class="teacher-profile-title"><h2>'+esc(p.name)+'</h2><p>'+esc(role)+'</p><span>Rivergum State High School</span></div>'+(rfPersonalEditing?'':'<button type="button" class="btn teacher-profile-edit" data-rf-personal-edit><span aria-hidden="true">✎</span> Edit profile</button>')+'</div></section>'+
+ (rfPersonalEditing?'<form id="rf-personal-profile-form" class="teacher-profile-form">'+sections+'<div class="teacher-profile-controls"><button type="button" class="btn" data-rf-personal-cancel>Cancel</button><button type="submit" class="btn green">Save changes</button></div></form>':sections)+
+ (rfPersonalStatus?'<p role="status">'+esc(rfPersonalStatus)+'</p>':'')+'<div class="teacher-profile-note"><div><strong>Personalise your workspace</strong></div><button type="button" class="btn" data-rf-personal="preferences">My Preferences ›</button></div></div>';
+}
+function rfPersonalPreferences(){
+ const p=rfPersonalData();
+ const select=(key,label,description,choices)=>'<label class="pref-row"><span class="pref-copy"><strong>'+esc(label)+'</strong><small>'+esc(description)+'</small></span><select data-rf-personal-setting="'+key+'">'+choices.map(([value,title])=>'<option value="'+esc(value)+'" '+(p[key]===value?'selected':'')+'>'+esc(title)+'</option>').join('')+'</select></label>';
+ const toggle=(key,label,description)=>'<label class="pref-row"><span class="pref-copy"><strong>'+esc(label)+'</strong><small>'+esc(description)+'</small></span><input type="checkbox" data-rf-personal-setting="'+key+'" '+(p[key]?'checked':'')+'></label>';
+ const display=preferenceSection('Appearance & accessibility','Choose a comfortable way to use RollFlow.','settings',select('theme','Colour theme','Choose a light or dark workspace.',[['Light','Light'],['Dark','Dark']])+select('font','Text size','Make text easier to read.',[['Standard','Standard'],['Large','Large']])+toggle('contrast','High contrast','Use stronger outlines and clearer text.')+toggle('motion','Reduce animation','Minimise interface movement.'));
+ const workspaceSettings=preferenceSection('Workspace','Set up your everyday work routine.','calendar-days',select('landing','Start RollFlow on','Choose which authorised workspace opens when you sign in.',rfPersonalHomeOptions()));
+ return '<div class="preferences-clean"><div class="pref-intro"><div><h2>Settings</h2></div><span class="pref-saved" role="status">'+esc(rfPersonalStatus||'Saved automatically')+'</span></div>'+display+workspaceSettings+'<div class="pref-foot"><p>Resetting preferences keeps saved records and profile details.</p><button type="button" class="btn" data-rf-personal-reset>Reset to defaults</button></div></div>';
+}
+function rfPersonalHelp(){
+ const faq=(q,a)=>'<details><summary>'+esc(q)+'</summary><p>'+esc(a)+'</p></details>';
+ const modules=demoRole==='admin'?adminSections.flatMap(x=>x[1]).map(([id,label])=>({id,label,attr:'data-admin-page'})):RFU_MODULES.filter(m=>rfuCan(m[0])).map(([id,label])=>({id,label,attr:'data-rfu-page'}));
+ const groups=[
+ ['Getting started','Use the sidebar to open your workspaces. Related features are grouped into tabs.'],
+ ['Your account','Open the account menu to view your profile, change preferences or sign out.'],
+ ['Access & support','If a workspace or record is unavailable, check your assigned responsibilities with your administrator.']
+ ];
+ const steps='<div class="help-steps">'+groups.map(([title,desc],i)=>'<div><span class="help-bubble">'+(i+1)+'</span><strong>'+esc(title)+'</strong><p>'+esc(desc)+'</p></div>').join('')+'</div>';
+ return '<div class="rf-personal-help"><div class="section-intro"><h2>Using RollFlow</h2><p>Quick help for your '+esc(rfuRoleText())+' workspace.</p></div><section class="sheet"><div class="sheet-head">GETTING STARTED</div>'+steps+'</section><section class="sheet help-second"><div class="sheet-head">QUESTIONS</div>'+
+ faq('How do I return to my workspace?','Select the RollFlow logo or a sidebar menu option.')+
+ faq('How do I find related features?','Open a sidebar workspace and use the tabs above its content.')+
+ faq('Why can’t I see a menu or record?','Access is determined by your assigned roles, duties, scope and account restrictions.')+
+ faq('How do I change my display settings?','Open your account menu and select My Preferences. Changes are saved in this browser.')+
+ faq('Who can help with access or technical issues?','Contact your school IT support or workspace administrator. Do not share passwords or real student records in this public demonstration.')+
+ '</section><section class="sheet"><div class="sheet-head">YOUR AVAILABLE WORKSPACES</div><div class="rf-personal-help-links">'+modules.map(m=>'<button class="btn" type="button" '+m.attr+'="'+esc(m.id)+'">'+esc(m.label)+' ›</button>').join('')+'</div></section></div>';
+}
+function rfPersonalApply(){
+ if(!['admin','staff'].includes(demoRole))return;
+ const p=rfPersonalData(),content=app.querySelector('.content-shell'),main=content?.querySelector('main');
+ document.body.classList.toggle('v2-large',p.font==='Large');
+ document.body.classList.toggle('v2-contrast',p.contrast===true);
+ document.body.classList.toggle('v2-motion',p.motion===true);
+ if(!main)return;
+ const top=content.querySelector('.top-user > span');if(top)top.textContent=p.name;
+ const avatar=content.querySelector('.circle-user');if(avatar){avatar.textContent=teacherInitials(p);avatar.title=p.name}
+ if(!rfPersonalPage)return;
+ const titles={profile:['My Profile','Your account information'],preferences:['My Preferences','Personalise your workspace'],help:['Help & Support','Guidance and troubleshooting']};
+ const [title,sub]=titles[rfPersonalPage];
+ content.querySelector('.rf-compact-tabs')?.remove();
+ const h=content.querySelector('.page-bar h1');if(h)h.textContent=title;
+ const context=content.querySelector('.page-sub');if(context)context.textContent=sub;
+ const right=content.querySelector('.page-right');if(right)right.replaceChildren();
+ main.className='main main-home rf-personal-main';main.dataset.rfModern=rfPersonalPage;
+ main.innerHTML=rfPersonalPage==='profile'?rfPersonalProfile():rfPersonalPage==='preferences'?rfPersonalPreferences():rfPersonalHelp();
+ app.querySelectorAll('.nav-primary [aria-current="page"]').forEach(b=>{b.classList.remove('active');b.removeAttribute('aria-current')});
+ const selected=app.querySelector('.rf-compact-account [data-rf-personal="'+rfPersonalPage+'"]');if(selected)selected.setAttribute('aria-current','page');
+}
+const rfPersonalStyle=document.createElement('style');
+rfPersonalStyle.textContent=`
+.rf-personal-main{display:block!important;overflow:auto;align-content:start}
+.rf-personal-help{max-width:900px;margin:0 auto;display:grid;gap:16px;padding:8px 0 30px}
+.rf-personal-help .sheet{margin:0}
+.rf-personal-help-links{display:flex;flex-wrap:wrap;gap:8px;padding:16px}
+.rf-personal-main .pref-row input[type=checkbox]{width:20px;height:20px;accent-color:var(--school-secondary,#168a38);flex:none}
+body.v2-contrast .rf-shared-admin .v31-panel,body.v2-contrast .rf-personal-main .pref-section,body.v2-contrast .rf-personal-main .teacher-profile-section{border:2px solid var(--rf-text,#243a48)}
+body[data-theme="Dark"].v2-contrast .rf-shared-admin .main{color:var(--rf-text,#fff)}
+`;
+document.head.appendChild(rfPersonalStyle);
+// Clear personal page before existing navigation handlers run, without changing their permission checks.
+window.addEventListener('click',e=>{
+ if(!rfPersonalPage||!['admin','staff'].includes(demoRole))return;
+ if(e.target.closest('[data-admin-page],[data-rfu-page],[data-demo-signout]')){rfPersonalPage='';rfPersonalEditing=false;rfPersonalStatus=''}
 },true);
-
+document.addEventListener('click',e=>{
+ if(!['admin','staff'].includes(demoRole))return;
+ const b=e.target.closest('[data-rf-personal]');
+ if(b){e.preventDefault();e.stopImmediatePropagation();rfPersonalOpen(b.dataset.rfPersonal);return}
+ if(e.target.closest('[data-rf-personal-edit],[data-rf-personal-cancel]')){rfPersonalEditing=!!e.target.closest('[data-rf-personal-edit]');render();if(rfPersonalEditing)app.querySelector('#rf-personal-profile-form input')?.focus();return}
+ if(e.target.closest('[data-rf-personal-reset]')&&rfPersonalPage==='preferences'){
+  if(!confirm('Reset your personal preferences? Profile and saved records will be kept.'))return;
+  rfPersonalSave({...rfPersonalData(),theme:'Light',font:'Standard',contrast:false,motion:false,landing:'default'});render();
+ }
+},true);
+document.addEventListener('submit',e=>{
+ if(!['admin','staff'].includes(demoRole)||e.target.id!=='rf-personal-profile-form'||rfPersonalPage!=='profile')return;
+ e.preventDefault();e.stopImmediatePropagation();const d=new FormData(e.target),name=String(d.get('name')||'').trim().slice(0,80),avatar=String(d.get('avatar')||'').trim().slice(0,4);
+ if(!name)return;if(rfPersonalSave({...rfPersonalData(),name,avatar}))rfPersonalEditing=false;render();
+},true);
+document.addEventListener('change',e=>{
+ const key=e.target.dataset.rfPersonalSetting;if(!key||!['admin','staff'].includes(demoRole)||rfPersonalPage!=='preferences')return;
+ const allowed={theme:['Light','Dark'],font:['Standard','Large'],landing:rfPersonalHomeOptions().map(x=>x[0]),contrast:[true,false],motion:[true,false]};
+ const value=e.target.type==='checkbox'?e.target.checked:e.target.value;if(!allowed[key]?.includes(value))return;
+ rfPersonalSave({...rfPersonalData(),[key]:value});render();app.querySelector('[data-rf-personal-setting="'+key+'"]')?.focus({preventScroll:true});
+},true);
 document.addEventListener('click',e=>{
  for(const menu of document.querySelectorAll('.rf-compact-account[open]'))if(!menu.contains(e.target))menu.open=false;
 });
@@ -3908,12 +3972,18 @@ const rfCompactPreviousRender=render;
 render=function(){
  const identity=demoRole?demoRole+':'+rfuActor:null;
  if(identity!==rfCompactLastActor){
-  rfCompactLastActor=identity;
-  if(['admin','staff'].includes(demoRole)){try{rfAdminDark=(localStorage.getItem(rfPersonalThemeKey())||localStorage.getItem('rollflow_admin_theme'))==='dark'}catch{rfAdminDark=false}}
-  if(demoRole==='staff'&&rfuCan('schedule')&&rfuPage==='dashboard')rfuPage='schedule';
+  rfCompactLastActor=identity;rfPersonalPage='';rfPersonalEditing=false;rfPersonalStatus='';
+  if(['admin','staff'].includes(demoRole)){
+   try{rfAdminDark=(localStorage.getItem(rfPersonalThemeKey())||localStorage.getItem('rollflow_admin_theme'))==='dark'}catch{rfAdminDark=false}
+   const landing=rfPersonalData().landing;
+   if(landing!=='default'&&rfPersonalHomeOptions().some(x=>x[0]===landing)){if(demoRole==='admin')adminPage=landing;else rfuPage=landing}
+   else if(demoRole==='admin')adminPage='dashboard';
+   else if(rfuCan('schedule')&&rfuPage==='dashboard')rfuPage='schedule';
+  }
  }
  rfCompactPreviousRender();
  rfCompactNavigation();
+ rfPersonalApply();
 };
 
 
