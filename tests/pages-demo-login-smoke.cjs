@@ -74,7 +74,12 @@ async function test() {
     await page.locator('[data-nav="finder"]').first().click();
     assert.equal(await page.locator('[data-teacher-scope]').count(), 0, 'Class Finder must not show the scope selector');
     assert.equal(await page.locator('.page-right .tag').count(),0,'Class count badge removed');
-    const englishClasses = await page.locator('.finder-table tbody tr').filter({hasText:'My class'}).allInnerTexts().then(rows=>rows.join(' '));
+    const englishOwned=[];
+    for(const code of ['ENG071A','ENG091B','ENG101B','10BH','ENG081C','ENG101C','MAF102A']){
+      await page.locator('#finderQuery').fill(code);
+      if(await page.locator('.finder-card[data-class-code="'+code+'"][data-my-class="true"]').count())englishOwned.push(code);
+    }
+    const englishClasses=englishOwned.join(' ');
     for (const code of ['ENG071A', 'ENG091B', 'ENG101B', '10BH']) {
       assert(englishClasses.includes(code), 'Missing assigned English class ' + code);
     }
@@ -595,7 +600,12 @@ async function test() {
     await page.locator('[data-nav="finder"]').first().click();
     assert.equal(await page.locator('[data-teacher-scope]').count(), 0, 'Class Finder must not show the scope selector');
     assert.equal(await page.locator('.page-right .tag').count(),0,'Class count badge removed');
-    const mathsClasses = await page.locator('.finder-table tbody tr').filter({hasText:'My class'}).allInnerTexts().then(rows=>rows.join(' '));
+    const mathsOwned=[];
+    for(const code of ['MAF102A','ENG071A']){
+      await page.locator('#finderQuery').fill(code);
+      if(await page.locator('.finder-card[data-class-code="'+code+'"][data-my-class="true"]').count())mathsOwned.push(code);
+    }
+    const mathsClasses=mathsOwned.join(' ');
     assert(mathsClasses.includes('MAF102A'), 'Default teacher class missing');
     assert(!mathsClasses.includes('ENG071A'), 'Default teacher inherited Sarah class');
 
