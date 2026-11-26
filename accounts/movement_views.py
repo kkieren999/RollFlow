@@ -21,6 +21,10 @@ from .permissions import can_teach
 from .live_views import page, shell
 
 
+def movement_clock():
+    return timezone.localtime()
+
+
 def current_lesson(pub,user,day,key,now):
     if not pub or day!=now.date():
         return None
@@ -34,7 +38,7 @@ def student_label(m):
 
 
 def projection(m,user,now):
-    return {"pk":m.pk,"student":student_label(m),"class_code":m.class_code,"destination":m.destination_name,
+    return {"pk":m.pk,"student_pk":m.student_id,"student":student_label(m),"class_code":m.class_code,"destination":m.destination_name,
         "origin":m.origin_room,"state":m.get_state_display(),"departure":m.departed_at,"due":m.due_at,
         "overdue":not m.closed_at and m.due_at<=now,"revision":m.revision,
         "actions":actions_for(user,m),"closed":m.closed_at}
@@ -49,6 +53,11 @@ def board(request):
         return HttpResponseForbidden("Movement access required.")
     now=timezone.now()
     qs=visible(request.user)
+    student_filter=request.GET.get('student','')
+    if student_filter:
+        if not student_filter.isascii() or not student_filter.isdecimal() or len(student_filter)>18:
+            return HttpResponseBadRequest('Invalid student filter.')
+        qs=qs.filter(student_id=int(student_filter))
     try:
         day=date.fromisoformat(request.GET.get("date") or timezone.localdate().isoformat())
         if day>timezone.localdate():
@@ -60,7 +69,7 @@ def board(request):
     history=qs.filter(lesson_date=day,closed_at__isnull=False).order_by("-closed_at","-pk")
     active_page=Paginator(active,50).get_page(request.GET.get("open_page"))
     history_page=Paginator(history,50).get_page(request.GET.get("page"))
-    return page(request,"movement_board.html",day=day,open_count=active.count(),
+    return page(request,"movement_board.html",day=day,student_filter=student_filter,open_count=active.count(),
         overdue_count=active.filter(due_at__lte=now).count(),active_page=active_page,history_page=history_page,
         open_rows=[projection(m,request.user,now) for m in active_page],
         closed_rows=[projection(m,request.user,now) for m in history_page],
@@ -87,7 +96,7 @@ def issue(request):
                 actor=request.user
             if not eligible_account(actor) or not can_teach(actor):
                 return HttpResponseForbidden("Teaching access revoked.")
-            now=timezone.localtime()
+            now=movement_clock()
             day=now.date()
             pub=current()
             row=current_lesson(pub,actor,day,key,now)
@@ -191,5 +200,6 @@ def destinations(request):
                 if action!="create":
                     return HttpResponseBadRequest("Unknown action.")
         except (ValueError,IntegrityError):
-            form.add_error(None,"Destination configuration changed; review again.")
+            messages.error(request,"Destination configuration changed; review again.")
+            return redirect("movement-destinations")
     return render(request,"movement_destinations.html",{"form":form,"destinations":MovementDestination.objects.order_by("name")})

@@ -110,6 +110,10 @@ def manage_access(request):
                     if not class_publication:
                         return HttpResponseForbidden("Publication changed; review the class again.")
                 user = User.objects.select_for_update().get(pk=c["user"].pk)
+                if c["scope"] == "destination":
+                    from .models import MovementDestination
+                    if not MovementDestination.objects.select_for_update().filter(pk=int(c["scope_value"]),active=True,requires_reception=True).exists():
+                        return HttpResponseForbidden("Destination changed; review access again.")
                 if not user.is_active or PendingTeacherSetup.objects.filter(user=user, activated_at__isnull=True).exists():
                     return HttpResponseForbidden("Account not eligible.")
                 grant = StaffAccessGrant.objects.create(user=user, role=template.name if template else (c["custom_role"] if c["role"] == "Custom" else c["role"]),
