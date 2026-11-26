@@ -4925,7 +4925,7 @@ function rfCalEnhance(){
 
 }
 const rfCalBeforeRender=render;render=function(){
- if(demoRole==='teacher'&&(rfTeachingMode(rfuActor)!=='both'||rfuConfig().roles.some(r=>r!=='teacher')||rfuConfig().disabled.length)){demoRole='staff';rfuPage=rfuCan('schedule')?'schedule':'dashboard';state.drawer=null;state.modal=null}
+ if(demoRole==='teacher'&&(rfTeachingMode(rfuActor)!=='both'||(rfuConfig().roles.length!==1||rfuConfig().roles[0]!=='teacher')||rfuConfig().disabled.length)){demoRole='staff';rfuPage=rfuCan('schedule')?'schedule':'dashboard';state.drawer=null;state.modal=null}
  if(demoRole==='teacher'&&state.page==='roll'&&!rfTeachingLegacyCanRoll()){state.page='timetable';state.drawer=null;state.modal=null}
  rfCalBeforeRender();rfCalEnhance()
 };
