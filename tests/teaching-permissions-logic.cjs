@@ -15,7 +15,11 @@ check('Existing teacher defaults to regular and relief',rfTeachingMode('teacher'
 check('Learning support defaults to regular',rfTeachingMode('learning')==='regular');
 check('Relief defaults to relief only',rfTeachingMode('relief')==='relief');
 check('Aide and leadership do not automatically teach',rfTeachingMode('aide')==='none'&&rfTeachingMode('hod')==='none');
-cfg.hod={teachingMode:'both'};check('Leadership may be delegated both',rfTeachingCan('hod')&&rfTeachingCan('hod','relief'));
+cfg.hod={teachingMode:'both'};check('Admin has no teaching by default',rfTeachingMode('admin')==='none');
+cfg.admin={teachingMode:'both'};check('Admin can be delegated regular and relief',rfTeachingCan('admin')&&rfTeachingCan('admin','relief')&&rfTeachingDirectory().includes('admin'));
+cfg.aide={roles:[],teachingMode:'regular'};check('Teaching permission needs no role template',rfTeachingCan('aide'));delete cfg.aide;
+cfg.hod={roles:['teacher'],teachingMode:'none'};check('Role cannot override explicit denial',!rfTeachingCan('hod'));cfg.hod={teachingMode:'both'};
+check('Leadership may be delegated both',rfTeachingCan('hod')&&rfTeachingCan('hod','relief'));
 check('Regular teaching directory includes delegated leader',rfTeachingDirectory().includes('hod')&&!rfTeachingDirectory().includes('relief')&&!rfTeachingDirectory().includes('aide'));
 check('Actual own slots plus allocated cover',rfTeachingSlots('hod','2026-11-26').map(x=>x.classCode).join(',')==='M8,X10,E9');
 check('Relief only has assigned cover',rfTeachingSlots('relief','2026-11-26').map(x=>x.classCode).join(',')==='E9');
