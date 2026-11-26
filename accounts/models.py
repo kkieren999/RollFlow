@@ -334,6 +334,7 @@ class AttendanceRevision(models.Model):
     revision = models.PositiveIntegerField()
     actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
     action = models.CharField(max_length=12)
+    reason = models.CharField(max_length=500, blank=True)
     marks = models.JSONField()
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -353,3 +354,23 @@ class AttendanceTransferReview(models.Model):
     reconciled_at = models.DateTimeField(null=True, blank=True)
     class Meta:
         constraints = [models.UniqueConstraint(fields=["roll", "revision", "digest"], name="unique_attendance_transfer_review")]
+
+
+class ReliefAttendanceAssignment(models.Model):
+    """One explicitly reviewed lesson; no general access to a teacher's schedule."""
+    publication = models.ForeignKey(ConnectedSchoolPublication, on_delete=models.PROTECT)
+    lesson_date = models.DateField()
+    class_code = models.CharField(max_length=30)
+    period = models.CharField(max_length=50)
+    start = models.CharField(max_length=5)
+    end = models.CharField(max_length=5)
+    regular_teacher = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    relief_teacher = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["publication", "lesson_date", "class_code", "period", "start"],
+            condition=models.Q(cancelled_at__isnull=True), name="unique_active_relief_attendance")]

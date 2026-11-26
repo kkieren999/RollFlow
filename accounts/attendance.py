@@ -1,10 +1,11 @@
 """First protected attendance workflow: reviewed dated publication, today's own lessons."""
 from collections import Counter
+import re
 from django.conf import settings
 from datetime import time
 from django.utils import timezone
 from .connected_school import canonical, personal_codes, visible_slots
-from .models import AttendanceRoll, ImportedTimetable, Student
+from .models import AttendanceRoll, ImportedTimetable, Student, ReliefAttendanceAssignment
 from .school_access import grants_for
 
 
@@ -42,10 +43,23 @@ def lesson_valid(row):
     try:
         code, period, start = lesson_key(row)
         end = row["end"]
+        if re.search(r"\b(lunch|recess|break|interval|playground duty|supervision)\b", period, re.I):
+            return False
         return (0 < len(code) <= 30 and 0 < len(period) <= 50 and len(start) == len(end) == 5
                 and time.fromisoformat(start) < time.fromisoformat(end))
     except (KeyError, TypeError, ValueError):
         return False
+
+
+def lesson_started(day,row,now=None):
+    now = now or timezone.localtime()
+    return day < now.date() or (day == now.date() and now.strftime("%H:%M") >= row["start"])
+
+
+def active_relief(pub, day):
+    return {(a.class_code,a.period,a.start):a for a in ReliefAttendanceAssignment.objects.filter(
+        publication=pub,lesson_date=day,cancelled_at__isnull=True,expires_at__gt=timezone.now()
+    ).select_related("relief_teacher","regular_teacher")}
 
 
 def own_lessons(pub, user, day):
@@ -54,9 +68,21 @@ def own_lessons(pub, user, day):
     all_slots = [r for r in visible_slots(pub, day) if lesson_valid(r)]
     counts = Counter(lesson_key(r) for r in all_slots)
     codes = personal_codes(pub, user)
-    return [r for r in all_slots if r.get("staff") in codes and counts[lesson_key(r)] == 1
-            and not any(other is not r and (other.get("staff") == r.get("staff") or other["code"] == r["code"])
-                        and other["start"] < r["end"] and r["start"] < other["end"] for other in all_slots)]
+    relief = active_relief(pub,day)
+    result=[]
+    for r in all_slots:
+        key=lesson_key(r)
+        assignment=relief.get(key)
+        if assignment:
+            if assignment.relief_teacher_id!=user.pk or assignment.end!=r["end"] or not codes:
+                continue
+        elif r.get("staff") not in codes:
+            continue
+        if counts[key]!=1 or any(other is not r and (other.get("staff")==r.get("staff") or other["code"]==r["code"])
+                 and other["start"]<r["end"] and r["start"]<other["end"] for other in all_slots):
+            continue
+        result.append(r)
+    return result
 
 
 def roster_for(pub, code, day, lock=False):

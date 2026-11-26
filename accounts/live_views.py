@@ -12,7 +12,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_http_methods
 from .attendance import (MARKS, AttendanceUnavailable, can_monitor, publication_ready,
                          own_lessons, lesson_key, lesson_valid, roster_for, roll_for,
-                         roll_matches, status_label)
+                         roll_matches, status_label, lesson_started)
 from .connected_school import current, visible_slots
 from .models import (AttendanceRoll, AttendanceRevision, ConnectedSchoolPublication,
                      StaffProfile, SecurityEvent, PendingTeacherSetup, ImportedTimetable)
@@ -112,7 +112,7 @@ def mark_roll(request):
             error = ""
             if request.method == "POST":
                 if roll and roll.submitted_at:
-                    raise AttendanceUnavailable("Submitted rolls are locked. Corrections are not enabled in this version.")
+                    raise AttendanceUnavailable("Submitted rolls are locked. Request an administrator correction.")
                 expected = str(roll.revision if roll else 0)
                 if (request.POST.get("roster_token") != roster_token(students) or request.POST.get("revision") != expected or request.POST.get("publication") != str(pub.pk)
                         or request.POST.get("day") != day.isoformat()):
@@ -120,6 +120,8 @@ def mark_roll(request):
                 action = request.POST.get("action")
                 if action not in ("draft", "submit"):
                     return HttpResponseBadRequest("Choose save draft or submit.")
+                if action == "submit" and not lesson_started(day,row):
+                    raise AttendanceUnavailable("Attendance cannot be submitted before the lesson starts.")
                 fields = {"mark_" + str(s.pk): str(s.pk) for s in students}
                 actual = {k for k in request.POST if k.startswith("mark_")}
                 if actual != set(fields) or any(len(request.POST.getlist(k)) != 1 for k in fields):
@@ -166,23 +168,12 @@ def monitor(request):
         return redirect("teacher-login")
     if not eligible(request.user) or not can_monitor(request.user):
         return HttpResponseForbidden("Attendance monitoring permission required.")
-    pub, day = current(), timezone.localdate()
-    slots = [r for r in visible_slots(pub, day) if lesson_valid(r)] if pub and pub.snapshot.get("source") == "dated" else []
-    counts = Counter(lesson_key(r) for r in slots)
-    rolls = {(r.class_code,r.period,r.start):r for r in AttendanceRoll.objects.filter(lesson_date=day)}
-    seen, rows = set(), []
-    for row in sorted(slots, key=lambda r:(r["start"],r["code"])):
-        key = lesson_key(row)
-        if key in seen:
-            continue
-        seen.add(key)
-        roll = rolls.get(key)
-        state = status_label(roll,pub) if counts[key] == 1 else "Ambiguous allocation — review required"
-        tally = Counter(roll.marks.values()) if roll and state == "Submitted" else {}
-        rows.append({"code":key[0],"period":key[1],"start":key[2],"status":state,
-                     "present":tally.get("P","—"),"absent":tally.get("A","—"),"late":tally.get("L","—")})
-    for key, roll in rolls.items():
-        if key not in seen:
-            rows.append({"code":key[0],"period":key[1],"start":key[2],
-                         "status":"No current allocation — review required","present":"—","absent":"—","late":"—"})
-    return page(request, "live_monitor.html", rows=rows, day=day, ready=publication_ready(pub))
+    from datetime import date
+    from .attendance_operations import daily_status
+    try:
+        day=date.fromisoformat(request.GET.get("date") or timezone.localdate().isoformat())
+    except ValueError:
+        return HttpResponseBadRequest("Choose a valid date.")
+    pub=current()
+    rows,summary=daily_status(pub,day)
+    return page(request,"live_monitor.html",rows=rows,summary=summary,day=day,ready=publication_ready(pub))

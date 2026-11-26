@@ -11,6 +11,10 @@ from .live_views import roster_token
                    SESSION_COOKIE_SECURE=False, CSRF_COOKIE_SECURE=False)
 class LiveFoundationTests(TestCase):
     def setUp(self):
+        from unittest.mock import patch
+        clock=patch('accounts.live_views.lesson_started',return_value=True)
+        clock.start()
+        self.addCleanup(clock.stop)
         self.day = timezone.localdate()
         self.admin = User.objects.create_superuser("fictional-admin", password="Fictional-password-42!")
         self.teacher = User.objects.create_user("fictional-teacher", password="Fictional-password-42!")

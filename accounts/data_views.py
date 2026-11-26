@@ -91,8 +91,8 @@ def transfer_content(roll, lock=False):
         raise ValueError("Only complete submitted rolls can be reviewed.")
     if len(set(roll.roster))!=len(roll.roster) or any(v not in ("P","A","L") for v in roll.marks.values()):
         raise ValueError("Invalid or incomplete attendance marks.")
-    latest=AttendanceRevision.objects.filter(roll=roll,revision=roll.revision,action="submit").first()
-    if not latest or latest.marks!=roll.marks or latest.actor_id!=roll.teacher_id:
+    latest=AttendanceRevision.objects.filter(roll=roll,revision=roll.revision).first()
+    if not latest or latest.marks!=roll.marks or latest.action not in ("submit","correct") or (latest.action=="submit" and latest.actor_id!=roll.teacher_id) or (latest.action=="correct" and not latest.reason):
         raise ValueError("Submission history does not match. Administrator review required.")
     pub=roll.publication
     records=[c for c in pub.snapshot.get("classes",[]) if c.get("code")==roll.class_code]
@@ -114,7 +114,9 @@ def transfer_content(roll, lock=False):
             raise ValueError("Student identity changed. Review required.")
         writer.writerow([safe_csv_cell(x) for x in (roll.lesson_date.isoformat(),roll.class_code,roll.period,roll.start,identity,roll.marks[str(student.pk)])])
     raw=buffer.getvalue().encode("utf-8")
-    return raw,hashlib.sha256(raw).hexdigest(),len(students)
+    # Bind corrected review to the revision even if the marks return to an earlier value.
+    digest_input=raw if latest.action=="submit" else str(roll.revision).encode()+b"\n"+raw
+    return raw,hashlib.sha256(digest_input).hexdigest(),len(students)
 
 
 @administrator

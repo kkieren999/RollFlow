@@ -1,3 +1,7 @@
+# V4.2 live attendance staging
+
+See [V4.2 notes](../docs/v4.2-attendance.md). Existing database state paths unchanged. Fictional staging only.
+
 # V4.1 school data staging
 
 See [V4.1 notes](../docs/v4.1-school-data.md). Use the protected School data centre to review source imports and publication history. Existing database paths remain unchanged. No real school data in staging.
