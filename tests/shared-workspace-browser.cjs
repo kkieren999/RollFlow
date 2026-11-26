@@ -40,6 +40,7 @@ async function run(){
    assert.equal(await page.locator('.rf-training-notice').count(),0,'Persistent banner removed');
    assert.equal(await page.locator('.nav-primary button').count(),counts[id],id+' compact menu count');
    assert.equal(await page.locator('.nav-primary [data-nav="school-calendar"],.nav-primary [data-rfu-page="calendar"],.rf-compact-tabs [data-nav="school-calendar"],.rf-compact-tabs [data-rfu-page="calendar"]').count(),0,id+' calendar route removed');
+   assert.equal(await page.locator('.nav-primary [data-rfu-page="supervision"],.rf-compact-tabs [data-rfu-page="supervision"]').count(),0,id+' supervision route removed');
    const teacher=['teacher','swilliams'].includes(id),attr=id==='admin'?'data-admin-page':teacher?'data-nav':'data-rfu-page';
    await capture(page,id+'-desktop-landing');
    for(const label of ['My Profile','My Preferences','Help & Support']){
@@ -79,6 +80,9 @@ async function run(){
     assert(!await page.locator('.rf-scheduling-notices').innerText().then(t=>t.includes('QA community celebration')));
    }
    if(teacher){
+    await page.locator('.nav-primary [data-nav="timetable"]').click();
+    assert.equal(await page.locator('.rf-compact-tabs').count(),0,id+' daily schedule has no redundant tabs');
+    assert(await page.locator('[data-rf-duty]').count()>0,id+' allocated supervision in daily schedule');
     await page.locator('.nav-primary [data-nav="finder"]').click();
     const code=id==='swilliams'?'ENG071A':'MAF102A';
     await page.locator('#finderQuery').fill(code);
@@ -109,6 +113,7 @@ async function run(){
    if(!teacher&&['learning','aide','relief'].includes(id)){
     await page.setViewportSize({width:1440,height:1000});
     await page.locator('.nav-primary [data-rfu-page="schedule"]').click();
+    assert(await page.locator('[data-rf-duty]').count()>0,id+' allocated supervision in daily schedule');
     await page.locator('[data-rf-unified-view="week"]').click();
     const days=await page.locator('.rf-unified-schedule.week>.timetable-day').evaluateAll(nodes=>nodes.map(n=>({x:n.getBoundingClientRect().x,y:n.getBoundingClientRect().y})));
     assert.equal(days.length,5,id+' five weekdays');
@@ -126,6 +131,26 @@ async function run(){
    console.log('PASS: '+id+' account pages, compact navigation and workspace rendering');
    }catch(error){console.error('Failure on '+id+' at '+stage);await capture(page,id+'-failure').catch(()=>{});throw error}finally{await context.close();}
   }
+  // A real allocation through the workforce form must follow the selected recipient,
+  // never another user's account, and must not create a separate navigation route.
+  const context=await browser.newContext({viewport:{width:1440,height:1000}}),page=await context.newPage();
+  try{
+   async function login(id){await page.goto(url);await page.locator('#demo-username').fill(id);await page.locator('#demo-password').fill(id);await page.locator('#demo-login-form button[type="submit"]').click();await page.locator('.rf-compact-account summary').waitFor()}
+   async function logout(){await page.locator('.rf-compact-account summary').click();await page.locator('.rf-compact-account-panel [data-demo-signout]').click();await page.locator('#demo-login-form').waitFor()}
+   await login('business');await page.locator('.nav-primary [data-rfu-page="workforce"]').click();
+   await page.locator('.rf-duty-management summary').click();
+   await page.locator('#rf-duty-form [name="owner"]').selectOption('teacher');
+   await page.locator('#rf-duty-form [name="title"]').fill('QA allocated playground duty');
+   await page.locator('#rf-duty-form [name="time"]').fill('10:45');
+   await page.locator('#rf-duty-form [name="detail"]').fill('Junior courtyard');
+   await page.locator('#rf-duty-form button[type="submit"]').click();
+   assert.match(await page.locator('.rf-duty-management').innerText(),/QA allocated playground duty/);
+   await logout();await login('teacher');await page.locator('.nav-primary [data-nav="timetable"]').click();
+   assert.match(await page.locator('[data-rf-duty]').allInnerTexts().then(x=>x.join(' ')),/QA allocated playground duty/);
+   await logout();await login('swilliams');await page.locator('.nav-primary [data-nav="timetable"]').click();
+   assert(!await page.locator('[data-rf-duty]').allInnerTexts().then(x=>x.join(' ').includes('QA allocated playground duty')));
+   console.log('PASS: assigned supervision follows the recipient and remains in Daily Schedule');
+  }finally{await context.close()}
  }finally{if(browser)await browser.close();server.close()}
 }
 run().catch(e=>{console.error(e);process.exitCode=1});
