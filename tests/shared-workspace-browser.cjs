@@ -42,6 +42,44 @@ async function run(){
      }
     }
    }
+
+   if(teacher){
+    await page.locator('.nav-primary [data-nav="finder"]').click();
+    const code=id==='swilliams'?'ENG071A':'MAF102A';
+    await page.locator('#finderQuery').fill(code);
+    const card=page.locator('.finder-card[data-class-code="'+code+'"][data-my-class="true"]');
+    assert.equal(await card.count(),1,id+' assigned class ownership');
+    assert.match(await card.innerText(),/My class/);
+    await page.locator('#finderQuery').fill('');
+    await page.locator('select[data-finder-field="year"]').selectOption(id==='swilliams'?'7':'10');
+    assert(await page.locator('.finder-card').count()>0,id+' filter-only search');
+   }
+   // Representative full-page geometry and light/dark checks on each account.
+   for(const size of [{width:1366,height:768},{width:1024,height:768},{width:820,height:1180},{width:390,height:844}]){
+    await page.setViewportSize(size);
+    await page.locator('.rf-compact-account summary').click();
+    await page.locator('.rf-compact-account-panel').getByRole('button',{name:'My Preferences',exact:true}).click();
+    const theme=page.locator(teacher?'[data-v2-setting="theme"]':'[data-rf-personal-setting="theme"]');
+    for(const value of ['Dark','Light']){
+     await theme.selectOption(value);
+     assert.equal(await page.locator('body').getAttribute('data-theme'),value);
+     const geometry=await page.locator('.content-shell>main').evaluate(el=>({width:el.clientWidth,scroll:el.scrollWidth,rect:el.getBoundingClientRect().right,viewport:innerWidth}));
+     assert(geometry.rect<=geometry.viewport+3,id+' '+size.width+' page outside viewport');
+     assert(geometry.scroll-geometry.width<=3,id+' '+size.width+' horizontal overflow: '+JSON.stringify(geometry));
+    }
+   }
+   if(!teacher&&['learning','aide','relief'].includes(id)){
+    await page.setViewportSize({width:1440,height:1000});
+    await page.locator('.nav-primary [data-rfu-page="schedule"]').click();
+    await page.locator('[data-rf-unified-view="week"]').click();
+    const days=await page.locator('.rf-unified-schedule.week>.timetable-day').evaluateAll(nodes=>nodes.map(n=>({x:n.getBoundingClientRect().x,y:n.getBoundingClientRect().y})));
+    assert.equal(days.length,5,id+' five weekdays');
+    assert(days.every(n=>Math.abs(n.y-days[0].y)<2),id+' weekdays must stay in one row');
+    await page.setViewportSize({width:390,height:844});
+    const scroll=await page.locator('.rf-unified-week-scroll').evaluate(el=>({client:el.clientWidth,scroll:el.scrollWidth}));
+    assert(scroll.scroll>scroll.client,id+' mobile week has internal horizontal scrolling');
+   }
+   await page.setViewportSize({width:1440,height:1000});
    await page.locator('.rf-compact-account summary').click();
    await page.locator('.rf-compact-account-panel').getByRole('button',{name:'Sign out',exact:true}).click();
    await page.locator('#demo-login-form').waitFor();
