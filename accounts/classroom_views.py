@@ -59,6 +59,7 @@ def classroom(request):
                     ids.append(int(raw))
                 locked={u.pk:u for u in User.objects.select_for_update().filter(pk__in=ids).order_by("pk")}
                 actor=locked[actor.pk]
+                list(StaffAccessGrant.objects.select_for_update().filter(user_id__in=ids).order_by('pk'))
                 lock_sources()
                 list(StaffProfile.objects.select_for_update().filter(user=actor))
             pub=current()
@@ -129,7 +130,8 @@ def classroom(request):
             roster=[{"pk":s.pk,"name":f"{s.last_name}, {s.preferred_name or s.first_name}","seat":seats.get(str(s.pk),"")} for s in students]
             observations=ClassroomObservation.objects.filter(publication=pub,teacher=actor,class_code=key[0],
                 student_id__in=[s.pk for s in students],withdrawn_at__isnull=True).select_related("student").order_by("-created_at")[:50] if regular else []
-            return page(request,"classroom_tools.html",row=row,regular=regular,roster=roster,plan=plan,
+            occupied=sorted((s for s in roster if s['seat']),key=lambda s:s['seat'])
+            return page(request,"classroom_tools.html",row=row,regular=regular,roster=roster,plan=plan,occupied=occupied,
                 publication=pub,roster_token=roster_token(students),observations=observations,
                 observation_choices=OBSERVATIONS,task_choices=TASKS,referral_choices=REFERRALS,
                 recipients=recipients("support_task") if regular else [])
@@ -196,5 +198,5 @@ def change(request,kind,pk):
             if record.state in ("closed","withdrawn","completed","cancelled"):record.closed_at=timezone.now()
             record.save()
             audit(actor,"support_"+action,after={"kind":kind,"record":record.pk,"revision":record.revision,"prior_state":old,"state":record.state})
-    except ValueError as exc:return conflict(request,str(exc))
+    except (ValueError,IntegrityError) as exc:return conflict(request,str(exc) if isinstance(exc,ValueError) else 'Concurrent support change. Reload.')
     return redirect("support-board")

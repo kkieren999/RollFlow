@@ -44,7 +44,10 @@ def regular_class(pub,user,code,day):
 
 
 def student_matches(record,pub):
+    today=timezone.localdate()
     return bool(pub and record.publication_id==pub.pk and record.student.status=="active"
+        and (not record.student.enrolled_on or record.student.enrolled_on<=today)
+        and (not record.student.left_on or record.student.left_on>=today)
         and pub.snapshot.get("student_identity",{}).get(str(record.student_id))==canonical(record.student.student_id)
         and canonical(record.student.student_id)
         and any(c.get("code")==record.class_code and record.student_id in c.get("students",[]) for c in pub.snapshot.get("classes",[])))
