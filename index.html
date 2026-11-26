@@ -3584,7 +3584,7 @@ function rfuRecords(){
  const next=rows.filter(r=>!(r.id==='s4'&&r.module==='supervision'&&r.owner==='teacher'&&r.title==='Library duty'&&r.time==='11:00'&&r.detail==='Library'&&r.status==='Allocated'));
  for(let date='2026-07-13';date<='2026-12-11';date=dateOffset(date,1)){
   if(alexSchoolStatus(date))continue;
-  const day=weekdayFor(date),duty={Monday:['11:25','Playground supervision','Junior courtyard'],Wednesday:['12:45','Library duty','Library'],Friday:['12:45','Lunch supervision','Senior courtyard']}[day];
+  const day=weekdayFor(date),duty={Monday:['11:25','Playground duty','Junior courtyard'],Wednesday:['12:45','Library duty','Library'],Friday:['12:45','Lunch duty','Senior courtyard']}[day];
   if(!duty)continue;
   const id='alex-sem2-duty-'+date;if(next.some(r=>r.id===id))continue;
   next.push({module:'supervision',id,owner:'teacher',date,time:duty[0],title:duty[1],detail:duty[2],category:'Other',status:'Allocated'});
@@ -4436,7 +4436,7 @@ function rfSupervisionManagerAllowed(){
 }
 function rfSupervisionManager(){
  const rows=rfuRows('supervision').filter(r=>r.kind!=='class-supervision').sort((a,b)=>(a.date+(a.time||'')).localeCompare(b.date+(b.time||''))),today=brisbaneToday(),staff=rfuStaff('staff'),active=rows.filter(r=>r.date>=today&&!['Complete','Cancelled'].includes(r.status));
- const list=active.length?active.map(r=>'<article><div><strong>'+esc(r.title)+'</strong><small>'+esc(rfuStaffName(r.owner)+' · '+r.date+' · '+(r.time||'Unscheduled'))+'</small><small>'+esc(r.detail||'')+'</small></div>'+rfUnifiedBadge(r.status)+(rfuCanChange('supervision',r)?'<button class="btn small" type="button" data-rf-duty-complete="'+esc(r.id)+'">Mark complete</button><button class="btn small" type="button" data-rf-duty-cancel="'+esc(r.id)+'">Cancel duty</button>':'')+'</article>').join(''):'<p class="quiet">No upcoming duty allocations.</p>';
+ const list=active.length?active.map(r=>'<article><div><strong>'+esc(rfDutyTitle(r))+'</strong><small>'+esc(rfuStaffName(r.owner)+' · '+r.date+' · '+(r.time||'Unscheduled'))+'</small><small>'+esc(r.detail||'')+'</small></div>'+rfUnifiedBadge(r.status)+(rfuCanChange('supervision',r)?'<button class="btn small" type="button" data-rf-duty-complete="'+esc(r.id)+'">Mark complete</button><button class="btn small" type="button" data-rf-duty-cancel="'+esc(r.id)+'">Cancel duty</button>':'')+'</article>').join(''):'<p class="quiet">No upcoming duty allocations.</p>';
  const form=rfSupervisionManagerAllowed()?'<form id="rf-duty-form" class="rf-module-form"><label>Staff member<select name="owner" required>'+planOpt([['','Select staff member'],...staff.map(p=>[p.username,rfUnifiedPersonName(p)])],'')+'</select></label><label>Duty title<input name="title" maxlength="100" required placeholder="e.g. Lunch duty"></label><label>Date<input type="date" name="date" required value="'+today+'"></label><label>Time<input type="time" name="time" required></label><label>Category<select name="category">'+planOpt(RFUnifiedDutyCategories.map(x=>[x,x]),'Playground')+'</select></label><label>Location / details<input name="detail" maxlength="300" required placeholder="e.g. Junior courtyard"></label><div class="rf-student-wide"><button type="submit" class="btn green">Assign duty</button></div><p class="rf-student-wide" data-rf-duty-message role="status"></p></form>':'';
  return '<details class="sheet rf-scheduling-manage rf-duty-management"><summary class="sheet-head">Duty allocations <span class="rf-unified-badge">'+active.length+' upcoming</span></summary><div class="rf-module-body"><p class="rf-scheduling-note">Assigned duties appear in the staff member’s daily schedule. No separate duty timetable is needed.</p>'+form+'<div class="rf-scheduling-list">'+list+'</div></div></details>';
 }
@@ -4482,7 +4482,7 @@ function rfClassSupervisionRecords(date,owner){
  return rfuRecords().filter(r=>r.module==='supervision'&&r.kind==='class-supervision'&&r.date===date&&(!owner||r.owner===owner)&&!['Cancelled','Canceled'].includes(r.status));
 }
 function rfAllocatedClassSupervisions(date,owner){
- if(!['teacher','swilliams'].includes(owner)||!rfuCan('supervision',null,owner))return [];
+ if(!rfClassCoverReady||!['teacher','swilliams'].includes(owner)||!rfuCan('supervision',null,owner))return [];
  return rfClassSupervisionRecords(date,owner).map(r=>{
   const c=schoolClasses.find(c=>c.id===r.classCode);if(!c)return null;
   return {...c,myClass:false,allocatedSupervision:true,supervisionId:r.id,day:weekdayFor(date),slot:String(r.period),period:'PERIOD '+r.period,time:SARAH_2026_PERIOD_TIMES[r.period],room:r.room||c.room,scheduledDate:date};
@@ -4506,6 +4506,7 @@ function rfCoverChoices(owner,date,period){
  const day=planDays.indexOf(weekdayFor(date))+1,own=owner==='teacher'?defaultDemoClassIds:new Set(schoolClasses.filter(c=>c.teacher==='S. Williams').map(c=>c.id)),used=new Set(rfClassSupervisionRecords(date).filter(r=>Number(r.period)===Number(period)).map(r=>r.classCode)),recipientCodes=new Set(rfClassSupervisionRecords(date,owner).map(r=>r.classCode));
  return planning.slots.filter(x=>x.active&&x.day===day&&String(x.period)===String(period)&&!own.has(x.classCode)&&!used.has(x.classCode)&&!recipientCodes.has(x.classCode)&&planning.classes.some(c=>c.code===x.classCode&&c.active)&&schoolClasses.some(c=>c.id===x.classCode)&&!(date>SARAH_2026_YEAR10_FINISH&&Number(schoolClasses.find(c=>c.id===x.classCode)?.year)===10)).filter((x,i,a)=>a.findIndex(y=>y.classCode===x.classCode)===i);
 }
+var rfClassCoverReady=true;
 let rfMorningOwner='teacher',rfMorningPeriod='',rfMorningOpen=false;
 function rfMorningCoverPanel(){
  const date=brisbaneToday(),owners=['teacher','swilliams'].filter(id=>rfuCan('supervision',null,id)),owner=owners.includes(rfMorningOwner)?rfMorningOwner:owners[0]||'',spares=rfSparePeriods(owner,date),period=spares.includes(Number(rfMorningPeriod))?String(rfMorningPeriod):String(spares[0]||''),choices=rfCoverChoices(owner,date,period);
