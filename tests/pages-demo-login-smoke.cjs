@@ -59,7 +59,7 @@ async function openRoute(page,attr,route){
  }
  if(teacher&&route==='alerts'){await page.locator('.rf-compact-header-action').click();return;}
  if(teacher&&route==='home')route='timetable';
- const parents=teacher?{'classroom-management':'finder','seating-plans':'finder','class-lists':'finder','school-calendar':'timetable','follow-ups':'student-support'}:{'student-actions':'students','master':'timetable','classes':'timetable','roles':'accounts','audit':'security','data':'oneschool'};
+ const parents=teacher?{'classroom-management':'finder','seating-plans':'finder','class-lists':'finder','follow-ups':'student-support'}:{'student-actions':'students','master':'timetable','classes':'timetable','roles':'accounts','audit':'security','data':'oneschool'};
  const primary=parents[route]||route;
  const nav=page.locator('.nav-primary ['+attr+'="'+primary+'"]');
  if(!await nav.isVisible())await page.locator('[data-rf-portal-menu]').click();
@@ -171,7 +171,7 @@ async function test() {
     console.log('PASS: student profiles, semester attendance action, incidents, admin referrals and configurable choices.');
 
     // Newly approved classroom modules and local teacher tools.
-    for(const route of ['attendance-overview','classroom-management','student-support','follow-ups','seating-plans','class-lists','school-calendar']){
+    for(const route of ['attendance-overview','classroom-management','student-support','follow-ups','seating-plans','class-lists']){
       await openRoute(page,'data-nav',''+route+'');
       assert(await page.locator('.rf-module-root').isVisible(),'Module failed to render: '+route);
     }
@@ -193,14 +193,20 @@ async function test() {
     await logIn(page,'admin','admin','.v31-admin');
     await openRoute(page,'data-admin-page','teacher-modules');
     await page.locator('[data-rf-module-toggle="class-lists"]').click();
-    await page.locator('#rf-calendar-admin [name="title"]').fill('Fictional assembly');
-    await page.locator('#rf-calendar-admin button').click();
+    await openRoute(page,'data-admin-page','timetable');
+    await page.locator('.rf-scheduling-manage summary').first().click();
+    await page.locator('#rf-exception-form [name="title"]').fill('Fictional assembly');
+    await page.locator('#rf-exception-form [name="category"]').selectOption('Assembly');
+    await page.locator('#rf-exception-form [name="date"]').fill('2026-01-01');
+    await page.locator('#rf-exception-form [name="end"]').fill('2027-12-31');
+    await page.locator('#rf-exception-form button[type="submit"]').click();
+    assert.match(await page.locator('.rf-scheduling-manage').innerText(),/Fictional assembly/);
     await signOut(page);
     await logIn(page,'swilliams','swilliams');
     assert.equal(await page.locator('[data-nav="class-lists"]').count(),0);
-    await openRoute(page,'data-nav','school-calendar');
+    await openRoute(page,'data-nav');
     assert.match(await page.locator('.rf-module-root').innerText(),/Fictional assembly/);
-    console.log('PASS: teacher modules, follow-up completion, seating swaps, admin visibility and calendar.');
+    console.log('PASS: teacher modules, follow-up completion, seating swaps, admin visibility and contextual scheduling exceptions.');
     await signOut(page);
     await logIn(page,'admin','admin','.v31-admin');
     await openRoute(page,'data-admin-page','teacher-modules');
@@ -747,7 +753,7 @@ async function test() {
     const deviceSizes = [{width:1920,height:1200},{width:1024,height:768},{width:768,height:1024},{width:820,height:1180}];
     for (const size of deviceSizes) {
       await page.setViewportSize(size);
-      for (const route of ['home','timetable','master','finder','search','movements','alerts','profile','preferences','help','attendance-overview','classroom-management','student-support','follow-ups','seating-plans','class-lists','school-calendar']) {
+      for (const route of ['home','timetable','master','finder','search','movements','alerts','profile','preferences','help','attendance-overview','classroom-management','student-support','follow-ups','seating-plans','class-lists']) {
         await openRoute(page,'data-nav',route);
         await assertWorkspaceFits('Teacher '+route+' '+JSON.stringify(size), '.content-shell>.main');
       }
