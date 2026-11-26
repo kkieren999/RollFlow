@@ -4831,9 +4831,7 @@ function rfCalEnhance(){
   const compact=select.closest('.roll-view,.lesson-actions,td,.rf-compact-tabs,.mt-toolbar,.rf-master-table')||select.classList.contains('small');
   select.classList.add(compact?'rf-ui-select--compact':'rf-ui-select');
  }
- if(!rfScheduleAllowed()||rfPersonalPage)return;
- const route=demoRole==='admin'?adminPage:demoRole==='teacher'&&!rfuTeacherExtra?state.page:rfuPage,main=app.querySelector('.content-shell>main,.v31-content>main');
- if(main&&['timetable','schedule','master','workforce'].includes(route)&&!main.querySelector('[data-rf-school-calendar]'))main.insertAdjacentHTML('afterbegin','<div class="rf-cal-launch"><button type="button" class="rf-ui-button" data-rf-school-calendar>'+navSvg('calendar-days')+' School Calendar</button></div>');
+
 }
 const rfCalBeforeRender=render;render=function(){rfCalBeforeRender();rfCalEnhance()};
 /* Enhance dynamically opened dialogs without modifying their form handlers. */
