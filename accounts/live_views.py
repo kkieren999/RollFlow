@@ -179,4 +179,5 @@ def monitor(request):
         return HttpResponseBadRequest("Choose a valid date.")
     pub=current()
     rows,summary=daily_status(pub,day)
-    return page(request,"live_monitor.html",rows=rows,summary=summary,day=day,ready=publication_ready(pub))
+    from .workforce_service import closed
+    return page(request,"live_monitor.html",rows=rows,summary=summary,day=day,ready=publication_ready(pub),day_closed=closed(pub,day))

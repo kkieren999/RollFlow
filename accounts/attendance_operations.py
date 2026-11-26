@@ -85,7 +85,7 @@ def daily_status(pub,day,now=None):
             state="Uncovered absence — review required"
         elif row.get("staff") not in verified:
             state="Unverified allocation — review required"
-        elif key in relief and not personal_codes(pub,relief[key].relief_teacher):
+        elif key in relief and (not personal_codes(pub,relief[key].relief_teacher) or absent(pub,day,relief[key].relief_teacher)):
             state="Relief identity — review required"
         else:
             try:

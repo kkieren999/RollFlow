@@ -1,7 +1,7 @@
 """Operational overlays on a reviewed dated timetable; no source mutations."""
 from django.contrib.auth.models import User
 from django.utils import timezone
-from .models import WorkforceEntry, WorkforceNotice, ReliefAttendanceAssignment, AttendanceRoll, StudentMovement
+from .models import WorkforceEntry, WorkforceNotice, ReliefAttendanceAssignment, AttendanceRoll, StudentMovement, StaffProfile
 from .security_service import eligible_account
 from .permissions import can_teach
 from .school_access import grants_for
@@ -42,6 +42,10 @@ def effective_room(pub,day,row):
 def raw_busy(pub,day,user,start,end):
     """Conservative: original published allocations count even when covered."""
     codes=personal_codes(pub,user)
+    profile=StaffProfile.objects.filter(user=user).first()
+    # A known raw staff identifier without verified binding is a conflict, not free time.
+    if profile and profile.staff_id:
+        codes=codes|{profile.staff_id.strip().upper()}
     return any(r.get("staff") in codes and r.get("start","")<end and start<r.get("end","")
         for r in visible_slots(pub,day)) or ReliefAttendanceAssignment.objects.filter(
         publication=pub,lesson_date=day,relief_teacher=user,cancelled_at__isnull=True,start__lt=end,end__gt=start).exists() or duty_conflict(pub,day,user,start,end)

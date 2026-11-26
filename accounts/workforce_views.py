@@ -131,7 +131,13 @@ def cancel_entry(actor,pub,day,pk):
         row={"code":entry.class_code,"period":entry.period,"start":entry.start,"end":entry.end}
         if lesson_has_records(day,row):
             raise ValueError("Existing roll or movement prevents automatic room restoration.")
-        people=lesson_people(pub,day,next(r for r in visible_slots(pub,day) if lesson_key(r)==lesson_key(row)))
+        original=next((r for r in visible_slots(pub,day) if lesson_key(r)==lesson_key(row)),None)
+        if not original:
+            raise ValueError("Original allocation changed; review required.")
+        original_room=original.get("room","")
+        if original_room and any(lesson_key(r)!=lesson_key(row) and r.get("start","")<entry.end and entry.start<r.get("end","") and effective_room(pub,day,r)==original_room for r in visible_slots(pub,day)):
+            raise ValueError("Original room now conflicts with another allocation.")
+        people=lesson_people(pub,day,original)
     if entry.kind=="closure":
         check_no_day_records(day)
         people=[b.get("user") for b in pub.snapshot.get("bindings",{}).values() if isinstance(b,dict) and b.get("user")]
@@ -173,6 +179,8 @@ def board(request):
                 if not pub or not active or active.pk!=pub.pk or request.POST.get("publication")!=str(pub.pk) or not planning_day(active,day):
                     raise ValueError("Current reviewed publication or planning day changed.")
                 if valid:
+                    if form.cleaned_data["kind"]=="room" and form.cleaned_data.get("lesson") not in form.rows:
+                        raise ValueError("Review the current lesson.")
                     create_entry(request.user,active,day,form.cleaned_data,form.rows)
                     return redirect(link(day))
                 if action=="cancel":

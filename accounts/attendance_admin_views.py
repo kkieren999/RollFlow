@@ -91,7 +91,7 @@ class ReliefForm(forms.Form):
 @require_http_methods(["GET","POST"])
 def relief(request):
     pub=current()
-    from .workforce_service import closed, absent, duty_conflict, notify, lesson_has_records
+    from .workforce_service import closed, absent, duty_conflict, notify, lesson_has_records, raw_busy
     try:
         day=date.fromisoformat(request.GET.get("date") or timezone.localdate().isoformat())
     except ValueError:
@@ -127,7 +127,7 @@ def relief(request):
                         raise ValueError("A roll or movement already exists. No automatic ownership transfer is allowed.")
                     if ReliefAttendanceAssignment.objects.filter(publication=active,lesson_date=day,class_code=key[0],period=key[1],start=key[2],cancelled_at__isnull=True).exists():
                         raise ValueError("An assignment already exists; review or cancel it first.")
-                    if any(r["start"]<row["end"] and row["start"]<r["end"] for r in own_lessons(active,teacher,day)):
+                    if raw_busy(active,day,teacher,row["start"],row["end"]):
                         raise ValueError("The relief teacher already has an overlapping lesson.")
                     if ReliefAttendanceAssignment.objects.filter(publication=active,lesson_date=day,relief_teacher=teacher,
                          cancelled_at__isnull=True,start__lt=row["end"],end__gt=row["start"]).exists():
@@ -137,7 +137,7 @@ def relief(request):
                         regular_teacher=regular,relief_teacher=teacher,created_by=request.user,expires_at=expiry)
                     audit(request.user,"relief_lesson_assigned",teacher,after={"assignment":a.pk,"publication":active.pk,"regular_teacher":regular.pk})
                     notify(active,day,[regular.pk,teacher.pk],f"Relief assignment {key[0]} {key[1]} on {day.isoformat()}. Review your schedule.")
-                    return redirect(reverse("attendance-relief")+"?date="+day.isoformat())
+                    return redirect("attendance-relief") if day==timezone.localdate() else redirect(reverse("attendance-relief")+"?date="+day.isoformat())
                 if request.POST.get("action")=="cancel":
                     lock_sources()
                     a=get_object_or_404(ReliefAttendanceAssignment.objects.select_for_update(),pk=request.POST.get("assignment"))
