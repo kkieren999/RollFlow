@@ -1,0 +1,149 @@
+name: V3 foundation tests
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, integration/shared-core, windows-release]
+  pull_request:
+    branches: [main, integration/shared-core, windows-release]
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-24.04
+    env:
+      ROLLFLOW_DEBUG: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: |
+          python -m pip download --only-binary=:all: -r requirements.txt -d wheelhouse
+          python -m pip install --no-index --find-links=wheelhouse -r requirements.txt
+      - name: Validate embedded offline teacher JavaScript syntax
+        run: |
+          node -e "const fs=require('fs'),vm=require('vm');const h=fs.readFileSync('legacy/index.html','utf8');const m=h.match(/<script>([\s\S]*?)<\/script>/);if(!m)throw Error('Missing inline script');new vm.Script(m[1]);if(!m[1].includes('function rfMovementEntriesForDate()'))throw Error('Movement dashboard missing');"
+      - name: Validate bundled website source and permissions
+        run: |
+          python deployment/sync_training.py --check
+          python -m unittest deployment.test_training -v
+          node tests/shared-schedule-contract.cjs
+          node tests/teaching-permissions-logic.cjs
+          node tests/calendar-logic.cjs
+          node tests/classroom-management-logic.cjs
+          node tests/room-changes-logic.cjs
+      - run: python manage.py check
+      - run: python manage.py makemigrations --check --dry-run
+      - run: python manage.py test accounts
+      - run: python -m unittest deployment.test_native_permissions -v
+  postgres-and-native:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -r requirements.txt
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-16
+      - run: python -m compileall -q deployment rollflow accounts
+      - run: python deployment/ci_smoke.py
+
+  windows-offline-bundle:
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/integration/shared-core' || github.ref == 'refs/heads/windows-release'
+    runs-on: windows-2025
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14.10"
+          architecture: x64
+      - name: Download and verify runtime archives on the build machine
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = Join-Path $env:RUNNER_TEMP 'rf-runtime'
+          New-Item -ItemType Directory -Path $root | Out-Null
+          $py = 'https://www.python.org/ftp/python/3.14.10/python-3.14.10-embed-amd64.zip'
+          $pg = 'https://get.enterprisedb.com/postgresql/postgresql-18.7-1-windows-x64-binaries.zip'
+          Invoke-WebRequest $py -OutFile "$root/python.zip"
+          $expectedPython = '90905e64a840557d8c1bc4f5b74db3d7ee85e3ffb217611cac1c7813acea4159'
+          if ((Get-FileHash "$root/python.zip" -Algorithm SHA256).Hash.ToLower() -ne $expectedPython) { throw 'Python archive checksum mismatch' }
+          Invoke-WebRequest "$pg.sha256" -OutFile "$root/postgres.sha256"
+          $expectedPg = [regex]::Match((Get-Content "$root/postgres.sha256" -Raw), '\b[0-9A-Fa-f]{64}\b').Value.ToLower()
+          if ($expectedPg.Length -ne 64) { throw 'Vendor PostgreSQL checksum unavailable' }
+          Invoke-WebRequest $pg -OutFile "$root/postgres.zip"
+          if ((Get-FileHash "$root/postgres.zip" -Algorithm SHA256).Hash.ToLower() -ne $expectedPg) { throw 'PostgreSQL archive checksum mismatch' }
+          Expand-Archive "$root/python.zip" "$root/python"
+          Expand-Archive "$root/postgres.zip" "$root/postgres"
+          $pgRoot = Get-ChildItem "$root/postgres" -Directory -Recurse | Where-Object { (Test-Path (Join-Path $_.FullName 'bin/postgres.exe')) -and (Test-Path (Join-Path $_.FullName 'share')) } | Select-Object -First 1
+          if (!$pgRoot -and (Test-Path "$root/postgres/bin/postgres.exe")) { $pgRoot = Get-Item "$root/postgres" }
+          if (!$pgRoot) { throw 'PostgreSQL bin/lib/share layout not found' }
+          python deployment/build_windows.py --python-runtime "$root/python" --postgres-runtime $pgRoot.FullName --output "$env:RUNNER_TEMP/RollFlow"
+          if ($LASTEXITCODE -ne 0) { throw 'Bundle build failed' }
+      - name: Unit-test Windows password-file ACL handling
+        run: python -m unittest deployment.test_native_permissions -v
+      - name: Smoke-test bundled runtime, database and backup
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $bundle = "$env:RUNNER_TEMP/RollFlow"
+          $state = "$env:RUNNER_TEMP/rf-test-state"
+          # Regression: the actual Windows shortcuts must not silently reuse
+          # a previous version's default RollFlow-Staging instance.
+          $setupLauncher = Get-Content (Join-Path $bundle 'First Setup.cmd') -Raw
+          $startLauncher = Get-Content (Join-Path $bundle 'Start RollFlow.cmd') -Raw
+          foreach ($launcher in @($setupLauncher, $startLauncher)) {
+            if ($launcher -notmatch 'RollFlow-V3641-Staging') { throw 'V3.6.1 shortcuts must have a dedicated instance state' }
+            if ($launcher -notmatch '--state') { throw 'Shortcut state override missing' }
+          }
+          if ($setupLauncher -notmatch '--db-port 55437 --web-port 18085') { throw 'V3.6.1 setup must use independent database and web ports' }
+          if ($startLauncher -notmatch 'start') { throw 'Start shortcut must use configured V3.6.1 state' }
+          & "$bundle/python/python.exe" -m deployment.native --state $state init --no-admin
+          if ($LASTEXITCODE -ne 0) { throw 'Native setup failed' }
+          if (Test-Path (Join-Path $state 'initial-password.txt')) { throw 'Temporary initdb password was not deleted' }
+          & "$bundle/python/python.exe" -m deployment.native --state $state manage check
+          if ($LASTEXITCODE -ne 0) { throw 'Django system check failed' }
+          & "$bundle/python/python.exe" -m deployment.native --state $state manage makemigrations --check --dry-run
+          if ($LASTEXITCODE -ne 0) { throw 'Migration integrity check failed' }
+          & "$bundle/python/python.exe" -m deployment.native --state $state manage shell -c "from django.urls import reverse; from django.db import connection; from accounts.models import StaffProfile; assert reverse('teacher-week') == '/teacher/week/'; cursor = connection.cursor(); assert 'timetable_link_verified' in [col.name for col in connection.introspection.get_table_description(cursor, StaffProfile._meta.db_table)]"
+          if ($LASTEXITCODE -ne 0) { throw 'V3.6.1 teacher route or migrated identity verification missing' }
+          & "$bundle/python/python.exe" -m deployment.native --state $state manage shell -c "from django.urls import reverse; import openpyxl, pypdf, cryptography; from accounts.models import OneSchoolArchiveBatch; assert reverse('oneschool-documents') == '/manage/oneschool/documents/'; assert OneSchoolArchiveBatch._meta.db_table in __import__('django.db',fromlist=['connection']).connection.introspection.table_names()"
+          & "$bundle/python/python.exe" -m deployment.native --state $state manage shell -c "from accounts.oneschool_storage import save_encrypted, read_encrypted; token=save_encrypted(b'fictional-offline-import'); assert read_encrypted(token) == b'fictional-offline-import'"
+          if ($LASTEXITCODE -ne 0) { throw 'Windows local encrypted OneSchool archive smoke test failed' }
+          & "$bundle/python/python.exe" -m deployment.native --state $state manage shell -c "from django.urls import reverse; from django.db import connection; from accounts.models import OneSchoolClassMembership; assert reverse('oneschool-documents-apply-classes', kwargs={'pk':1}) == '/manage/oneschool/documents/1/apply-classes/'; assert OneSchoolClassMembership._meta.db_table in connection.introspection.table_names()"
+          if ($LASTEXITCODE -ne 0) { throw 'Class membership migration or import route unavailable' }
+          & "$bundle/python/python.exe" -m deployment.native --state $state manage shell -c "from django.db import connection; from django.urls import reverse; from accounts.models import OneSchoolLineAllocation, OneSchoolStaffClassReference; assert all(x._meta.db_table in connection.introspection.table_names() for x in (OneSchoolLineAllocation, OneSchoolStaffClassReference)); assert reverse('oneschool-documents-apply-alignment', kwargs={'pk':1}) == '/manage/oneschool/documents/1/apply-alignment/'; assert reverse('oneschool-documents-apply-staff-evidence', kwargs={'pk':1}) == '/manage/oneschool/documents/1/apply-staff-evidence/'"
+          if ($LASTEXITCODE -ne 0) { throw 'V3.6.4 OneSchool staff and line evidence schema/route smoke failed' }
+          & "$bundle/python/python.exe" -m deployment.native --state $state manage shell -c "from accounts.test_oneschool_real_formats import fictional_line, without_excel_dimensions; from accounts.oneschool_alignment import parse_alignment_file; rows, detail = parse_alignment_file(without_excel_dimensions(fictional_line(1))); assert detail['line_number'] == 1 and len(rows) > 0"
+          if ($LASTEXITCODE -ne 0) { throw 'Windows missing-dimension OneSchool XLSX parser smoke failed' }
+          & "$bundle/python/python.exe" -m deployment.native --state $state manage shell -c "from accounts.test_oneschool_real_formats import fictional_mixed_staff_pdf; from accounts.oneschool_staff_pdf import parse_staff_pdf; rows, info = parse_staff_pdf(fictional_mixed_staff_pdf()); assert len(rows) == 1 and info['pages_without_legend'] == 2"
+          if ($LASTEXITCODE -ne 0) { throw 'Windows mixed staff PDF legend smoke test failed' }
+          & "$bundle/python/python.exe" -m deployment.native --state $state backup "$env:RUNNER_TEMP/rf-test-backup.dump"
+          if ($LASTEXITCODE -ne 0) { throw 'Database backup failed' }
+          # Isolated CI only: recreate pre-upgrade schema, seed an archive and student,
+          # then exercise the actual supported upgrade command. Never downgrade a real instance.
+          & "$bundle/python/python.exe" -m deployment.native --state $state manage migrate accounts 0011 --noinput
+          if ($LASTEXITCODE -ne 0) { throw 'Could not prepare old schema for upgrade smoke' }
+          & "$bundle/python/python.exe" -m deployment.native --state $state manage shell -c "from accounts.models import Student, OneSchoolArchiveBatch, OneSchoolArchivedFile; from accounts.oneschool_storage import save_encrypted; from django.contrib.auth.models import User; import hashlib; u=User.objects.create_superuser('upgrade-fixture', password='Fictional-ci-password-321!'); Student.objects.create(student_id='UPGRADEFAKE',first_name='Fictional',last_name='Learner',year_level=7); b=OneSchoolArchiveBatch.objects.create(kind='students',label='fictional prior import',created_by=u,status='applied'); raw=b'fictional-existing-archive'; OneSchoolArchivedFile.objects.create(batch=b,original_name='fictional.xlsx',storage_token=save_encrypted(raw),sha256=hashlib.sha256(raw).hexdigest(),size=len(raw),format='.xlsx')"
+          if ($LASTEXITCODE -ne 0) { throw 'Could not seed prior schema with fictional data' }
+          & "$bundle/python/python.exe" -m deployment.native --state $state manage shell -c "from accounts.models import ConnectedSchoolPublication; from django.contrib.auth.models import User; from datetime import date; ConnectedSchoolPublication.objects.create(name='Fictional prior publication',starts=date(2026,1,12),ends=date(2026,3,27),source_batches={},snapshot={'preservation_marker':'FICTIONAL-KEEP'},digest='a'*64,published_by=User.objects.get(username='upgrade-fixture'))"
+          if ($LASTEXITCODE -ne 0) { throw 'Could not seed existing V3.6.5 publication' }
+          & "$bundle/python/python.exe" -m deployment.native --state $state upgrade
+          if ($LASTEXITCODE -ne 0) { throw 'V3.6.6 existing-instance upgrade failed' }
+          & "$bundle/python/python.exe" -m deployment.native --state $state manage shell -c "from accounts.models import Student, OneSchoolArchivedFile, ConnectedSchoolPublication; from accounts.oneschool_storage import read_encrypted; from django.urls import reverse; from django.db import connection; from django.conf import settings; import pathlib; assert Student.objects.filter(student_id='UPGRADEFAKE').exists(); f=OneSchoolArchivedFile.objects.get(original_name='fictional.xlsx'); assert read_encrypted(f.storage_token)==b'fictional-existing-archive'; assert ConnectedSchoolPublication._meta.db_table in connection.introspection.table_names(); assert reverse('connected-school')=='/manage/connected/'; backups=list((pathlib.Path(settings.ROLLFLOW_ARCHIVE_STATE_DIR)/'upgrade-backups').iterdir()); assert len(backups)==1 and (backups[0]/'rollflow.dump').is_file() and (backups[0]/'oneschool-import.key').is_file() and (backups[0]/'oneschool-imports'/(f.storage_token+'.rfenc')).is_file()"
+          if ($LASTEXITCODE -ne 0) { throw 'Existing database or archive preservation smoke failed' }
+          & "$bundle/python/python.exe" -m deployment.native --state $state manage shell -c "from accounts.models import PendingTeacherSetup, ConnectedSchoolPublication; from django.db import connection; from django.urls import reverse; assert ConnectedSchoolPublication.objects.get(active=True).snapshot=={'preservation_marker':'FICTIONAL-KEEP'}; assert PendingTeacherSetup._meta.db_table in connection.introspection.table_names(); assert reverse('automated-school-setup') == '/manage/connected/setup/'"
+          if ($LASTEXITCODE -ne 0) { throw 'V3.6.6 setup schema or route unavailable' }
+          & "$bundle/python/python.exe" -m deployment.native --state $state manage shell -c "from django.template.loader import get_template; from django.conf import settings; from pathlib import Path; expected=['ui_system.html','ui_header.html','staff_portal.html','connected_school.html','automated_setup.html','teacher_week.html','teacher_timetable.html','oneschool_documents.html']; assert all(get_template(x) for x in expected); text=(Path(settings.BASE_DIR)/'legacy'/'index.html').read_text(encoding='utf-8'); assert text.count('<!-- ROLLFLOW_SERVER_BOOTSTRAP -->')==1 and '--green:#147f38' in text"
+          if ($LASTEXITCODE -ne 0) { throw 'V3.6.7 unified design system, portal template or legacy teacher bootstrap missing' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RollFlow-V3.7.1-Windows-x64-STAGING
+          path: ${{ runner.temp }}/RollFlow/
+          if-no-files-found: error
+          retention-days: 14
