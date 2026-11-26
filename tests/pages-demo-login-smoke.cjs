@@ -133,7 +133,9 @@ async function test() {
     assert.match(await page.locator('.rf-student-profile-grid').innerText(),/PIN #\s+Restricted/);
     await page.locator('#review-dialog [data-review-close]').first().click();
     await page.locator('[data-rf-student-action="attendance"]').click();
-    assert.match(await page.locator('#review-dialog').innerText(),/Semester [12]/);
+    assert.match(await page.locator('#review-dialog').innerText(),/Last 8 months/);
+    assert.match(await page.locator('#review-dialog').innerText(),/Attendance breakdown/);
+    assert(await page.locator('#review-dialog .rf-student-attendance-row').count()>0,'Student attendance should show class breakdowns');
     await page.locator('#review-dialog [data-review-close]').first().click();
     await page.locator('[data-rf-classroom-picker]').click();
     await page.locator('#review-dialog [data-rf-student-action="late"]').click();
