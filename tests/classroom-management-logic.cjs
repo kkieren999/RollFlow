@@ -9,7 +9,7 @@ const test=String.raw`
 const students=[{id:'s1',year:8,status:'active'},{id:'s2',year:9,status:'active'},{id:'s3',year:8,status:'inactive'}];
 const previewStudents=students,planning={enrolments:[{studentId:'s1',classCode:'M8',start:'2026-01-01'},{studentId:'s2',classCode:'E9',start:'2026-01-01'}]};
 let config={roles:['aide'],disabled:[],expires:'',faculty:'Mathematics',year:'8'},rfuActor='actor';
-const rfuConfig=()=>config,brisbaneToday=()=> '2026-11-26',rfuAssignedStudents=()=>['s1'],rfuReferredStudents=()=>['s2'];
+const rfTeachingMode=()=> 'none',rfuConfig=()=>config,brisbaneToday=()=> '2026-11-26',rfuAssignedStudents=()=>['s1'],rfuReferredStudents=()=>['s2'];
 const rfuActiveClasses=()=>[{code:'M8',subject:'Mathematics',year:8},{code:'E9',subject:'English',year:9}];
 const rfuClassAllowed=(c,g)=>g.scope==='school'||g.scope==='assigned'&&c.code==='M8'||g.scope==='year'&&String(c.year)===config.year||g.scope==='faculty'&&c.subject===config.faculty;
 const checks=[];function check(name,v){if(!v)throw Error(name);checks.push(name)}
