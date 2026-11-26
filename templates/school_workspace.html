@@ -3,16 +3,20 @@
 <main id="main-content"><h1>Staff workspace</h1><p>Welcome, {{ request.user.get_full_name|default:request.user.username }}.</p>
 <nav><a href="{% url 'school-workspace' %}">Workspace home</a>{% if teaching %}<a href="{% url 'teacher' %}">My teaching</a>{% endif %}{% if admin_access %}<a href="{% url 'management-dashboard' %}">Administration</a>{% endif %}</nav>
 <section><h2>Your assigned roles</h2><ul>{% for grant in grants %}<li>{{ grant.role }} — {{ grant.scope }} {{ grant.scope_value }}</li>{% endfor %}</ul><nav>{% for code,label in modules.items %}<a href="{% url 'school-workspace-module' code %}">{{ label }}</a>{% endfor %}</nav></section>
-{% if module %}<section><h2>Scoped records</h2><p>Read-only. Manual classes and timetable are separate from published OneSchool data. No attendance or movement data is available through these modules.</p>
-<div class="table-wrap"><table><thead><tr>
+{% if module %}<section><h2>Scoped records</h2><p>Read-only. No attendance or movement data is available through these modules.</p>
+{% if module == "published_classes" or module == "published_timetable" %}{% if publication %}<p>Published timetable: {{ publication.name }}</p>{% else %}<p>No active OneSchool publication.</p>{% endif %}{% endif %}{% if module == "published_timetable" and publication %}<form method="get"><label>Date <input type="date" name="date" value="{{ day|date:'Y-m-d' }}" min="{{ publication.starts|date:'Y-m-d' }}" max="{{ publication.ends|date:'Y-m-d' }}"></label><button>View date</button></form>{% endif %}<div class="table-wrap"><table><thead><tr>
 {% if module == "staff" %}<th>Name</th><th>Faculty</th>
 {% elif module == "students" %}<th>Name</th><th>Year</th><th>Home group</th>
 {% elif module == "classes" %}<th>Class</th><th>Subject</th><th>Year</th>
+{% elif module == "published_classes" %}<th>Class</th><th>Name</th><th>Years</th>
+{% elif module == "published_timetable" %}<th>Period</th><th>Class</th><th>Time</th><th>Room</th>
 {% elif module == "timetable" %}<th>Day</th><th>Period</th><th>Class</th><th>Room</th>{% endif %}
 </tr></thead><tbody>{% for row in rows %}<tr>
 {% if module == "staff" %}<td>{{ row.user.get_full_name|default:row.user.username }}</td><td>{{ row.faculty }}</td>
 {% elif module == "students" %}<td>{{ row.first_name }} {{ row.last_name }}</td><td>{{ row.year_level }}</td><td>{{ row.home_group }}</td>
 {% elif module == "classes" %}<td>{{ row.code }}</td><td>{{ row.subject }}</td><td>{{ row.year_level }}</td>
+{% elif module == "published_classes" %}<td>{{ row.code }}</td><td>{{ row.name }}</td><td>{{ row.years|join:", " }}</td>
+{% elif module == "published_timetable" %}<td>{{ row.period_label }}</td><td>{{ row.code }}</td><td>{{ row.start }}–{{ row.end }}</td><td>{{ row.room }}</td>
 {% elif module == "timetable" %}<td>{{ row.get_weekday_display }}</td><td>{{ row.period.label }}</td><td>{{ row.school_class.code }}</td><td>{{ row.room.code }}</td>{% endif %}
 </tr>{% empty %}<tr><td colspan="4">No records within your assigned scope.</td></tr>{% endfor %}</tbody></table></div>{% include "school_access_pagination.html" with page=rows %}</section>{% endif %}
 </main></body></html>

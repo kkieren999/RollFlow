@@ -12,11 +12,13 @@ CAPABILITIES = {
     "students": "Student directory",
     "classes": "Manual class directory",
     "timetable": "Manual timetable",
+    "published_classes": "Published OneSchool classes",
+    "published_timetable": "Published OneSchool timetable",
 }
 SCOPES = {
     "school": set(CAPABILITIES),
-    "faculty": {"staff", "classes", "timetable"},
-    "year": {"students", "classes", "timetable"},
+    "faculty": {"staff", "classes", "timetable", "published_classes", "published_timetable"},
+    "year": {"students", "classes", "timetable", "published_classes", "published_timetable"},
 }
 YEARS = {str(y) for y in range(7, 13)}
 
@@ -75,3 +77,33 @@ def scoped_rows(grants, module):
             field = "school_class__year_level" if module == "timetable" else "year_level"
             condition |= Q(**{field: int(g.scope_value)})
     return qs.filter(condition)
+
+
+def published_rows(publication, grants, module, day):
+    """Read-only projection without roster IDs or raw staff identifiers."""
+    from .connected_school import personal_codes, visible_slots
+    applicable = [g for g in grants if valid_grant(g) and module in g.capabilities]
+    whole = any(g.scope == "school" for g in applicable)
+    years = {int(g.scope_value) for g in applicable if g.scope == "year"}
+    faculties = {g.scope_value.casefold() for g in applicable if g.scope == "faculty"}
+    codes = set()
+    if faculties and not whole:
+        bound_ids = {b["user"] for b in publication.snapshot.get("bindings", {}).values()
+                     if isinstance(b, dict) and isinstance(b.get("user"), int)}
+        profiles = StaffProfile.objects.filter(user_id__in=bound_ids, user__is_active=True).select_related("user")
+        for profile in profiles:
+            if profile.faculty.casefold() in faculties:
+                codes.update(personal_codes(publication, profile.user))
+    classes = {c["code"]: c for c in publication.snapshot.get("classes", [])}
+    def year_allowed(code):
+        values = classes.get(code, {}).get("years", [])
+        return bool(values) and all(type(y) is int and y in years for y in values)
+    def slot_allowed(slot):
+        return whole or slot.get("staff") in codes or year_allowed(slot.get("code"))
+    if module == "published_classes":
+        permitted_codes = {s["code"] for s in publication.snapshot.get("slots", []) if s.get("staff") in codes}
+        return [{"code": c["code"], "name": c["name"], "years": c.get("years", [])}
+                for c in classes.values() if whole or c["code"] in permitted_codes or year_allowed(c["code"])]
+    return [{"code": s["code"], "period_label": s.get("period_label", ""), "room": s.get("room", ""),
+             "start": s.get("start", ""), "end": s.get("end", "")}
+            for s in visible_slots(publication, day) if slot_allowed(s)]

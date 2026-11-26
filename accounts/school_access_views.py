@@ -10,7 +10,7 @@ from django.views.decorators.http import require_GET, require_http_methods
 from .models import StaffAccessGrant, SecurityEvent, StaffProfile, PendingTeacherSetup
 from .staff_views import administrator
 from .permissions import can_teach
-from .school_access import ROLES, CAPABILITIES, SCOPES, valid_scope, grants_for, visible_modules, scoped_rows
+from .school_access import ROLES, CAPABILITIES, SCOPES, valid_scope, grants_for, visible_modules, scoped_rows, published_rows
 
 
 class GrantForm(forms.Form):
@@ -86,9 +86,18 @@ def workspace(request, module=None):
     modules = visible_modules(grants)
     if not modules or (module is not None and module not in modules):
         return HttpResponseForbidden("Assigned staff access required.")
-    rows = Paginator(scoped_rows(grants, module), 50).get_page(request.GET.get("page")) if module else None
+    publication = day = None
+    if module in ("published_classes", "published_timetable"):
+        from .connected_school import current, selected_day
+        publication = current()
+        day = selected_day(publication, request.GET.get("date")) if publication else None
+        data = published_rows(publication, grants, module, day) if publication else []
+    else:
+        data = scoped_rows(grants, module) if module else []
+    rows = Paginator(data, 50).get_page(request.GET.get("page")) if module else None
     return render(request, "school_workspace.html", {
         "grants": grants, "modules": modules, "module": module, "rows": rows,
+        "publication": publication, "day": day,
         "teaching": can_teach(request.user),
         "admin_access": request.user.is_staff and request.user.is_superuser,
     })
