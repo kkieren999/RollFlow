@@ -4,7 +4,6 @@ const assert = require('node:assert/strict');
 const { spawn } = require('node:child_process');
 const { chromium } = require('playwright-core');
 const path = require('node:path');
-const fs = require('node:fs');
 const root = path.resolve(__dirname, '..');
 const py = process.env.RF_PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
 const users = ['admin','principal','deputy','hod','ylc','business','office','teacher','swilliams','learning','aide','relief','guidance'];

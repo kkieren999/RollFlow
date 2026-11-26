@@ -52,7 +52,10 @@ def main():
     subprocess.run([str(out / "python" / "python.exe"), "-c",
                     "import django, psycopg, waitress, whitenoise, PIL, argon2; print(django.get_version())"],
                    cwd=out, check=True)
-    from deployment.windows_launchers import write_launchers
+    if __package__:
+        from .windows_launchers import write_launchers
+    else:
+        from windows_launchers import write_launchers
     write_launchers(out)
     (out / "BUILD-INFO.json").write_text(json.dumps({
         "version": "3.8.0-staging",
