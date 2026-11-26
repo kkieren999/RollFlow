@@ -1,3 +1,7 @@
+# V4.3 movement staging
+
+See [V4.3 notes](../docs/v4.3-movements.md). Configure approved destinations, grant specific reception access, issue passes from a current class. Existing database paths unchanged. Fictional data only.
+
 # V4.2 live attendance staging
 
 See [V4.2 notes](../docs/v4.2-attendance.md). Existing database state paths unchanged. Fictional staging only.

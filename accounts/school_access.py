@@ -17,12 +17,15 @@ CAPABILITIES = {
     "published_classes": "Published OneSchool classes",
     "published_timetable": "Published OneSchool timetable",
     "attendance_monitor": "School-wide attendance monitoring (summary only)",
+    "movement_monitor": "School-wide student movement monitoring",
+    "movement_receive": "Destination reception (check in / release)",
 }
 SCOPES = {
-    "school": set(CAPABILITIES),
+    "school": set(CAPABILITIES) - {"movement_receive"},
     "faculty": {"staff", "classes", "timetable", "published_classes", "published_timetable"},
     "year": {"students", "classes", "timetable", "published_classes", "published_timetable"},
     "class": {"published_classes", "published_timetable"},
+    "destination": {"movement_receive"},
 }
 YEARS = {str(y) for y in range(7, 13)}
 
@@ -31,7 +34,8 @@ def valid_scope(scope, value):
     return isinstance(value, str) and ((scope == "school" and value == "") or
             (scope == "faculty" and isinstance(value, str) and bool(value.strip()) and value == value.strip()) or
             (scope == "year" and value in YEARS) or
-            (scope == "class" and bool(value) and len(value) <= 30 and value == value.strip().upper()))
+            (scope == "class" and bool(value) and len(value) <= 30 and value == value.strip().upper()) or
+            (scope == "destination" and value.isascii() and value.isdecimal() and 0 < len(value) <= 18 and value[0] != "0"))
 
 
 def valid_grant(grant):

@@ -29,7 +29,8 @@ def shell(user):
     grants = grants_for(user)
     modules = visible_modules(grants)
     modules.pop("attendance_monitor", None)
-    return {"teaching": can_teach(user), "monitor": can_monitor(user),
+    from .movement_service import may_access
+    return {"movements":may_access(user), "teaching": can_teach(user), "monitor": can_monitor(user),
             "admin_access": user.is_staff and user.is_superuser,
             "modules": modules, "grants": grants}
 

@@ -22,8 +22,8 @@ class GrantForm(forms.Form):
     template = forms.ModelChoiceField(queryset=RoleTemplate.objects.none(), required=False, help_text="Optional reviewed bundle. Its scope and capabilities are copied at assignment; choose matching scope. Role label is copied.")
     starts_at = forms.DateTimeField(required=False, widget=forms.DateTimeInput(attrs={"type":"datetime-local"}), help_text="School local time; blank means immediately.")
     expires_at = forms.DateTimeField(required=False, widget=forms.DateTimeInput(attrs={"type":"datetime-local"}), help_text="School local time; blank means no scheduled expiry.")
-    scope = forms.ChoiceField(choices=[("faculty", "Staff faculty"), ("year", "Year level"), ("school", "Whole school"), ("class", "Published class (read only)")])
-    scope_value = forms.CharField(max_length=100, required=False, help_text="Exact existing faculty name, year 7–12 or published class code. Leave blank for whole school.")
+    scope = forms.ChoiceField(choices=[("faculty", "Staff faculty"), ("year", "Year level"), ("school", "Whole school"), ("class", "Published class (read only)"), ("destination", "Movement destination ID")])
+    scope_value = forms.CharField(max_length=100, required=False, help_text="Exact existing faculty name, year 7–12 or published class code, or movement destination ID (see destination settings). Leave blank for whole school.")
     capabilities = forms.MultipleChoiceField(choices=list(CAPABILITIES.items()), widget=forms.CheckboxSelectMultiple, required=False)
 
     def __init__(self, *args, **kwargs):
@@ -58,6 +58,10 @@ class GrantForm(forms.Form):
                 c["class_publication"] = pub.pk
             if not end:
                 self.add_error("expires_at", "Published class grants require an expiry.")
+        if scope == "destination" and valid_scope(scope,value):
+            from .models import MovementDestination
+            if not MovementDestination.objects.filter(pk=int(value),active=True,requires_reception=True).exists():
+                self.add_error("scope_value", "Select an active staffed movement destination ID.")
         if not valid_scope(scope, value):
             self.add_error("scope_value", "Enter a valid scope.")
         elif scope == "faculty" and not StaffProfile.objects.filter(faculty__iexact=value).exists():
@@ -130,6 +134,8 @@ def workspace(request, module=None):
     modules = visible_modules(grants)
     if module == "attendance_monitor" and module in modules:
         return redirect("live-monitor")
+    if module in ("movement_monitor","movement_receive") and module in modules:
+        return redirect("movement-board")
     if not modules or (module is not None and module not in modules):
         return HttpResponseForbidden("Assigned staff access required.")
     publication = day = None

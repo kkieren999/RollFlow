@@ -6,9 +6,14 @@ from accounts.teacher_week_views import week as teacher_week
 from accounts.connected_views import roster as connected_roster
 from accounts.school_access_views import workspace, manage_access
 
-from accounts import live_views, security_views
+from accounts import live_views, security_views, movement_views
 
 urlpatterns = [
+    path('live/movements/', movement_views.board, name='movement-board'),
+    path('live/movements/issue/', movement_views.issue, name='movement-issue'),
+    path('live/movements/<int:pk>/', movement_views.detail, name='movement-detail'),
+    path('live/movements/<int:pk>/change/', movement_views.change, name='movement-change'),
+    path('manage/movement-destinations/', movement_views.destinations, name='movement-destinations'),
     path("manage/security/templates/", security_views.templates, name="security-templates"),
     path("manage/security/effective/<int:pk>/", security_views.effective, name="security-effective"),
     path("manage/security/history/", security_views.history, name="security-history"),

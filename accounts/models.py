@@ -374,3 +374,68 @@ class ReliefAttendanceAssignment(models.Model):
     class Meta:
         constraints = [models.UniqueConstraint(fields=["publication", "lesson_date", "class_code", "period", "start"],
             condition=models.Q(cancelled_at__isnull=True), name="unique_active_relief_attendance")]
+
+
+class MovementDestination(models.Model):
+    """Reviewed non-clinical destination configuration; stable identity for scoped grants."""
+    name = models.CharField(max_length=80, unique=True)
+    expected_minutes = models.PositiveSmallIntegerField(default=10)
+    requires_reception = models.BooleanField(default=False)
+    active = models.BooleanField(default=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.CheckConstraint(condition=models.Q(expected_minutes__gte=1, expected_minutes__lte=180),
+                                                name="movement_duration_bounds")]
+
+
+class StudentMovement(models.Model):
+    class State(models.TextChoices):
+        OUTBOUND = "outbound", "Departed classroom"
+        ARRIVED = "arrived", "Checked in"
+        RETURNING = "returning", "Returning to classroom"
+        RETURNED = "returned", "Returned"
+        CLOSED = "closed", "Administratively closed — return unconfirmed"
+
+    publication = models.ForeignKey(ConnectedSchoolPublication, on_delete=models.PROTECT)
+    student = models.ForeignKey(Student, on_delete=models.PROTECT)
+    issuer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    destination = models.ForeignKey(MovementDestination, on_delete=models.PROTECT)
+    destination_name = models.CharField(max_length=80)
+    requires_reception = models.BooleanField()
+    lesson_date = models.DateField()
+    class_code = models.CharField(max_length=30)
+    period = models.CharField(max_length=50)
+    start = models.CharField(max_length=5)
+    end = models.CharField(max_length=5)
+    origin_room = models.CharField(max_length=100, blank=True)
+    state = models.CharField(max_length=12, choices=State.choices, default=State.OUTBOUND)
+    revision = models.PositiveIntegerField(default=1)
+    departed_at = models.DateTimeField()
+    due_at = models.DateTimeField()
+    closed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["student"], condition=models.Q(closed_at__isnull=True), name="one_open_student_movement"),
+            models.CheckConstraint(condition=(models.Q(state__in=["outbound","arrived","returning"],closed_at__isnull=True) |
+                models.Q(state__in=["returned","closed"],closed_at__isnull=False)), name="movement_closed_state"),
+            models.CheckConstraint(condition=models.Q(due_at__gt=models.F("departed_at")), name="movement_due_order"),
+        ]
+        indexes = [models.Index(fields=["closed_at","due_at"],name="movement_open_due_idx")]
+
+
+class MovementEvent(models.Model):
+    """Append-only through protected endpoints. No free-text medical/welfare details."""
+    movement = models.ForeignKey(StudentMovement, on_delete=models.PROTECT, related_name="events")
+    revision = models.PositiveIntegerField()
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    action = models.CharField(max_length=20)
+    from_state = models.CharField(max_length=12, blank=True)
+    to_state = models.CharField(max_length=12)
+    reason_code = models.CharField(max_length=30, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["movement","revision"],name="unique_movement_revision")]
