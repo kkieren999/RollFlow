@@ -110,3 +110,63 @@ class DatedSchoolTests(TestCase):
         self.version.save(update_fields=["status"])
         self.assertEqual(current().pk, publication.pk)
         self.assertEqual(len(visible_slots(current(), self.monday)),2)
+
+    def test_data_centre_source_freshness_and_duplicate_publication(self):
+        from .attendance import publication_ready
+        self.rosters()
+        publication = self.publish()
+        self.assertTrue(publication_ready(publication))
+        response = self.client.get("/manage/school-data/")
+        self.assertContains(response, "Candidate changes and validation")
+        self.assertEqual(response.context["changes"]["membership_added"], 0)
+        self.assertEqual(self.publish().pk, publication.pk)
+        self.source("students", "replacement.xlsx", fictional_students())
+        self.assertFalse(publication_ready(publication))
+        self.assertContains(self.client.get("/manage/school-data/"), "Review and republish the student directory")
+        self.assertNotEqual(self.publish().pk, publication.pk)
+        self.assertTrue(publication_ready(current()))
+        self.client.force_login(self.a)
+        self.assertEqual(self.client.get("/manage/school-data/").status_code,403)
+        self.assertEqual(self.client.get("/manage/school-data/transfers/").status_code,403)
+
+    def test_safe_restore_requires_exact_sources_and_creates_new_identity(self):
+        from .models import ConnectedSchoolPublication
+        self.rosters()
+        original = self.publish()
+        original.active=False
+        original.save(update_fields=["active"])
+        path=f"/manage/school-data/restore/{original.pk}/"
+        self.assertEqual(self.client.post(path,{"confirm":"yes","digest":"wrong"}).status_code,400)
+        self.assertEqual(self.client.post(path,{"confirm":"yes","digest":original.digest}).status_code,302)
+        self.assertNotEqual(current().pk,original.pk)
+        self.assertEqual(current().digest,original.digest)
+        self.assertFalse(ConnectedSchoolPublication.objects.get(pk=original.pk).active)
+        active=current()
+        active.active=False
+        active.save(update_fields=["active"])
+        self.source("students","changed.xlsx",fictional_students())
+        self.assertContains(self.client.post(path,{"confirm":"yes","digest":original.digest}),"Current sources or identities differ")
+        self.assertIsNone(current())
+
+    def test_restore_and_replacement_protect_recorded_rolls(self):
+        from .models import AttendanceRoll
+        self.rosters()
+        original=self.publish()
+        roll=AttendanceRoll.objects.create(publication=original,lesson_date=self.monday,
+            class_code="DEMO07A",period="Care class",start="08:35",end="08:50",
+            teacher=self.a,roster=[self.student.pk],marks={str(self.student.pk):"P"})
+        self.source("students","replacement.xlsx",fictional_students())
+        p=self.preview()
+        request={"action":"publish","digest":p["digest"],"confirm":"yes"}
+        self.assertContains(self.client.post("/manage/connected/dated/",request),"explicitly acknowledge")
+        self.assertEqual(current().pk,original.pk)
+        request["acknowledge_rolls"]="yes"
+        self.assertEqual(self.client.post("/manage/connected/dated/",request).status_code,302)
+        latest=current()
+        latest.active=False
+        latest.save(update_fields=["active"])
+        self.assertContains(self.client.post(f"/manage/school-data/restore/{latest.pk}/",
+            {"confirm":"yes","digest":latest.digest}),"Attendance exists")
+        roll.refresh_from_db()
+        self.assertEqual(roll.publication_id,original.pk)
+        self.assertIsNone(current())
