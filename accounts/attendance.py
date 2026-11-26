@@ -39,11 +39,15 @@ def lesson_key(row):
     return (row["code"], str(row["period"]), row["start"])
 
 
+def non_instructional(row):
+    return bool(re.search(r"\b(lunch|recess|break|interval|playground duty|supervision)\b", str(row.get("period","")), re.I))
+
+
 def lesson_valid(row):
     try:
         code, period, start = lesson_key(row)
         end = row["end"]
-        if re.search(r"\b(lunch|recess|break|interval|playground duty|supervision)\b", period, re.I):
+        if non_instructional(row):
             return False
         return (0 < len(code) <= 30 and 0 < len(period) <= 50 and len(start) == len(end) == 5
                 and time.fromisoformat(start) < time.fromisoformat(end))
@@ -81,7 +85,7 @@ def own_lessons(pub, user, day):
         if counts[key]!=1 or any(other is not r and (other.get("staff")==r.get("staff") or other["code"]==r["code"])
                  and other["start"]<r["end"] and r["start"]<other["end"] for other in all_slots):
             continue
-        result.append(r)
+        result.append(dict(r, relief=bool(assignment)))
     return result
 
 

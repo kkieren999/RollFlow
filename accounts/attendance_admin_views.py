@@ -145,3 +145,40 @@ def relief(request):
             error=str(exc) if isinstance(exc,ValueError) else "Concurrent assignment changed; review again."
     assignments=ReliefAttendanceAssignment.objects.filter(lesson_date=day).select_related("regular_teacher","relief_teacher").order_by("start","pk")
     return render(request,"attendance_relief.html",{"form":form,"publication":pub,"day":day,"assignments":assignments,"error":error})
+
+
+@administrator
+@require_http_methods(["GET"])
+def student_report(request):
+    """Bounded, admin-only history. No unmarked lesson is inferred as absence."""
+    from datetime import timedelta
+    from django.core.paginator import Paginator
+    from .models import Student
+    today=timezone.localdate()
+    try:
+        start=date.fromisoformat(request.GET.get("start") or (today-timedelta(days=6)).isoformat())
+        end=date.fromisoformat(request.GET.get("end") or today.isoformat())
+        if not 0<=(end-start).days<=30 or end>today:
+            raise ValueError()
+    except ValueError:
+        return HttpResponseBadRequest("Choose up to 31 historical calendar days.")
+    query=request.GET.get("student","").strip()[:100]
+    student=Student.objects.filter(student_id__iexact=query).first() if query else None
+    rows=[]
+    totals={"P":0,"A":0,"L":0}
+    exceptions=0
+    if student:
+        # JSON filtering differs between SQLite and PostgreSQL. Bounded date scan
+        # avoids backend-specific membership queries and never reveals other students.
+        for roll in AttendanceRoll.objects.filter(lesson_date__range=(start,end),submitted_at__isnull=False).select_related("publication").order_by("lesson_date","start","pk").iterator():
+            if student.pk not in roll.roster:
+                continue
+            try:
+                frozen_students(roll)
+                mark=roll.marks[str(student.pk)]
+                totals[mark]+=1
+                rows.append({"roll":roll,"mark":dict(MARKS)[mark]})
+            except ValueError:
+                exceptions+=1
+    return render(request,"attendance_student_report.html",{"query":query,"student":student,"start":start,
+        "end":end,"rows":Paginator(rows,50).get_page(request.GET.get("page")),"totals":totals,"exceptions":exceptions})

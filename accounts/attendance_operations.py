@@ -1,7 +1,7 @@
 """Daily exception-aware attendance status and frozen-roll verification."""
 from collections import Counter
 from django.utils import timezone
-from .attendance import lesson_valid, lesson_key, publication_ready, roster_for, AttendanceUnavailable, active_relief
+from .attendance import lesson_valid, non_instructional, lesson_key, publication_ready, roster_for, AttendanceUnavailable, active_relief
 from .connected_school import visible_slots, personal_codes, canonical
 from .models import AttendanceRoll, AttendanceRevision, Student, StaffProfile
 
@@ -88,16 +88,17 @@ def daily_status(pub,day,now=None):
             try:
                 roster_for(pub,row["code"],day)
                 overdue=day<now.date() or (day==now.date() and now.strftime("%H:%M")>=row["end"])
-                state=("Overdue draft" if roll else "Overdue — Not started") if overdue else ("Draft" if roll else "Not started")
+                state=("Overdue — Draft" if roll else "Overdue — Not started") if overdue else ("Draft" if roll else "Not started")
             except AttendanceUnavailable:
                 state="Roster not ready — review required"
         add(key,state,roll)
     for key,roll in rolls.items():
         if key not in seen:
             add(key,"No current allocation — review required",roll,False)
+    invalid=sum(not lesson_valid(r) and not non_instructional(r) for r in source)
     # The count is scheduled unique valid lesson keys, never just existing roll rows.
     return rows,{"expected":len(seen),"submitted":summary["Submitted"],
-        "outstanding":len(seen)-summary["Submitted"],"overdue":summary["Overdue draft"]+summary["Overdue — Not started"],
-        "exceptions":sum(n for label,n in summary.items() if "review required" in label),
-        "excluded":len(source)-len(slots),
+        "outstanding":len(seen)-summary["Submitted"],"overdue":summary["Overdue — Draft"]+summary["Overdue — Not started"],
+        "exceptions":invalid+sum(n for label,n in summary.items() if "review required" in label),
+        "invalid":invalid,"excluded":sum(non_instructional(r) for r in source),
         "reconciled":sum(r["reconciliation"]=="Manually reconciled" for r in rows)}

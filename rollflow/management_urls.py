@@ -3,6 +3,7 @@ from accounts import connected_views, automated_views, data_views, attendance_ad
 from accounts import staff_views, student_views, timetable_views, master_views, oneschool_views, oneschool_document_views
 
 urlpatterns = [
+    path('attendance/student-history/', attendance_admin_views.student_report, name='attendance-student-report'),
     path('attendance/correct/<int:pk>/', attendance_admin_views.correct, name='attendance-correct'),
     path('attendance/relief/', attendance_admin_views.relief, name='attendance-relief'),
     path('school-data/', data_views.overview, name='school-data-overview'),

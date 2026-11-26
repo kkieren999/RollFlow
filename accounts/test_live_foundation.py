@@ -179,3 +179,78 @@ class LiveFoundationTests(TestCase):
         self.student.save()
         self.assertContains(self.client.get(f"/manage/school-data/transfers/{roll.pk}/"),"Student identity changed")
 
+
+    def test_future_submit_rejected_and_non_instructional_excluded(self):
+        from unittest.mock import patch
+        with patch("accounts.live_views.lesson_started",return_value=False):
+            self.assertEqual(self.client.post(self.url,self.payload("submit")).status_code,409)
+        self.assertFalse(AttendanceRoll.objects.exists())
+        self.pub.snapshot["slots"][0]["period"]="Lunch"
+        self.pub.save()
+        self.assertEqual(self.client.get("/live/roll/?code=ENG7&period=Lunch&start=09:00").status_code,403)
+
+    def test_daily_completeness_includes_unstarted_and_overdue(self):
+        from datetime import datetime,time
+        from .attendance_operations import daily_status
+        now=timezone.make_aware(datetime.combine(self.day,time(11)))
+        rows,summary=daily_status(self.pub,self.day,now)
+        self.assertEqual(summary["expected"],2)
+        self.assertEqual(summary["outstanding"],2)
+        self.assertEqual(summary["overdue"],2)
+        self.assertEqual(self.client.post(self.url,self.payload("submit")).status_code,302)
+        rows,summary=daily_status(self.pub,self.day,now)
+        self.assertEqual(summary["submitted"],1)
+        self.assertEqual(summary["outstanding"],1)
+        self.assertEqual(summary["overdue"],1)
+
+    def test_correction_preserves_revision_and_requires_new_reconciliation(self):
+        from .models import AttendanceTransferReview
+        self.assertEqual(self.client.post(self.url,self.payload("submit")).status_code,302)
+        roll=AttendanceRoll.objects.get()
+        path=f"/manage/attendance/correct/{roll.pk}/"
+        self.assertEqual(self.client.get(path).status_code,403)
+        self.client.force_login(self.monitor)
+        self.assertEqual(self.client.post(path,{}).status_code,403)
+        self.client.force_login(self.admin)
+        transfer=f"/manage/school-data/transfers/{roll.pk}/"
+        old_digest=self.client.get(transfer).context["digest"]
+        self.client.post(transfer,{"confirm":"yes","action":"export","digest":old_digest})
+        self.client.post(transfer,{"confirm":"yes","action":"reconcile","digest":old_digest})
+        p={"revision":"1","confirm":"yes","reason":"Checked classroom record","mark_"+str(self.student.pk):"A"}
+        self.assertEqual(self.client.post(path,p).status_code,302)
+        roll.refresh_from_db()
+        self.assertEqual(roll.revision,2)
+        self.assertEqual(roll.teacher_id,self.teacher.pk)
+        self.assertEqual(roll.history.get(revision=1).marks,{str(self.student.pk):"P"})
+        self.assertEqual(roll.history.get(revision=2).reason,p["reason"])
+        self.assertContains(self.client.post(path,p),"newer revision")
+        self.assertNotEqual(self.client.get(transfer).context["digest"],old_digest)
+        self.assertContains(self.client.post(transfer,{"confirm":"yes","action":"reconcile","digest":old_digest}),"changed")
+        self.assertEqual(AttendanceTransferReview.objects.count(),1)
+        self.assertContains(self.client.get("/live/attendance/"),"Review required")
+        r=self.client.get("/manage/attendance/student-history/",{"student":self.student.student_id})
+        self.assertEqual(r.context["totals"]["A"],1)
+        self.assertNotContains(r,"OtherPupil")
+
+    def test_relief_assignment_exact_scope_and_no_existing_roll_transfer(self):
+        from .models import ReliefAttendanceAssignment
+        # Give the relief teacher a verified non-overlapping lesson.
+        self.pub.snapshot["slots"][1]["start"]="11:00"
+        self.pub.snapshot["slots"][1]["end"]="12:00"
+        self.pub.save()
+        self.client.force_login(self.admin)
+        path="/manage/attendance/relief/"
+        p={"action":"assign","publication":str(self.pub.pk),"lesson":"ENG7|P1|09:00","teacher":self.other.pk}
+        r=self.client.post(path,p)
+        self.assertEqual(r.status_code,302, r.context["error"] if r.status_code==200 else "")
+        a=ReliefAttendanceAssignment.objects.get()
+        self.client.force_login(self.teacher)
+        self.assertEqual(self.client.get(self.url).status_code,403)
+        self.client.force_login(self.other)
+        self.assertContains(self.client.get(self.url),"FictionalPupil")
+        self.assertNotContains(self.client.get(self.url),"OtherPupil")
+        self.assertEqual(self.client.post(self.url,self.payload("submit")).status_code,302)
+        self.assertEqual(AttendanceRoll.objects.get().teacher_id,self.other.pk)
+        self.client.force_login(self.admin)
+        self.assertContains(self.client.post(path,{"action":"cancel","assignment":a.pk}),"roll exists")
+        self.assertIsNone(ReliefAttendanceAssignment.objects.get().cancelled_at)
