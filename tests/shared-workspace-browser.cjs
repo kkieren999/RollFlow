@@ -70,7 +70,7 @@ async function run(){
    if(id==='admin'||['principal','deputy','business'].includes(id)){
     const attr=id==='admin'?'data-admin-page':'data-rfu-page',route=id==='admin'?'timetable':'master';
     await page.locator('.nav-primary ['+attr+'="'+route+'"]').click();
-    assert.equal(await page.locator('.rf-scheduling-manage').count(),1,id+' authorised exception manager');
+    assert.equal(await page.locator('.rf-scheduling-manage:not(.rf-morning-cover):not(.rf-duty-management)').count(),1,id+' authorised exception manager');
     assert(!await page.locator('.content-shell>main').innerText().then(t=>t.includes('QA community celebration')),id+' general events hidden');
    }else if(!teacher){
     const route=await page.locator('.nav-primary [data-rfu-page="schedule"]').count()?'schedule':await page.locator('.nav-primary [data-rfu-page="master"]').count()?'master':'dashboard';
@@ -100,15 +100,24 @@ async function run(){
        const box=x=>{const r=x.getBoundingClientRect();return {l:r.left,r:r.right,t:r.top,b:r.bottom,w:r.width,h:r.height}};
        const heads=[...grid.querySelectorAll('.day-panel-heading')],days=[...grid.querySelectorAll('.timetable-day')];
        const headerRects=heads.map(box),slots=days.map(d=>[...d.querySelectorAll('.rf-week-slot')].map(box));
+       const timeHead=box(grid.querySelector('.rf-week-label-head')),timeRects=[...grid.querySelectorAll('.rf-week-label')].map(box);
+       const timeOverlap=headerRects.some(h=>h.l<timeHead.r-2)||slots.some(rows=>rows.some((r,j)=>r.l<timeRects[j].r-2||Math.abs(r.t-timeRects[j].t)>2||Math.abs(r.b-timeRects[j].b)>2));
+       const cardOverflow=[...grid.querySelectorAll('.rf-week-slot .rf-timetable-card')].some(el=>{const r=box(el),parent=box(el.closest('.rf-week-slot'));return r.l<parent.l-2||r.r>parent.r+2||r.t<parent.t-2||r.b>parent.b+2});
        const overlap=slots.some((rows,i)=>rows.some((r,j)=>r.l<headerRects[i].l-2||r.r>headerRects[i].r+2||j>0&&r.t<rows[j-1].b-2));
        const scroll=grid.closest('.rf-week-scroll'),scrollBox=box(scroll);
        scroll.scrollLeft=scroll.scrollWidth;scroll.scrollTop=80;
        const last=box(heads.at(-1)),first=box(heads[0]);
-       return {overlap,labels:heads.map(h=>h.querySelector('button strong').textContent),headerY:headerRects.map(r=>r.t),scrollWidth:scroll.scrollWidth,clientWidth:scroll.clientWidth,scrollBox,last,first};
+       const stickyTime=box(grid.querySelector('.rf-week-label-head'));
+       const timeTop=document.elementFromPoint(stickyTime.l+stickyTime.w/2,stickyTime.t+stickyTime.h/2);
+       const stickyTimeVisible=!!timeTop?.closest('.rf-week-label-head');
+       return {overlap,timeOverlap,cardOverflow,stickyTimeVisible,labels:heads.map(h=>h.querySelector('button strong').textContent),headerY:headerRects.map(r=>r.t),scrollWidth:scroll.scrollWidth,clientWidth:scroll.clientWidth,scrollBox,last,first};
       });
       assert.deepEqual(geometry.labels,['Monday','Tuesday','Wednesday','Thursday','Friday']);
       assert(geometry.headerY.every(y=>Math.abs(y-geometry.headerY[0])<2),'Weekday header alignment '+width);
       assert(!geometry.overlap,'Overlapping grid cells '+width);
+      assert(!geometry.timeOverlap,'Time labels must occupy a separate aligned column '+width);
+      assert(!geometry.cardOverflow,'Lesson cards must remain inside their own grid cells '+width);
+      assert(geometry.stickyTimeVisible,'Time heading must stay visible during scrolling '+width);
       assert(geometry.last.r<=geometry.scrollBox.r+3,'Friday reachable by scrolling '+width);
       assert(geometry.last.t>=geometry.scrollBox.t-3,'Header stays visible when scrolling '+width);
       await capture(page,'teacher-semester2-week-'+width);
@@ -180,41 +189,59 @@ async function run(){
   try{
    async function login(id){await page.goto(url);await page.locator('#demo-username').fill(id);await page.locator('#demo-password').fill(id);await page.locator('#demo-login-form button[type="submit"]').click();await page.locator('.rf-compact-account summary').waitFor()}
    async function logout(){await page.locator('.rf-compact-account summary').click();await page.locator('.rf-compact-account-panel [data-demo-signout]').click();await page.locator('#demo-login-form').waitFor()}
+   await page.clock.setFixedTime(new Date('2026-11-25T08:00:00+10:00'));
    await login('business');await page.locator('.nav-primary [data-rfu-page="workforce"]').click();
    await page.locator('.rf-duty-management summary').click();
    await page.locator('#rf-duty-form [name="owner"]').selectOption('teacher');
    await page.locator('#rf-duty-form [name="title"]').fill('QA allocated playground duty');
-   await page.locator('#rf-duty-form [name="time"]').fill('10:45');
+   await page.locator('#rf-duty-form [name="time"]').fill('08:15');
    await page.locator('#rf-duty-form [name="detail"]').fill('Junior courtyard');
    await page.locator('#rf-duty-form button[type="submit"]').click();
    assert.match(await page.locator('.rf-duty-management').innerText(),/QA allocated playground duty/);
-   await page.locator('.nav-primary [data-rfu-page="relief"]').click();
+   await logout();await login('teacher');await page.locator('.nav-primary [data-nav="timetable"]').click();
+   const originalSpares=await page.locator('.rf-planning-slot').evaluateAll(xs=>xs.map(x=>x.dataset.rfMotion.split('|').at(-1)));
+   assert(originalSpares.length>0,'Fixed school date has a spare');
+   assert.match(await page.locator('[data-rf-duty]').allInnerTexts().then(x=>x.join(' ')),/QA allocated playground duty/);
+   await logout();await login('admin');await page.locator('.nav-primary [data-admin-page="timetable"]').click();
    await page.locator('.rf-morning-cover summary').click();
    const form=page.locator('#rf-morning-cover-form');
    await form.locator('[name="owner"]').selectOption('teacher');
-   const options=await form.locator('[name="classCode"] option').evaluateAll(xs=>xs.map(x=>x.value).filter(Boolean));
+   const periods=await form.locator('[name="period"] option').evaluateAll(xs=>xs.map(x=>x.value).filter(Boolean));
+   assert(periods.length>0,'Admin has eligible spare periods on fixed school date');
+   assert(periods.every(p=>originalSpares.includes(p)),'Only available spares can be allocated');
    let assigned=null;
-   if(options.length){
-    const period=await form.locator('[name="period"]').inputValue();
-    assigned={code:options[0],period};
-    await form.locator('[name="classCode"]').selectOption(assigned.code);
-    await form.locator('button[type="submit"]').click();
-    assert.match(await page.locator('.rf-morning-cover').innerText(),new RegExp(assigned.code));
-   }else console.log('No eligible morning cover on current school date');
-   await logout();await login('teacher');await page.locator('.nav-primary [data-nav="timetable"]').click();
-   if(assigned){
-    const card=page.locator('[data-timetable-class="'+assigned.code+'"][data-rf-period="'+assigned.period+'"]');
-    assert.equal(await card.count(),1,'Supervision replaces spare in assigned period');
-    assert.match(await card.innerText(),/SUPERVISION/);
-    await page.locator('[data-timetable-view="week"]').click();
-    const weekCard=page.locator('.rf-week-slot[data-rf-period="'+assigned.period+'"] [data-timetable-class="'+assigned.code+'"] .rf-admin-supervision-badge');
-    assert(await weekCard.count()>0,'Supervision is in teaching period in weekly view');
-    await page.locator('[data-timetable-view="day"]').click();
+   for(const period of periods){
+    await form.locator('[name="period"]').selectOption(period);
+    const options=await form.locator('[name="classCode"] option').evaluateAll(xs=>xs.map(x=>x.value).filter(Boolean));
+    if(options.length){assigned={code:options[0],period};break}
    }
+   assert(assigned,'Fixed school date must offer a class requiring supervision');
+   await form.locator('[name="classCode"]').selectOption(assigned.code);
+   await form.locator('button[type="submit"]').click();
+   assert.match(await page.locator('.rf-morning-cover').innerText(),new RegExp(assigned.code));
+   await logout();await login('teacher');await page.locator('.nav-primary [data-nav="timetable"]').click();
+   const card=page.locator('[data-timetable-class="'+assigned.code+'"][data-rf-period="'+assigned.period+'"]');
+   assert.equal(await card.count(),1,'Supervision replaces spare in assigned period');
+   assert.match(await card.innerText(),/SUPERVISION/);
+   const spare=page.locator('.rf-planning-slot[data-rf-motion="2026-11-25|spare|'+assigned.period+'"]');
+   assert.equal(await spare.count(),0,'Assigned period no longer displays a spare');
+   await page.locator('[data-timetable-view="week"]').click();
+   const weekCard=page.locator('.rf-week-slot[data-rf-period="'+assigned.period+'"] [data-timetable-class="'+assigned.code+'"][data-timetable-date="2026-11-25"] .rf-admin-supervision-badge');
+   assert.equal(await weekCard.count(),1,'Supervision is in the correct teaching period and date in weekly view');
+   await page.locator('[data-timetable-view="day"]').click();
    assert.match(await page.locator('[data-rf-duty]').allInnerTexts().then(x=>x.join(' ')),/QA allocated playground duty/);
    await logout();await login('swilliams');await page.locator('.nav-primary [data-nav="timetable"]').click();
    assert(!await page.locator('[data-rf-duty]').allInnerTexts().then(x=>x.join(' ').includes('QA allocated playground duty')));
-   console.log('PASS: assigned supervision follows the recipient and remains in Daily Schedule');
+   assert.equal(await page.locator('.rf-admin-supervision-badge').count(),0,'Another teacher does not receive the allocation');
+   await logout();await login('admin');await page.locator('.nav-primary [data-admin-page="timetable"]').click();
+   const morning=page.locator('.rf-morning-cover');
+   if(!await morning.locator('summary').evaluate(el=>el.parentElement.open))await morning.locator('summary').click();
+   page.once('dialog',dialog=>dialog.accept());
+   await morning.locator('[data-rf-morning-cancel]').click();
+   await logout();await login('teacher');await page.locator('.nav-primary [data-nav="timetable"]').click();
+   assert.equal(await card.count(),0,'Cancelled allocation removed');
+   assert.equal(await spare.count(),1,'Cancellation restores the spare');
+   console.log('PASS: duty and admin supervision remain separate, only the recipient gets the allocation, and cancellation restores the spare');
   }finally{await context.close()}
  }finally{if(browser)await browser.close();server.close()}
 }
