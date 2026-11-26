@@ -54,6 +54,7 @@ def restore(request, pk):
                 list(OneSchoolArchiveBatch.objects.select_for_update().order_by("pk"))
                 list(ConnectedSchoolPublication.objects.select_for_update().order_by("pk"))
                 active=current()
+                target=ConnectedSchoolPublication.objects.get(pk=pk)
                 if target.active or (active and active.digest==target.digest):
                     raise ValueError("This publication is already active or equivalent.")
                 if target.snapshot.get("source")!="dated":

@@ -90,9 +90,11 @@ def mark_roll(request):
         with transaction.atomic():
             if request.method == "POST":
                 # Serialise writes against other attendance submissions and current publication changes.
-                list(ImportedTimetable.objects.select_for_update().order_by("pk"))
-                pub = ConnectedSchoolPublication.objects.select_for_update().filter(active=True).first()
                 actor = User.objects.select_for_update().get(pk=request.user.pk)
+                list(ImportedTimetable.objects.select_for_update().order_by("pk"))
+                from .models import OneSchoolArchiveBatch
+                list(OneSchoolArchiveBatch.objects.select_for_update().order_by("pk"))
+                pub = ConnectedSchoolPublication.objects.select_for_update().filter(active=True).first()
                 list(StaffProfile.objects.select_for_update().filter(user=actor))
             else:
                 pub, actor = current(), request.user

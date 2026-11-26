@@ -175,8 +175,3 @@ class LiveFoundationTests(TestCase):
         self.student.save()
         self.assertContains(self.client.get(f"/manage/school-data/transfers/{roll.pk}/"),"Student identity changed")
 
-    def test_restore_rejects_existing_attendance(self):
-        self.assertEqual(self.client.post(self.url,self.payload("submit")).status_code,302)
-        self.client.force_login(self.admin)
-        self.assertEqual(self.client.post(f"/manage/school-data/restore/{self.pub.pk}/",
-            {"confirm":"yes","digest":"wrong"}).status_code,400)
