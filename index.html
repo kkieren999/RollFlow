@@ -3987,6 +3987,247 @@ render=function(){
 };
 
 
+
+/* Shared workspace components: use the Teacher portal's panels, cards, metrics and controls.
+   Scope is always calculated before search, filters, details and actions. */
+const rfUnifiedState={actor:'',date:'',view:'day',month:'',directory:'',selected:'',year:'',subject:'',status:'all',classCode:'',query:'',limit:24,record:'',recordMode:'list'};
+function rfUnifiedReset(){
+ Object.assign(rfUnifiedState,{date:brisbaneToday(),view:'day',month:brisbaneToday().slice(0,7),directory:'',selected:'',year:'',subject:'',status:'all',classCode:'',query:'',limit:24,record:'',recordMode:'list'});
+}
+function rfUnifiedScope(){return demoRole==='staff'||demoRole==='teacher'&&rfuTeacherExtra}
+function rfUnifiedRoot(html){return '<div class="rf-module-root rf-unified-workspace">'+html+'</div>'}
+const rfUnifiedPanel=rfModulePanel;
+const rfUnifiedEmpty=rfModuleEmpty;
+const rfUnifiedMetrics=rfModuleMetrics;
+function rfUnifiedButton(label,attr,primary=false){return '<button type="button" class="btn '+(primary?'green':'')+'" '+attr+'>'+esc(label)+'</button>'}
+function rfUnifiedField(label,key,options,value){
+ return '<label>'+esc(label)+'<select data-rf-unified-filter="'+key+'">'+planOpt(options,value)+'</select></label>';
+}
+function rfUnifiedDate(value){return new Date(value+'T12:00:00Z').toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'Australia/Brisbane'})}
+function rfUnifiedBadge(value){const good=['Complete','Reviewed','Approved','Recorded','Returned','Available','Allocated'].includes(value);return '<span class="rf-unified-badge '+(good?'good':'')+'">'+esc(value||'Open')+'</span>'}
+function rfUnifiedSearch(placeholder='Search by name or ID'){
+ return '<form id="rfu-search" class="rf-module-controls rf-unified-search"><label>Search<input type="search" name="q" value="'+esc(rfuQuery)+'" placeholder="'+esc(placeholder)+'"></label><button class="btn green">Search</button>'+rfUnifiedButton('Clear','data-rf-unified-action="clear"')+'</form>';
+}
+function rfUnifiedRows(module){return module==='students'?rfuStudents(module):module==='classes'?rfuClasses(module):rfuStaff(module)}
+function rfUnifiedId(module,p){return module==='classes'?p.code:p.id}
+function rfUnifiedPersonName(p){return [p.first,p.last].filter(Boolean).join(' ')}
+function rfUnifiedRoster(code,date=brisbaneToday()){
+ // A class grant alone is not a student grant. Intersect both before rendering.
+ const allowed=new Set(rfuStudents('students').map(p=>p.id));
+ const ids=new Set(planning.enrolments.filter(e=>e.classCode===code&&e.start<=date&&(!e.end||e.end>=date)).map(e=>e.studentId));
+ return previewStudents.filter(p=>p.status==='active'&&allowed.has(p.id)&&ids.has(p.id));
+}
+function rfUnifiedDirectoryDetail(module,p){
+ const student=module==='students',staff=module==='staff',id=rfUnifiedId(module,p),title=student||staff?rfUnifiedPersonName(p):p.name||p.code;
+ const subtitle=student?rfMasterYearLabel(String(p.year))+' · '+p.id:staff?p.role+' · '+p.username:p.code+' · '+rfMasterYearLabel(String(p.year));
+ const avatar=student?previewPortrait(p,true):'<div class="teacher-profile-avatar">'+(staff?esc(teacherInitials({name:title})):navSvg('clipboard-check'))+'</div>';
+ const items=student?[['Student ID',p.id],['Year level',rfMasterYearLabel(String(p.year))],['Home group',p.group],['Enrolment status',studentStatuses[p.status]||p.status]]:staff?[['Staff ID',p.id],['Username',p.username],['Role',p.role],['Faculty',p.faculty],['Campus',p.campus]]:[['Class code',p.code],['Subject',p.subject],['Year level',rfMasterYearLabel(String(p.year))],['Teacher',planTeacherName(p.teacher)]];
+ let extra='';
+ if(module==='classes'){
+  const roster=rfUnifiedRoster(p.code),canStudents=rfuCan('students');
+  const lessons=planning.slots.filter(x=>x.active&&x.classCode===p.code).sort((a,b)=>a.day-b.day||String(a.period).localeCompare(String(b.period),undefined,{numeric:true}));
+  extra=rfUnifiedPanel('Class timetable',rfuTable(['Day','Period','Room'],lessons.map(x=>[esc(planDays[x.day-1]||''),esc(planning.periods.find(t=>t.code===x.period)?.label||x.period),esc(x.room)])));
+  if(canStudents)extra+=rfUnifiedPanel('Authorised student list',roster.length?'<div class="rf-unified-person-list">'+roster.map(q=>'<article>'+previewPortrait(q)+'<div><strong>'+esc(rfUnifiedPersonName(q))+'</strong><small>'+esc(q.id)+'</small></div>'+rfUnifiedButton('View profile','data-rf-unified-open="students" data-rf-unified-id="'+esc(q.id)+'"')+'</article>').join('')+'</div>':rfUnifiedEmpty('No authorised students in this class.'));
+ }
+ if(student&&rfuCan('classes')){
+  const date=brisbaneToday(),codes=new Set(planning.enrolments.filter(e=>e.studentId===p.id&&e.start<=date&&(!e.end||e.end>=date)).map(e=>e.classCode)),classes=rfuClasses('classes').filter(c=>codes.has(c.code));
+  extra+=rfUnifiedPanel('Authorised classes',classes.length?'<div class="rf-unified-person-list">'+classes.map(c=>'<article><div><strong>'+esc(c.code+' · '+c.name)+'</strong><small>'+esc(planTeacherName(c.teacher))+'</small></div>'+rfUnifiedButton('View class','data-rf-unified-open="classes" data-rf-unified-id="'+esc(c.code)+'"')+'</article>').join('')+'</div>':rfUnifiedEmpty('No classes available within your access scope.'));
+ }
+ if(staff&&rfuCan('classes')){
+  const codes=new Set(rfuClasses('classes').map(c=>c.code)),slots=planning.slots.filter(x=>x.active&&x.teacher===p.username&&codes.has(x.classCode));
+  extra+=rfUnifiedPanel('Authorised teaching allocations',rfuTable(['Day','Period','Class','Room'],slots.map(x=>[esc(planDays[x.day-1]||''),esc(planning.periods.find(t=>t.code===x.period)?.label||x.period),esc(x.classCode),esc(x.room)])));
+ }
+ return rfUnifiedRoot('<div class="teacher-profile-page rf-unified-profile">'+rfUnifiedButton('← Back to results','data-rf-unified-action="directory-back"')+'<section class="teacher-profile-hero"><div class="teacher-profile-brand-strip"></div><div class="teacher-profile-identity">'+avatar+'<div class="teacher-profile-title"><h2>'+esc(title)+'</h2><p>'+esc(subtitle)+'</p></div></div></section>'+profileSection(student?'Student information':staff?'Staff information':'Class information','Details available within your assigned access.', '<dl class="teacher-profile-details">'+items.map(([l,v])=>profileDetail(l,v)).join('')+'</dl>')+extra+'</div>');
+}
+rfuDirectory=function(module){
+ const state=rfUnifiedState,all=rfUnifiedRows(module),student=module==='students',staff=module==='staff';
+ if(state.directory===module&&state.selected){const p=all.find(x=>rfUnifiedId(module,x)===state.selected);if(p)return rfUnifiedDirectoryDetail(module,p);state.selected=''}
+ const schoolSearch=student&&rfuGrants(rfuActor,module).some(g=>g.scope==='school'),years=[...new Set(all.map(p=>String(p.year??'')).filter(Boolean))].sort((a,b)=>Number(a)-Number(b)),subjects=[...new Set(all.map(p=>staff?p.faculty:p.subject).filter(Boolean))].sort();
+ const q=rfuQuery.trim().toLowerCase(),filtered=(schoolSearch&&!q?[]:all.filter(p=>(!state.year||String(p.year)===state.year)&&(!state.subject||(staff?p.faculty:p.subject)===state.subject)&&(!q||q.split(/\s+/).every(word=>[p.first,p.last,p.id,p.code,p.name,p.username,p.subject,p.faculty,p.role,p.group].join(' ').toLowerCase().includes(word)))));
+ const filters='<div class="rf-module-controls">'+(!staff?rfUnifiedField('Year level','year',[['','All years'],...years.map(y=>[y,rfMasterYearLabel(y)])],state.year):'')+(!student?rfUnifiedField(staff?'Faculty':'Subject','subject',[['','All'],...subjects.map(x=>[x,x])],state.subject):'')+'</div>';
+ const cards=filtered.slice(0,state.limit).map(p=>{
+  const name=student||staff?rfUnifiedPersonName(p):p.code,sub=student?p.id+' · '+rfMasterYearLabel(String(p.year)):staff?p.role+' · '+p.faculty:p.name;
+  return '<article class="rfa-directory-card"><div class="rfa-directory-person">'+(student?previewPortrait(p):'<span class="v31-avatar">'+(staff?esc(teacherInitials({name})):navSvg('clipboard-check'))+'</span>')+'<div><h3>'+esc(name)+'</h3><small>'+esc(sub)+'</small></div></div><div class="rfa-directory-meta">'+esc(student?'Home group · '+(p.group||'—'):staff?'Campus · '+(p.campus||'—'):rfMasterYearLabel(String(p.year))+' · '+planTeacherName(p.teacher))+'</div><div class="rfa-directory-actions">'+rfUnifiedButton(student?'View profile':staff?'View staff profile':'Class details','data-rf-unified-open="'+module+'" data-rf-unified-id="'+esc(rfUnifiedId(module,p))+'"',true)+'</div></article>';
+ }).join('');
+ return rfUnifiedRoot(rfUnifiedPanel(student?'Find a student':staff?'Find a staff member':'Find a class',rfUnifiedSearch(student?'Enter student name or ID':staff?'Enter staff name or username':'Enter class code or subject')+filters+'<p class="quiet">'+filtered.length+' matching records</p>')+rfUnifiedPanel(student?'Student results':staff?'Staff results':'Class results',cards?'<div class="rfa-directory-grid">'+cards+'</div>'+(filtered.length>state.limit?rfUnifiedButton('Show more ('+(filtered.length-state.limit)+' remaining)','data-rf-unified-action="more"'):''):rfUnifiedEmpty(schoolSearch&&!q?'Search by student name or ID to display matching records.':'No matching authorised records.')));
+};
+function rfUnifiedTimeNow(){
+ const x=new Intl.DateTimeFormat('en-AU',{timeZone:'Australia/Brisbane',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date());
+ return x.find(p=>p.type==='hour').value+':'+x.find(p=>p.type==='minute').value;
+}
+function rfUnifiedDateControls(date,week=false){
+ return '<div class="rf-module-controls rf-unified-date-controls">'+rfUnifiedButton('‹','data-rf-unified-action="previous"')+'<label>Date<input type="date" data-rf-unified-filter="date" value="'+esc(date)+'"></label>'+rfUnifiedButton('›','data-rf-unified-action="next"')+rfUnifiedButton('Today','data-rf-unified-action="today"')+(week?'<div class="rf-unified-segments">'+['day','week'].map(x=>'<button type="button" class="btn" data-rf-unified-view="'+x+'" aria-pressed="'+(rfUnifiedState.view===x)+'">'+(x==='day'?'Day':'Week')+'</button>').join('')+'</div>':'')+'</div>';
+}
+rfuSchedule=function(){
+ const st=rfUnifiedState,date=st.date||brisbaneToday(),week=st.view==='week',today=brisbaneToday(),weekday=new Date(date+'T12:00:00Z').getUTCDay(),monday=dateOffset(date,-((weekday+6)%7)),days=week?Array.from({length:5},(_,i)=>dateOffset(monday,i)):[date],codes=new Set(rfuClasses('schedule').map(c=>c.code)),clock=rfUnifiedTimeNow();
+ const cards=days.map(d=>{
+  const day=planDays.indexOf(weekdayFor(d))+1,seen=new Set(),slots=planning.slots.filter(x=>x.active&&codes.has(x.classCode)&&x.day===day).filter(x=>{const key=x.classCode+'|'+x.period;if(seen.has(key))return false;seen.add(key);return true}).sort((a,b)=>(planning.periods.find(p=>p.code===a.period)?.start||'').localeCompare(planning.periods.find(p=>p.code===b.period)?.start||''));
+  const lessons=slots.map(x=>{const c=rfuActiveClasses().find(y=>y.code===x.classCode),p=planning.periods.find(y=>y.code===x.period),current=d===today&&p?.start&&clock>=p.start&&clock<p.end,canOpen=rfuClasses('classes').some(k=>k.code===x.classCode);return '<article class="day-lesson simple-row rf-timetable-card '+(current?'lesson-current':'')+'"><div class="lesson-time"><strong>'+esc((p?.start||'')+' – '+(p?.end||''))+'</strong><span>'+esc(p?.label||x.period)+'</span></div><div class="lesson-details"><div class="lesson-title"><h3>'+esc(c?.name||x.classCode)+'</h3></div><p>'+esc(x.classCode+' · Room '+(x.room||'—')+' · '+planTeacherName(x.teacher))+'</p></div><div class="lesson-actions">'+(current?'<span class="lesson-live">In progress</span>':'')+(canOpen?rfUnifiedButton('Class details','data-rf-unified-open="classes" data-rf-unified-id="'+esc(x.classCode)+'"'):'')+'</div></article>'}).join('');
+  const duties=rfuRecords().filter(r=>r.date===d&&r.owner===rfuActor&&(r.module==='workforce'||r.module==='supervision'&&rfuRecordAllowed('supervision',r)));
+  return '<section class="sheet day-schedule timetable-day"><div class="day-panel-heading"><h2>'+esc(d===today&&!week?'Today’s schedule':rfUnifiedDate(d))+'</h2><p>'+slots.length+' assigned lessons · '+duties.length+' duties</p></div><div class="day-lessons">'+(lessons||rfUnifiedEmpty('No assigned lessons for this day.'))+duties.map(r=>'<article class="day-lesson simple-row"><div class="lesson-time"><strong>'+esc(r.time||'Unscheduled')+'</strong><span>Duty</span></div><div class="lesson-details"><h3>'+esc(r.title)+'</h3><p>'+esc(r.detail||'')+'</p></div><div class="lesson-actions">'+rfUnifiedBadge(r.status)+'</div></article>').join('')+'</div></section>';
+ }).join('');
+ return rfUnifiedRoot(rfUnifiedDateControls(date,true)+'<div class="rf-unified-schedule '+(week?'week':'')+'">'+cards+'</div>');
+};
+rfuAttendance=function(module){
+ const st=rfUnifiedState,ops=rfuGrants(rfuActor,module).some(g=>g.scope==='operations');
+ if(ops){
+  const rows=rfuRows('workforce'),relief=rfuRows('relief'),availability=rfuRows('availability');
+  return rfUnifiedRoot(rfUnifiedMetrics([[rfuStaff('staff').length,'Staff records'],[rows.length,'Allocations'],[relief.filter(r=>r.status==='Open').length,'Open relief requests'],[availability.filter(r=>r.status==='Unavailable').length,'Unavailable staff']])+rfUnifiedPanel('Workforce activity',rfUnifiedRecordList('workforce',rows,false))+rfUnifiedPanel('Relief coverage',rfUnifiedRecordList('relief',relief,false)));
+ }
+ const today=brisbaneToday(),sem=rfStudentSemester(today),allStudents=rfuStudents(module),allClasses=rfuClasses(module),years=[...new Set(allStudents.map(p=>String(p.year)))].sort((a,b)=>Number(a)-Number(b)),classes=allClasses.filter(c=>(!st.year||String(c.year)===st.year)&&(!st.classCode||c.code===st.classCode)),codes=new Set(classes.map(c=>c.code)),members=new Set(planning.enrolments.filter(e=>codes.has(e.classCode)&&e.start<=today&&(!e.end||e.end>=sem.start)).map(e=>e.studentId)),students=allStudents.filter(p=>(!st.year||String(p.year)===st.year)&&(!st.classCode||members.has(p.id))),d=rfAdminAttendanceAggregate(rfAttendanceSources(codes),students,classes,planning.enrolments,sem.start,today),marked=d.students.filter(r=>r.total),low=marked.filter(r=>(r.P+r.L)/r.total<.9);
+ const filters='<div class="rf-module-controls">'+rfUnifiedField('Year level','year',[['','All authorised years'],...years.map(y=>[y,rfMasterYearLabel(y)])],st.year)+rfUnifiedField('Class','classCode',[['','All authorised classes'],...allClasses.filter(c=>!st.year||String(c.year)===st.year).map(c=>[c.code,c.code+' · '+c.name])],st.classCode)+rfUnifiedField('Attendance','status',[['all','All students'],['below','Below 90%'],['unmarked','No marks']],st.status)+'</div>'+rfUnifiedSearch('Search student name or ID');
+ const rows=d.students.filter(r=>rfuMatch(r.student.first,r.student.last,r.student.id)&&(st.status==='all'||st.status==='below'&&r.total&&(r.P+r.L)/r.total<.9||st.status==='unmarked'&&!r.total)).sort((a,b)=>(a.total?(a.P+a.L)/a.total:2)-(b.total?(b.P+b.L)/b.total:2));
+ const table=rfuTable(['Student','Year','Attendance','Present','Late','Absent','Marked'],rows.slice(0,st.limit).map(r=>{const p=r.student,pct=r.total?(r.P+r.L)*100/r.total:null;return ['<strong>'+esc(rfUnifiedPersonName(p))+'</strong><small>'+esc(p.id)+'</small>',esc(rfMasterYearLabel(String(p.year))),'<strong>'+esc(rfAdminRate([r]))+'</strong>'+rfModernAttendanceBar(pct),r.P,r.L,r.A,r.total]}));
+ return rfUnifiedRoot(rfUnifiedPanel('Attendance filters',filters)+rfUnifiedMetrics([[rfAdminRate(d.students),'Attendance'],[marked.length,'Students with marks'],[low.length,'Below 90%'],[marked.reduce((a,r)=>a+r.total,0),'Marked lessons']])+rfUnifiedPanel('Attendance trends · '+sem.name,rfAttendanceCharts(d.students,sem.start,today))+rfUnifiedPanel('Student attendance register',table+(rows.length>st.limit?rfUnifiedButton('Show more','data-rf-unified-action="more"'):'')));
+};
+rfuMovements=function(){
+ const st=rfUnifiedState,date=st.date||brisbaneToday(),ids=new Set(rfuStudents('movements').map(p=>p.id)),rows=rfAdminMovementRows().filter(r=>ids.has(r.studentId)&&(r.date===date||date===brisbaneToday()&&!r.sample&&!r.returnedAt)),out=rows.filter(r=>!r.sample&&!r.returnedAt),visible=rows.filter(r=>rfuMatch(rfuStudentName(r.studentId),r.destination)&&(st.status==='all'||st.status==='out'&&!r.sample&&!r.returnedAt||st.status==='returned'&&(r.sample||r.returnedAt))).sort((a,b)=>(b.date+' '+b.time).localeCompare(a.date+' '+a.time));
+ return rfUnifiedRoot(rfUnifiedMetrics([[out.length,'Currently out'],[rows.length-out.length,'Returned'],[rows.length,'Total passes']])+rfUnifiedPanel('Movement filters',rfUnifiedDateControls(date)+rfUnifiedField('Status','status',[['all','All passes'],['out','Currently out'],['returned','Returned']],st.status)+rfUnifiedSearch('Search student or destination'))+rfUnifiedPanel('Student movement register',rfuTable(['Student','Destination','Departure','Status'],visible.map(r=>['<strong>'+esc(rfuStudentName(r.studentId))+'</strong>',esc(r.destination),esc(r.date+' · '+(r.time||'—')),rfUnifiedBadge(r.sample||r.returnedAt?'Returned':'Out')]))));
+};
+const rfUnifiedRecordLabels={
+ observations:['Learning observations','New observation','Observation','Recorded observations','Recorded'],
+ tasks:['Learning support tasks','New support task','Task','Assigned tasks','Complete'],
+ referrals:['Student referrals','New referral','Referral','Referral queue','Reviewed'],
+ followups:['Follow-ups','New follow-up','Follow-up','Follow-up tasks','Complete'],
+ approvals:['Attendance review','New attendance assistance draft','Attendance draft','Review queue','Approved'],
+ workforce:['Workforce allocations','New allocation','Allocation','Staff allocations','Complete'],
+ availability:['Staff availability','New availability record','Availability','Staff availability','Complete'],
+ relief:['Relief management','New relief request','Relief request','Coverage queue','Allocated'],
+ supervision:['Supervision schedule','New duty','Duty','Supervision duties','Complete']
+};
+function rfUnifiedRecordAction(module,r){
+ if(!rfuCanChange(module,r)||['Complete','Reviewed','Approved','Recorded'].includes(r.status)||module==='relief'&&r.status==='Allocated')return '';
+ return rfUnifiedButton(module==='approvals'?(rfuRecordAllowed(module,r,rfuActor,['approve'])?'Approve draft':'Review draft'):module==='referrals'?'Mark reviewed':module==='relief'?'Mark allocated':'Mark complete','data-rfu-change="'+esc(r.id)+'"',true);
+}
+function rfUnifiedRecordList(module,rows,actions=true){
+ return rows.length?'<div class="rf-unified-record-list">'+rows.map(r=>{
+ const who=[r.studentId?rfuStudentName(r.studentId):'',r.classCode||'',rfuStaffName(r.owner)].filter(Boolean).join(' · ');
+ return '<article class="rf-module-task rf-modern-task '+(['Complete','Reviewed','Approved','Recorded'].includes(r.status)?'complete':r.date<brisbaneToday()?'due':'upcoming')+'"><span class="rf-wiz-icon '+(['Complete','Reviewed','Approved','Recorded'].includes(r.status)?'student':'left')+'">'+navSvg(RFU_MODULES.find(m=>m[0]===module)?.[2]||'clipboard-check')+'</span><div><strong>'+esc(r.title)+'</strong><small>'+esc(who)+'</small><small>'+esc(r.date+(r.time?' · '+r.time:''))+'</small><small>'+esc(r.detail||'')+'</small></div><div class="rf-module-task-buttons">'+rfUnifiedBadge(r.status)+(actions?rfUnifiedButton('View details','data-rf-unified-record="'+esc(r.id)+'"')+rfUnifiedRecordAction(module,r):'')+'</div></article>';
+ }).join('')+'</div>':rfUnifiedEmpty('No records match this selection.');
+}
+function rfUnifiedRecordDetail(module,r){
+ const fields=[['Status',r.status],['Date',r.date],['Time',r.time],['Assigned to',rfuStaffName(r.owner)],...(r.studentId?[['Student',rfuStudentName(r.studentId)]]:[]),...(r.classCode?[['Class',r.classCode]]:[])];
+ const log=rfuRead(RFU_AUDIT_KEY,[]).filter(x=>x.subject===r.id);
+ return rfUnifiedRoot(rfUnifiedButton('← Back to list','data-rf-unified-action="record-back"')+rfUnifiedPanel(r.title,'<dl class="teacher-profile-details">'+fields.map(([l,v])=>profileDetail(l,v)).join('')+'</dl><div class="rf-unified-notes"><strong>Details</strong><p>'+esc(r.detail||'No details recorded.')+'</p></div>'+rfUnifiedRecordAction(module,r))+rfUnifiedPanel('Activity history',log.length?rfuTable(['Date','Action','Staff member'],log.map(x=>[esc(x.date),esc(x.action),esc(rfuStaffName(x.actor))])):rfUnifiedEmpty('No additional activity recorded.'))+(module==='approvals'?rfUnifiedPanel('Attendance assistance','<p>This draft is a local assistance record, not a submitted class roll. It does not alter official attendance.</p>'):''));
+}
+const rfUnifiedOriginalRecordForm=rfuRecordForm;
+function rfUnifiedForm(module){
+ const raw=rfUnifiedOriginalRecordForm(module);if(!raw)return '';
+ return raw.replace(/^<details class="rfu-create"><summary>.*?<\/summary>/,'').replace(/<\/details>$/,'').replace('class="v31-form"','class="rf-module-form rf-unified-record-form"').replace('Save demo record','Save '+esc(rfUnifiedRecordLabels[module]?.[2].toLowerCase()||'record'));
+}
+rfuRecordsPage=function(module){
+ const st=rfUnifiedState,labels=rfUnifiedRecordLabels[module]||['Records','New record','Record','Records','Complete'],rows=rfuRows(module);
+ if(st.record){const r=rows.find(x=>x.id===st.record);if(r)return rfUnifiedRecordDetail(module,r);st.record=''}
+ const status=[...new Set(rows.map(r=>r.status))].sort(),visible=rows.filter(r=>rfuMatch(r.title,r.detail,r.status,rfuStaffName(r.owner),r.studentId?rfuStudentName(r.studentId):'',r.classCode||'')&&(st.status==='all'||r.status===st.status)&&(!st.query||r.date===st.query)).sort((a,b)=>(a.date+' '+(a.time||'')).localeCompare(b.date+' '+(b.time||'')));
+ const form=rfUnifiedForm(module),open=rows.filter(r=>['Open','Awaiting review','In review'].includes(r.status)).length,completed=rows.filter(r=>['Complete','Reviewed','Approved','Recorded','Allocated'].includes(r.status)).length;
+ if(st.recordMode==='new'&&form)return rfUnifiedRoot(rfUnifiedButton('← Back to '+labels[3].toLowerCase(),'data-rf-unified-action="record-back"')+rfUnifiedPanel(labels[1],form));
+ const filters='<div class="rf-module-controls">'+rfUnifiedField('Status','status',[['all','All statuses'],...status.map(x=>[x,x])],st.status)+'<label>Date<input type="date" data-rf-unified-filter="query" value="'+esc(st.query)+'"></label>'+(form?rfUnifiedButton('+ '+labels[1],'data-rf-unified-action="record-new"',true):'')+'</div>'+rfUnifiedSearch('Search '+labels[0].toLowerCase());
+ const isSchedule=module==='workforce'||module==='availability'||module==='supervision'||module==='relief';
+ let list=rfUnifiedRecordList(module,visible);
+ if(isSchedule&&visible.length){
+  const days=[...new Set(visible.map(r=>r.date))];
+  list=days.map(d=>'<div class="rf-unified-day-label">'+esc(rfUnifiedDate(d))+'</div>'+rfUnifiedRecordList(module,visible.filter(r=>r.date===d))).join('');
+ }
+ return rfUnifiedRoot(rfUnifiedMetrics([[rows.length,'Total'],[open,'Open / awaiting review'],[completed,'Completed / reviewed']])+rfUnifiedPanel(labels[0],filters)+rfUnifiedPanel(labels[3],list)+(module==='approvals'?'<p class="quiet">Review of assistance drafts only. Submitted rolls remain unchanged.</p>':''));
+};
+rfuCalendar=function(){
+ const st=rfUnifiedState,month=st.month||brisbaneToday().slice(0,7),today=brisbaneToday(),[year,m]=month.split('-').map(Number),offset=(new Date(Date.UTC(year,m-1,1)).getUTCDay()+6)%7,count=new Date(Date.UTC(year,m,0)).getUTCDate(),events=rfCalendarEvents().filter(e=>e.date.startsWith(month)).sort((a,b)=>(a.date+(a.time||'')).localeCompare(b.date+(b.time||'')));
+ const controls='<div class="rf-module-controls">'+rfUnifiedButton('‹','data-rf-unified-action="month-prev"')+'<label>Month<input type="month" data-rf-unified-filter="month" value="'+esc(month)+'"></label>'+rfUnifiedButton('›','data-rf-unified-action="month-next"')+rfUnifiedButton('This month','data-rf-unified-action="month-today"')+'</div>';
+ const grid='<div class="rf-calendar-grid">'+['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d=>'<div class="rf-calendar-heading">'+d+'</div>').join('')+Array.from({length:offset},()=>'<div class="rf-calendar-blank"></div>').join('')+Array.from({length:count},(_,i)=>{const day=month+'-'+String(i+1).padStart(2,'0');return '<div class="rf-calendar-day '+(day===today?'rf-calendar-today':'')+'"><strong>'+(i+1)+'</strong>'+events.filter(e=>e.date===day).map(e=>'<small>'+esc(e.title)+'</small>').join('')+'</div>'}).join('')+'</div>';
+ const form=rfuCan('calendar',['manage'])?rfUnifiedPanel('Add school event','<form id="rfu-calendar-form" class="rf-module-form"><label>Event title<input name="title" maxlength="100" required></label><label>Date<input type="date" name="date" value="'+today+'" required></label><label>Time<input type="time" name="time"></label><label>Category<select name="category">'+planOpt(['Assembly','Excursion','Assessment','School event','Closure','Other'].map(x=>[x,x]),'School event')+'</select></label><button class="btn green">Add event</button></form>'):'';
+ return rfUnifiedRoot(rfUnifiedPanel('School calendar',controls+grid)+rfUnifiedPanel('Events this month',events.length?events.map(e=>'<article class="rf-module-task"><div><strong>'+esc(e.title)+'</strong><small>'+esc(e.date+' · '+(e.time||'All day')+' · '+e.category)+'</small></div></article>').join(''):rfUnifiedEmpty('No school events this month.'))+form);
+};
+rfuDashboard=function(){
+ const today=brisbaneToday(),modules=['approvals','referrals','followups','tasks','relief','supervision','workforce'].filter(id=>rfuCan(id)),queues=modules.map(id=>({id,label:RFU_MODULES.find(m=>m[0]===id)[1],rows:rfuRows(id).filter(r=>['Open','Awaiting review','In review','Allocated'].includes(r.status))}));
+ const metrics=queues.slice(0,4).map(q=>[q.rows.length,q.label]);if(!metrics.length)metrics.push([rfuCan('students')?rfuStudents('students').length:0,'Authorised students']);
+ const tasks=queues.filter(q=>q.rows.length).map(q=>'<section class="sheet rf-module-panel"><div class="sheet-head">'+esc(q.label)+'</div><div class="rf-module-body">'+rfUnifiedRecordList(q.id,q.rows.slice(0,3),false)+rfUnifiedButton('Open '+q.label.toLowerCase(),'data-rfu-page="'+q.id+'"')+'</div></section>').join('');
+ const events=rfuCan('calendar')?rfCalendarEvents().filter(e=>e.date>=today).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,4):[];
+ return rfUnifiedRoot('<section class="sheet day-schedule"><div class="day-panel-heading"><h2>'+esc(rfUnifiedDate(today))+'</h2><p>'+esc(rfuRoleText())+' · Your work at a glance</p></div></section>'+rfUnifiedMetrics(metrics)+(tasks||rfUnifiedPanel('Outstanding work',rfUnifiedEmpty('No outstanding items in your assigned workspaces.')))+(rfuCan('calendar')?rfUnifiedPanel('Upcoming school events',events.length?events.map(e=>'<article class="rf-module-task"><div><strong>'+esc(e.title)+'</strong><small>'+esc(e.date+' · '+e.category)+'</small></div></article>').join(''):rfUnifiedEmpty('No upcoming school events.')):''));
+};
+const rfUnifiedStyle=document.createElement('style');
+rfUnifiedStyle.textContent=`
+.rf-unified-workspace{width:100%;min-width:0;max-width:1440px;margin:0 auto;display:grid;gap:15px;color:var(--rf-text)}
+.rf-unified-workspace>.sheet{margin:0;min-width:0}
+.rf-unified-workspace .rf-module-panel{width:100%;background:var(--rf-surface);color:var(--rf-text);border-color:var(--rf-border)}
+.rf-unified-workspace .rf-module-panel>.sheet-head{background:var(--rf-surface);color:var(--rf-text);border-color:var(--rf-border)}
+.rf-unified-workspace .rf-module-controls{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:10px}
+.rf-unified-workspace .rf-module-controls label{display:grid;gap:5px;min-width:130px}
+.rf-unified-workspace .rf-module-controls input,.rf-unified-workspace .rf-module-controls select,.rf-unified-record-form input,.rf-unified-record-form select,.rf-unified-record-form textarea{min-height:38px;max-width:100%;background:var(--rf-surface);color:var(--rf-text);border:1px solid var(--rf-border);border-radius:6px;padding:7px 9px}
+.rf-unified-search label{flex:1;max-width:440px}
+.rf-unified-workspace .btn{white-space:normal}
+.rf-unified-workspace .rf-unified-segments{display:flex;gap:4px}
+.rf-unified-segments button[aria-pressed="true"]{background:var(--school-primary);color:var(--school-on-brand)}
+.rf-unified-schedule{display:grid;gap:14px;min-width:0}
+.rf-unified-schedule.week{grid-template-columns:repeat(auto-fit,minmax(min(100%,255px),1fr))}
+.rf-unified-schedule.week .day-lesson{display:flex;flex-direction:column;align-items:flex-start;gap:9px;min-height:100px}
+.rf-unified-schedule .day-lesson{margin:0;min-width:0}
+.rf-unified-schedule .day-lesson .lesson-actions{flex-wrap:wrap}
+.rf-unified-profile{width:100%}
+.rf-unified-profile>.btn{justify-self:start}
+.rf-unified-profile .teacher-profile-identity img{max-width:84px;max-height:100px;object-fit:cover}
+.rf-unified-person-list{display:grid;gap:7px}
+.rf-unified-person-list article{display:flex;align-items:center;gap:10px;padding:10px;border-bottom:1px solid var(--rf-border)}
+.rf-unified-person-list article>div{flex:1;display:grid;gap:4px}
+.rf-unified-person-list article img{width:40px;height:52px;object-fit:cover;border-radius:5px}
+.rf-unified-person-list small,.rf-unified-workspace .quiet{color:var(--rf-muted,#647581)}
+.rf-unified-record-list{display:grid;gap:8px}
+.rf-unified-record-list .rf-module-task{min-width:0;overflow-wrap:anywhere}
+.rf-unified-record-list .rf-module-task-buttons{flex-wrap:wrap;justify-content:flex-end}
+.rf-unified-record-list .rf-wiz-icon svg{width:20px;height:20px}
+.rf-unified-badge{display:inline-block;border:1px solid var(--rf-border);border-radius:5px;padding:4px 7px;font-size:11px;font-weight:600;color:var(--rf-text);white-space:nowrap}
+.rf-unified-badge.good{color:var(--school-secondary);border-color:var(--school-secondary)}
+.rf-unified-day-label{font-weight:700;margin:16px 0 8px;color:var(--rf-text)}
+.rf-unified-notes{padding:14px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.rf-unified-workspace .v31-table td small{display:block}
+.rf-unified-workspace .rf-calendar-grid{min-width:0;overflow:auto}
+@media(max-width:700px){.rf-unified-workspace .rf-module-controls label{min-width:0;flex:1 1 130px}.rf-unified-record-list .rf-module-task{display:flex;flex-wrap:wrap}.rf-unified-record-list .rf-module-task-buttons{width:100%;justify-content:flex-start}.rf-unified-schedule .day-lesson{display:flex;flex-wrap:wrap}.rf-unified-person-list article{flex-wrap:wrap}}
+`;
+document.head.appendChild(rfUnifiedStyle);
+function rfUnifiedOpenDirectory(module,id){
+ if(!['students','staff','classes'].includes(module)||!rfuCan(module)||!rfUnifiedRows(module).some(p=>rfUnifiedId(module,p)===id))return;
+ if(demoRole!=='staff')return; // teacher portal retains its original class/student navigation
+ rfUnifiedReset();rfuPage=module;rfUnifiedState.directory=module;rfUnifiedState.selected=id;rfuQuery='';render();
+}
+window.addEventListener('click',e=>{
+ if(!rfUnifiedScope())return;
+ if(e.target.closest('[data-rfu-page],[data-nav],[data-demo-signout]'))rfUnifiedReset();
+},true);
+document.addEventListener('click',e=>{
+ if(!rfUnifiedScope()||!rfuCan(rfuPage))return;
+ const b=e.target.closest('[data-rf-unified-open],[data-rf-unified-action],[data-rf-unified-view],[data-rf-unified-record]');if(!b)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const st=rfUnifiedState;
+ if(b.dataset.rfUnifiedOpen){rfUnifiedOpenDirectory(b.dataset.rfUnifiedOpen,b.dataset.rfUnifiedId);return}
+ if(b.dataset.rfUnifiedRecord){if(rfuRows(rfuPage).some(r=>r.id===b.dataset.rfUnifiedRecord)){st.record=b.dataset.rfUnifiedRecord;render()}return}
+ if(b.dataset.rfUnifiedView){if(['day','week'].includes(b.dataset.rfUnifiedView))st.view=b.dataset.rfUnifiedView;render();return}
+ const action=b.dataset.rfUnifiedAction;
+ if(action==='clear'){rfuQuery='';st.year='';st.subject='';st.status='all';st.classCode='';st.query='';st.limit=24}
+ else if(action==='more')st.limit+=24;
+ else if(action==='directory-back'){st.selected='';st.directory=''}
+ else if(action==='record-back'){st.record='';st.recordMode='list'}
+ else if(action==='record-new')st.recordMode='new';
+ else if(action==='today')st.date=brisbaneToday();
+ else if(action==='previous'||action==='next')st.date=dateOffset(st.date||brisbaneToday(),(action==='previous'?-1:1)*(rfuPage==='schedule'&&st.view==='week'?7:1));
+ else if(action==='month-today')st.month=brisbaneToday().slice(0,7);
+ else if(action==='month-prev'||action==='month-next'){const [y,m]=(st.month||brisbaneToday().slice(0,7)).split('-').map(Number);st.month=new Date(Date.UTC(y,m-1+(action==='month-prev'?-1:1),1)).toISOString().slice(0,7)}
+ render();
+},true);
+document.addEventListener('change',e=>{
+ if(!rfUnifiedScope()||!rfuCan(rfuPage))return;
+ const key=e.target.dataset.rfUnifiedFilter;if(!['date','month','year','subject','status','classCode','query'].includes(key))return;
+ const value=e.target.value;if((key==='date'||key==='query'&&value)&&!osDateValid(value)||key==='month'&&!/^\d{4}-(0[1-9]|1[0-2])$/.test(value))return;
+ rfUnifiedState[key]=value;if(key==='year')rfUnifiedState.classCode='';rfUnifiedState.limit=24;render();
+},true);
+window.addEventListener('submit',e=>{
+ if(rfUnifiedScope()&&e.target.id==='rfu-record-form')rfUnifiedState.recordMode='list';
+},true);
+const rfUnifiedBeforeRender=render;
+render=function(){
+ const actor=demoRole?demoRole+':'+rfuActor:'';
+ if(actor!==rfUnifiedState.actor){rfUnifiedReset();rfUnifiedState.actor=actor}
+ rfUnifiedBeforeRender();
+};
+
 window.visualViewport?.addEventListener('resize',()=>requestAnimationFrame(fitGrid));
 window.addEventListener('resize',rfClearTimetableMorph);
 window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener?.('change',rfClearTimetableMorph);
