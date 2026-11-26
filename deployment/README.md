@@ -1,3 +1,7 @@
+# V4.5 classroom and student support staging
+
+See [V4.5 notes](../docs/v4.5-classroom-support.md). Existing state paths unchanged. Fictional data only.
+
 # V4.4 workforce staging
 
 See [V4.4 notes](../docs/v4.4-workforce.md). Use protected Workforce & supervision, review publication and choose date. Existing database paths unchanged. Fictional data only.

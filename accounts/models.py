@@ -479,3 +479,64 @@ class WorkforceNotice(models.Model):
     message = models.CharField(max_length=240)
     created_at = models.DateTimeField(auto_now_add=True)
     acknowledged_at = models.DateTimeField(null=True, blank=True)
+
+
+class ClassroomPlan(models.Model):
+    """Teacher-owned seating map, bound to an exact reviewed publication."""
+    publication = models.ForeignKey(ConnectedSchoolPublication,on_delete=models.PROTECT)
+    teacher = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT)
+    class_code = models.CharField(max_length=30)
+    seats = models.JSONField(default=dict)
+    revision = models.PositiveIntegerField(default=1)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["publication","teacher","class_code"],name="unique_classroom_plan")]
+
+
+class ClassroomObservation(models.Model):
+    """Structured educational observation, never a clinical or discipline case."""
+    publication = models.ForeignKey(ConnectedSchoolPublication,on_delete=models.PROTECT)
+    teacher = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT)
+    student = models.ForeignKey(Student,on_delete=models.PROTECT)
+    class_code = models.CharField(max_length=30)
+    lesson_date = models.DateField()
+    category = models.CharField(max_length=30)
+    created_at = models.DateTimeField(auto_now_add=True)
+    withdrawn_at = models.DateTimeField(null=True,blank=True)
+
+
+class SupportTask(models.Model):
+    """Explicit named recipient and one student; no general case access."""
+    publication = models.ForeignKey(ConnectedSchoolPublication,on_delete=models.PROTECT)
+    student = models.ForeignKey(Student,on_delete=models.PROTECT)
+    class_code = models.CharField(max_length=30)
+    requested_by = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,related_name="+")
+    assigned_to = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,related_name="+")
+    category = models.CharField(max_length=30)
+    due_on = models.DateField()
+    state = models.CharField(max_length=12,default="pending")
+    revision = models.PositiveIntegerField(default=1)
+    created_at = models.DateTimeField(auto_now_add=True)
+    closed_at = models.DateTimeField(null=True,blank=True)
+
+    class Meta:
+        constraints = [models.CheckConstraint(condition=models.Q(state__in=["pending","accepted"],closed_at__isnull=True) | models.Q(state__in=["completed","cancelled"],closed_at__isnull=False),name="support_task_state")]
+
+
+class SupportReferral(models.Model):
+    """Minimal educational referral. No narrative, diagnosis or safeguarding case notes."""
+    publication = models.ForeignKey(ConnectedSchoolPublication,on_delete=models.PROTECT)
+    student = models.ForeignKey(Student,on_delete=models.PROTECT)
+    class_code = models.CharField(max_length=30)
+    requested_by = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,related_name="+")
+    assigned_to = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,related_name="+",null=True,blank=True)
+    category = models.CharField(max_length=30)
+    state = models.CharField(max_length=12,default="pending")
+    revision = models.PositiveIntegerField(default=1)
+    follow_up_on = models.DateField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    closed_at = models.DateTimeField(null=True,blank=True)
+
+    class Meta:
+        constraints = [models.CheckConstraint(condition=models.Q(state__in=["pending","assigned","reviewed"],closed_at__isnull=True) | models.Q(state__in=["closed","withdrawn"],closed_at__isnull=False),name="support_referral_state")]
