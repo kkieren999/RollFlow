@@ -23,7 +23,24 @@ def role_for(user):
     return None
 
 def portal_allowed(user, mode):
-    return role_for(user) == "admin" if mode == "admin" else can_teach(user)
+    if mode == "admin":
+        return role_for(user) == "admin"
+    if mode == "unified":
+        from .school_access import has_workspace
+        return role_for(user) is not None or has_workspace(user)
+    return can_teach(user)
+
+
+def portal_destination(user, mode):
+    if mode == "admin":
+        return "management-dashboard"
+    if mode == "unified":
+        from .school_access import has_workspace
+        if has_workspace(user):
+            return "school-workspace"
+        if role_for(user) == "admin":
+            return "management-dashboard"
+    return "teacher"
 
 def limit_key(request, username):
     return salted_hmac("rollflow-login", request.META.get("REMOTE_ADDR", "") + "|" + username.casefold(), algorithm="sha256").hexdigest()
@@ -42,9 +59,9 @@ def consume_attempt(key):
 
 @never_cache
 @require_http_methods(["GET", "POST"])
-def portal_login(request, mode="teacher"):
+def portal_login(request, mode="unified"):
     if request.method == "GET" and portal_allowed(request.user, mode):
-        return redirect("management-dashboard" if mode == "admin" else "teacher")
+        return redirect(portal_destination(request.user, mode))
     error = ""
     if request.method == "POST":
         username = request.POST.get("username", "").strip()[:150]
@@ -58,7 +75,7 @@ def portal_login(request, mode="teacher"):
             login(request, user)
             LoginWindow.objects.filter(key=key).delete()
             SecurityEvent.objects.create(actor=user, event="login", subject=mode)
-            return redirect("management-dashboard" if mode == "admin" else "teacher")
+            return redirect(portal_destination(user, mode))
         error = "Incorrect username or password for this portal."
     return render(request, "login.html", {"live_timetable": settings.ROLLFLOW_LIVE_TIMETABLE, "mode": mode, "error": error})
 
