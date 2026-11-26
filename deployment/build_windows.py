@@ -58,7 +58,7 @@ def main():
         from windows_launchers import write_launchers
     write_launchers(out)
     (out / "BUILD-INFO.json").write_text(json.dumps({
-        "version": "3.8.0-staging",
+        "version": "3.9.0-staging",
         "source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
         "website_commit": (app / "training" / "SOURCE_COMMIT.txt").read_text().strip(),
         "website_mode": "exact offline public workspace; fictional data only",
@@ -66,18 +66,18 @@ def main():
         "channel": "unsigned staging"
     }, indent=2) + "\n", encoding="utf-8")
     (out / "READ FIRST.txt").write_text(
-        "ROLLFLOW 3.8 - SCHOOL MANAGEMENT SYSTEM (STAGING)\n"
+        "ROLLFLOW 3.9 - SCHOOL MANAGEMENT SYSTEM (STAGING)\n"
         "Extract the entire package to a new local folder before running it.\n"
-        "Start RollFlow.cmd opens the full website workspace offline, with all public training features.\n"
-        "No database setup or internet connection is required for the full website workspace.\n"
-        "Its accounts and records are fictional browser-local training data, not secure school accounts.\n"
+        "Start RollFlow.cmd opens the protected database workspace menu.\n"
+        "Open Training Demo.cmd opens the separate fictional offline website without database setup.\n"
+        "Training accounts and records are fictional browser-local data, not secure school accounts.\n"
         "For protected database-backed testing, open Protected Workspace.cmd and follow its menu.\n"
         "NEW TEST DATABASE: First Setup Fresh.cmd, then Start Fresh Protected.cmd.\n"
         "EXISTING DATABASE: stop the old server, keep the previous extracted folder, run Upgrade Existing.cmd,\n"
         "then Start Existing Protected.cmd. Never initialise or delete an existing instance.\n"
         "Existing school staging data and the fresh database are not shared.\n"
         "Protected mode is not yet feature-equivalent to the public training workspace.\n"
-        "See app/deployment/README.md and app/docs/v3.8-windows-rebuild.md. No real school data in staging.\n",
+        "See app/deployment/README.md and app/docs/v3.9-live-foundation.md. No real school data in staging.\n",
         encoding="utf-8")
     manifest = []
     for path in sorted(out.rglob("*")):

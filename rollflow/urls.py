@@ -6,7 +6,13 @@ from accounts.teacher_week_views import week as teacher_week
 from accounts.connected_views import roster as connected_roster
 from accounts.school_access_views import workspace, manage_access
 
+from accounts import live_views
+
 urlpatterns = [
+    path("live/", live_views.home, name="live-home"),
+    path("live/day/", live_views.my_day, name="live-day"),
+    path("live/roll/", live_views.mark_roll, name="live-roll"),
+    path("live/attendance/", live_views.monitor, name="live-monitor"),
     path("", portal_login, name="teacher-login"),
     path("login/", portal_login),
     path("admin-login/", portal_login, {"mode": "admin"}, name="admin-login"),

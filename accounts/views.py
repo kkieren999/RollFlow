@@ -27,7 +27,8 @@ def portal_allowed(user, mode):
         return role_for(user) == "admin"
     if mode == "unified":
         from .school_access import has_workspace
-        return role_for(user) is not None or has_workspace(user)
+        from .live_views import eligible
+        return eligible(user) and (role_for(user) is not None or has_workspace(user))
     return can_teach(user)
 
 
@@ -35,6 +36,8 @@ def portal_destination(user, mode):
     if mode == "admin":
         return "management-dashboard"
     if mode == "unified":
+        if settings.ROLLFLOW_PROTECTED_WORKSPACE:
+            return "live-home"
         from .school_access import has_workspace
         if has_workspace(user):
             return "school-workspace"
@@ -87,6 +90,8 @@ def teacher(request):
         return redirect("teacher-login")
     if not can_teach(request.user):
         return HttpResponseForbidden("Teaching permission is required.")
+    if settings.ROLLFLOW_PROTECTED_WORKSPACE:
+        return redirect("live-day")
     from .connected_school import current
     if current() or settings.ROLLFLOW_LIVE_TIMETABLE:
         return redirect("teacher-timetable")

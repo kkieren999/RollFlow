@@ -278,3 +278,36 @@ class StaffAccessGrant(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     granted_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
                                    related_name="+")
+
+
+class AttendanceRoll(models.Model):
+    """One dated class lesson, with frozen roster and server-owned state."""
+    publication = models.ForeignKey(ConnectedSchoolPublication, on_delete=models.PROTECT)
+    lesson_date = models.DateField()
+    class_code = models.CharField(max_length=30)
+    period = models.CharField(max_length=50)
+    start = models.CharField(max_length=5)
+    end = models.CharField(max_length=5)
+    teacher = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    roster = models.JSONField()
+    marks = models.JSONField(default=dict)
+    revision = models.PositiveIntegerField(default=1)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["lesson_date", "class_code", "period", "start"],
+                                                name="unique_dated_attendance_lesson")]
+
+
+class AttendanceRevision(models.Model):
+    """Append-only through application endpoints, retained for reconciliation."""
+    roll = models.ForeignKey(AttendanceRoll, on_delete=models.PROTECT, related_name="history")
+    revision = models.PositiveIntegerField()
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    action = models.CharField(max_length=12)
+    marks = models.JSONField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["roll", "revision"], name="unique_attendance_revision")]

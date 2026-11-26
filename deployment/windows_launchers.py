@@ -21,7 +21,7 @@ def write_launchers(out: Path):
         '"%~dp0python\\python.exe" -m deployment.training\n'
         'if errorlevel 1 pause\n'
     )
-    for name in ("Start RollFlow.cmd", "Open Training Demo.cmd"):
+    for name in ("Open Training Demo.cmd",):
         (out / name).write_text(website, encoding="ascii")
     commands = {
         "First Setup Fresh.cmd": (FRESH, "init", " --db-port 55438 --web-port 18087"),
@@ -52,10 +52,12 @@ def write_launchers(out: Path):
         'echo Q. Quit\n'
         'choice /C 123456Q /N /M "Choose: "\n'
         'if errorlevel 7 exit /b 0\n'
-        'if errorlevel 6 (call "%~dp0Start RollFlow.cmd" & goto menu)\n'
+        'if errorlevel 6 (call "%~dp0Open Training Demo.cmd" & goto menu)\n'
         'if errorlevel 5 (call "%~dp0Upgrade Fresh Protected.cmd" & goto menu)\n'
         'if errorlevel 4 (call "%~dp0Start Existing Protected.cmd" & goto menu)\n'
         'if errorlevel 3 (call "%~dp0Upgrade Existing.cmd" & goto menu)\n'
         'if errorlevel 2 (call "%~dp0Start Fresh Protected.cmd" & goto menu)\n'
         'if errorlevel 1 (call "%~dp0First Setup Fresh.cmd" & goto menu)\n'
         'exit /b 1\n', encoding="ascii")
+
+    (out / "Start RollFlow.cmd").write_text('@echo off\ncall "%~dp0Protected Workspace.cmd"\n', encoding="ascii")

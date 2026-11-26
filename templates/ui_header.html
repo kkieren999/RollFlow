@@ -7,7 +7,7 @@
   <nav class="rf-nav" aria-label="{% if portal == 'teacher' %}Teacher{% else %}Administration{% endif %} navigation">
     {% if portal == 'teacher' %}
       {% if request.user.is_staff and request.user.is_superuser %}<a class="rf-navlink" href="{% url 'management-dashboard' %}">Administration</a>{% endif %}
-      <a class="rf-navlink" href="{% url 'teacher-login' %}">Staff home</a>
+      <a class="rf-navlink" href="{% url 'live-home' %}">Staff home</a>
       <a class="rf-navlink" href="{% url 'teacher-timetable' %}" {% if active == 'day' %}aria-current="page"{% endif %}>My day</a>
       <a class="rf-navlink" href="{% url 'teacher-week' %}" {% if active == 'week' %}aria-current="page"{% endif %}>My week</a>
     {% else %}

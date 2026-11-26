@@ -15,6 +15,7 @@ CAPABILITIES = {
     "timetable": "Manual timetable",
     "published_classes": "Published OneSchool classes",
     "published_timetable": "Published OneSchool timetable",
+    "attendance_monitor": "School-wide attendance monitoring (summary only)",
 }
 SCOPES = {
     "school": set(CAPABILITIES),

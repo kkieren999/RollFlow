@@ -1,3 +1,7 @@
+# V3.9 protected foundation staging
+
+Start RollFlow.cmd now opens the protected database menu. Open Training Demo.cmd opens only fictional public website data. See [V3.9 notes](../docs/v3.9-live-foundation.md). Prior version instructions below are historical.
+
 # V3.8 Windows package — start here
 
 **Start RollFlow.cmd** opens the complete bundled website offline using fictional data. **Protected Workspace.cmd** opens a menu for fresh database-backed staging or backup-first upgrade of the existing database. See [V3.8 rebuild notes](../docs/v3.8-windows-rebuild.md). Old instructions below refer to earlier packages and their original shortcuts. Never use real records in staging.

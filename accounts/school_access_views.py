@@ -84,6 +84,8 @@ def workspace(request, module=None):
         return redirect("teacher-login")
     grants = grants_for(request.user)
     modules = visible_modules(grants)
+    if module == "attendance_monitor" and module in modules:
+        return redirect("live-monitor")
     if not modules or (module is not None and module not in modules):
         return HttpResponseForbidden("Assigned staff access required.")
     publication = day = None
