@@ -3,15 +3,39 @@
 **Last reviewed:** 27 November 2026 (Australia/Brisbane)  
 **Project:** kkieren999/RollFlow  
 **Goal:** Deliver a secure, school-wide Windows/browser application suitable for an approved Queensland secondary school pilot and eventually live deployment. The current website is the UX reference, not the production data layer.  
-**Status:** V3.9 implementation and native hostname repair committed; new release validation running. No production launch or real school data authorised.
+**Status:** V4.0 security foundation committed; final validation and outstanding security work remain. No production launch or real school data authorised.
+
+## CURRENT CHECKPOINT — V4.0 security foundation (27 Nov 2026)
+
+**Latest cumulative development branch:** `feature/v4.0-accounts-roles-security`, head `963bf058d32ff67d8173caf69ce7bd96a5631e51`, draft PR #37 https://github.com/kkieren999/RollFlow/pull/37 (base windows-release; includes prior drafts). Do not restart from main, windows-release or V3.9 for subsequent development. Recheck actual branch head before edits. Sections below retain the earlier roadmap/history; this checkpoint supersedes older statements of current phase.
+
+### Verified build state
+- V3.9 repair d3940a8: run #304 https://github.com/kkieren999/RollFlow/actions/runs/45892929577 — tests and PostgreSQL/native succeeded; Windows browser passed and artifact upload was running at last inspection. PR run #305 same status. Verify completion and actual artifact before reporting download.
+- V4.0 first commit 082e5fec: tests failed on unrelated flaky year-scope assertion: the random CSRF token contained substring Y8, not a leaked table cell. Confirmed exact match in log job 140160972140. Repaired in 963bf058 using exact authorised projection and rendered HTML cells, retaining no-private-staff-code assertion.
+- V4.0 second commit 6cbbfbad: standard tests job 140161285080 in run #307 succeeded; PostgreSQL/native in progress at last inspection.
+- Latest exact-commit run #309 https://github.com/kkieren999/RollFlow/actions/runs/45893460694 and PR run #310 https://github.com/kkieren999/RollFlow/actions/runs/45893468770 are in progress. Windows package name RollFlow-V4.0.0-Accounts-Roles-Security-Windows-x64-STAGING. No verified V4.0 artifact yet.
+
+### Implemented
+- Additive migrations 0016/0017, RoleTemplate and AccessAudit, optional grant start/expiry, source template provenance, temporary publication-bound class metadata scope.
+- Administrator can create/archive reviewed immutable template versions, copy explicit permissions into grants, revoke grants, view effective grants and structured before/after audit. Archiving a template does not revoke existing copies. Existing grants retain previous scope.
+- Scope union still per capability; expired/not-yet-active grants fail closed. Class grants require expiry, active publication, exact class code, only published class/timetable metadata. Republish invalidates. No roster or marking access.
+- Staff self-password change requires current password, validated new password; invalidates other sessions. Existing account admin status/reset/edit paths now recheck locked actor and audit changes; deactivation revokes delegated grants and sessions, reactivation does not restore those grants. Pending accounts blocked from teaching/admin; raw protected Django user/profile/group mutations disabled. Existing legacy teaching and full system admin remain independent.
+- Tests in accounts/test_security_foundation.py for template/expiry/forged scopes and admin role labels/direct URLs/POST/CSRF/revocation/reactivation/password/session invalidation/class publication invalidation. Role/action matrix in docs/v4.0-security.md. Windows staging version bumped to 4.0.0.
+
+### First next tasks (in priority order)
+1. Check exact V4.0 runs #309/#310 and V3.9 #304/#305. Fix actual failures, verify Windows artifact; update handover with result. Do not proceed as if passing until checked.
+2. Complete earlier V3.9 section 2B protected browser E2E, concurrency and restore drill if not already done. Current Windows packaged browser check validates the fictional site, not full protected operational UI.
+3. Finish V4.0 security acceptance: exact time-bounded relief lesson roster/attendance authority, including verified relief identity and publication-specific assignment with expiration/cancellation, avoid changing regular teacher's roll ownership without explicit transactional handover; test both actor and lesson scope. Implement actual delegated action-level write/export permissions only for approved real workflows; current capabilities are read/summary and existing teacher/admin actions. Support/confidential records require separate need-to-know rules. Review remaining legacy account/import/automated activation paths and audit retention; ensure concurrent deactivation, login/session revocation and raw admin bypass cannot widen permissions. Add deterministic browser tests for role management and negative access.
+4. SSO/MFA depends on school-approved identity provider and setup; document integration design, do not invent provider credentials or claim compliance. Review shared-network login throttling and session policies with ICT. V4.0 is partial and not production-ready.
+5. When these gates pass (or explicitly document approved deferred items), proceed to V4.1 school data and OneSchool integration from verified cumulative head. Keep handover current.
 
 ## 0. Start here — instructions for the next ChatGPT session
 
 This file is the durable project handover, not a transcript. Read it in full before changing code. The owner wants actual implementation in GitHub, not just suggestions when asking to build a phase.
 
 1. Connect to the GitHub repository and re-check the live branch heads, open pull requests, workflow runs, job logs and artifacts. Facts in this file are a snapshot; current repository evidence takes precedence.
-2. Resume the first incomplete task in section 2. Do not start an unrelated implementation or restart from an older release just because it is the default branch.
-3. Work from the latest cumulative Windows development branch, presently `feature/v3.9-live-foundation`. For a new phase, create a feature branch from the verified cumulative head. Inspect other overlapping branches before merging. Use an expected-head lease when updating a branch.
+2. Resume the first incomplete task in the CURRENT CHECKPOINT above, then consult the earlier roadmap sections. Do not start an unrelated implementation or restart from an older release just because it is the default branch.
+3. Work from the latest cumulative Windows development branch, presently `feature/v4.0-accounts-roles-security`. For a new phase, create a feature branch from the verified cumulative head. Inspect other overlapping branches before merging. Use an expected-head lease when updating a branch.
 4. Preserve working OneSchool imports, database schema/history, access boundaries and public website. Prefer incremental migrations and shared UI components; do not discard working code unnecessarily. Do not merge, deploy, delete existing databases, publish real data, or change school infrastructure without explicit approval.
 5. Add tests with fictional data. Run/trigger Django checks, migration consistency, all relevant regression tests, PostgreSQL/native smoke, browser checks and Windows packaging. Investigate failed jobs rather than weakening security or suppressing tests. A queued/running build is not a successful build.
 6. Create or update a draft PR. Report actual changes, limitations, branch, commit, PR, test outcomes and a verified artifact URL. Never claim an installer is ready unless the exact commit's required jobs passed and the artifact exists.
@@ -27,8 +51,10 @@ Stable handover URL: https://github.com/kkieren999/RollFlow/blob/development-han
 | Previous Windows release branch (unchanged by these phases) | `windows-release` — `6ac9059306f2e77880b94d549005d738cf77eb17` |
 | Cumulative V3.7 access work | `feature/v3.7-staff-access` — draft PR #34 |
 | Cumulative V3.8 packaging work | `feature/v3.8-windows-rebuild` — draft PR #35 |
-| **Current cumulative development source** | `feature/v3.9-live-foundation` — `d3940a8f51d8db08e2c8d9954c0e9803449c127f`, draft PR #36 |
+| Prior cumulative V3.9 development source | `feature/v3.9-live-foundation` — `d3940a8f51d8db08e2c8d9954c0e9803449c127f`, draft PR #36 |
 | Other overlapping shared-core work | `integration/shared-core`, draft PR #33 to main — inspect independently, do not assume merged |
+
+| **Current cumulative development source** | `feature/v4.0-accounts-roles-security` — `963bf058d32ff67d8173caf69ce7bd96a5631e51`, draft PR #37 |
 
 Links:
 - Website: https://kkieren999.github.io/RollFlow/
@@ -158,6 +184,9 @@ Use ROLLFLOW_DEBUG=1 for isolated dev checks as appropriate. PostgreSQL CI: `pyt
 - Official references to recheck for current requirements: https://ppr.qed.qld.gov.au/pp/roll-marking-in-state-schools-procedure and https://ppr.qed.qld.gov.au/pp/non-departmental-ict-service-providers-procedure .
 
 ## 7. Session log (newest first)
+
+### 27 Nov 2026 — V4.0 security foundation implemented
+- See CURRENT CHECKPOINT above. Cumulative branch feature/v4.0-accounts-roles-security, head 963bf058d32ff67d8173caf69ce7bd96a5631e51, draft PR #37. Tests and final Windows package require exact-commit validation. No releases or production deployment.
 
 ### 27 Nov 2026 — native hostname repair committed
 - Cumulative head: d3940a8f51d8db08e2c8d9954c0e9803449c127f on feature/v3.9-live-foundation, draft PR #36.
