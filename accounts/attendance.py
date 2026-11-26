@@ -51,7 +51,9 @@ def own_lessons(pub, user, day):
     all_slots = [r for r in visible_slots(pub, day) if lesson_valid(r)]
     counts = Counter(lesson_key(r) for r in all_slots)
     codes = personal_codes(pub, user)
-    return [r for r in all_slots if r.get("staff") in codes and counts[lesson_key(r)] == 1]
+    return [r for r in all_slots if r.get("staff") in codes and counts[lesson_key(r)] == 1
+            and not any(other is not r and (other.get("staff") == r.get("staff") or other["code"] == r["code"])
+                        and other["start"] < r["end"] and r["start"] < other["end"] for other in all_slots)]
 
 
 def roster_for(pub, code, day, lock=False):

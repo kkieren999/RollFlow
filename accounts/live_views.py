@@ -1,5 +1,6 @@
 """Authenticated application shell and transactional attendance endpoints."""
 from collections import Counter
+from django.utils.crypto import salted_hmac
 from urllib.parse import urlencode
 from django.contrib.auth.models import User
 from django.db import transaction, IntegrityError
@@ -14,7 +15,7 @@ from .attendance import (MARKS, AttendanceUnavailable, can_monitor, publication_
                          roll_matches, status_label)
 from .connected_school import current, visible_slots
 from .models import (AttendanceRoll, AttendanceRevision, ConnectedSchoolPublication,
-                     StaffProfile, SecurityEvent, PendingTeacherSetup)
+                     StaffProfile, SecurityEvent, PendingTeacherSetup, ImportedTimetable)
 from .permissions import can_teach
 from .school_access import grants_for, visible_modules
 
@@ -51,6 +52,10 @@ def home(request):
     return page(request, "live_home.html", ready=publication_ready(pub))
 
 
+def roster_token(students):
+    return salted_hmac("attendance-roster-v1", ",".join(str(s.pk) for s in sorted(students, key=lambda s:s.pk)), algorithm="sha256").hexdigest()
+
+
 def lesson_url(row):
     code, period, start = lesson_key(row)
     return reverse("live-roll") + "?" + urlencode({"code": code, "period": period, "start": start})
@@ -85,6 +90,7 @@ def mark_roll(request):
         with transaction.atomic():
             if request.method == "POST":
                 # Serialise writes against other attendance submissions and current publication changes.
+                list(ImportedTimetable.objects.select_for_update().order_by("pk"))
                 pub = ConnectedSchoolPublication.objects.select_for_update().filter(active=True).first()
                 actor = User.objects.select_for_update().get(pk=request.user.pk)
                 list(StaffProfile.objects.select_for_update().filter(user=actor))
@@ -97,6 +103,8 @@ def mark_roll(request):
                 return HttpResponseForbidden("No current verified allocation for this lesson.")
             students = roster_for(pub, row["code"], day, lock=request.method == "POST")
             roll = roll_for(day, row, lock=request.method == "POST")
+            if AttendanceRoll.objects.filter(lesson_date=day, class_code=row["code"]).exclude(pk=roll.pk if roll else None).filter(start__lt=row["end"], end__gt=row["start"]).exists():
+                raise AttendanceUnavailable("A different overlapping roll exists. Administrator reconciliation required.")
             if roll and not roll_matches(roll, pub, row, actor, students):
                 raise AttendanceUnavailable("Existing roll differs from current publication or roster. Administrator reconciliation required.")
             error = ""
@@ -104,7 +112,7 @@ def mark_roll(request):
                 if roll and roll.submitted_at:
                     raise AttendanceUnavailable("Submitted rolls are locked. Corrections are not enabled in this version.")
                 expected = str(roll.revision if roll else 0)
-                if (request.POST.get("revision") != expected or request.POST.get("publication") != str(pub.pk)
+                if (request.POST.get("roster_token") != roster_token(students) or request.POST.get("revision") != expected or request.POST.get("publication") != str(pub.pk)
                         or request.POST.get("day") != day.isoformat()):
                     raise AttendanceUnavailable("This page is stale. Reload before saving.")
                 action = request.POST.get("action")
@@ -140,7 +148,7 @@ def mark_roll(request):
             student_rows = [{"name": s.preferred_name or s.first_name, "last":s.last_name,
                              "pk":s.pk, "mark":marks.get(str(s.pk),"")} for s in students]
             return page(request, "live_roll.html", row=row, day=day, publication_id=pub.pk, roll=roll,
-                        students=student_rows, choices=MARKS, error=error)
+                        students=student_rows, choices=MARKS, error=error, roster_token=roster_token(students))
     except AttendanceUnavailable as exc:
         return render(
             request, "live_conflict.html", {**shell(request.user), "error":str(exc)}, status=409)

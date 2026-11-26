@@ -98,6 +98,8 @@ jobs:
           $setupLauncher = Get-Content (Join-Path $bundle 'First Setup Fresh.cmd') -Raw
           $startLauncher = Get-Content (Join-Path $bundle 'Start Fresh Protected.cmd') -Raw
           $existingLauncher = Get-Content (Join-Path $bundle 'Start Existing Protected.cmd') -Raw
+          $protectedLauncher = Get-Content (Join-Path $bundle 'Start RollFlow.cmd') -Raw
+          if ($protectedLauncher -notmatch 'Protected Workspace.cmd') { throw 'Protected workspace must be the default launcher' }
           $websiteLauncher = Get-Content (Join-Path $bundle 'Open Training Demo.cmd') -Raw
           foreach ($launcher in @($setupLauncher, $startLauncher)) {
             if ($launcher -notmatch 'RollFlow-V38-Fresh-Staging') { throw 'Fresh shortcuts must use isolated instance state' }
@@ -144,6 +146,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'V3.6.6 setup schema or route unavailable' }
           & "$bundle/python/python.exe" -m deployment.native --state $state manage shell -c "from django.template.loader import get_template; from django.conf import settings; from pathlib import Path; expected=['ui_system.html','ui_header.html','staff_portal.html','connected_school.html','automated_setup.html','teacher_week.html','teacher_timetable.html','oneschool_documents.html']; assert all(get_template(x) for x in expected); text=(Path(settings.BASE_DIR)/'index.html').read_text(encoding='utf-8'); assert text.count('<!-- ROLLFLOW_SERVER_BOOTSTRAP -->')==1 and '--green:#147f38' in text"
           if ($LASTEXITCODE -ne 0) { throw 'V3.6.7 unified design system, portal template or legacy teacher bootstrap missing' }
+      - name: Validate central attendance schema and protected routes on Windows
+        shell: pwsh
+        run: |
+          $bundle = "$env:RUNNER_TEMP/RollFlow"
+          $state = "$env:RUNNER_TEMP/rf-test-state"
+          & "$bundle/python/python.exe" -m deployment.native --state $state manage shell -c "from django.urls import reverse; from django.db import connection; from django.conf import settings; from accounts.models import AttendanceRoll, AttendanceRevision; assert settings.ROLLFLOW_PROTECTED_WORKSPACE; assert reverse('live-home') == '/live/'; assert AttendanceRoll._meta.db_table in connection.introspection.table_names(); assert AttendanceRevision._meta.db_table in connection.introspection.table_names()"
+          if ($LASTEXITCODE -ne 0) { throw 'Central attendance migration or protected workspace missing' }
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
