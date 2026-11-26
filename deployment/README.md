@@ -16,7 +16,7 @@ Earlier V3.7.0 builds packaged a public Pages snapshot in `app/training` alongsi
 
 `BUILD-INFO.json` records both Windows source and website commit hashes; `SHA256SUMS.txt` records bundle file digests. Retain existing private state and extract a new bundle separately before running **Upgrade Existing.cmd**. Do not run First Setup over existing state. Staging is not a signed or school-approved production release.
 
-For future releases, build the Windows bundle from the same canonical source commit used for the public demo. `python deployment/sync_training.py --check` checks the shared source layout.
+For future releases, build the Windows bundle from the same canonical source commit used for the public demo. `python -m deployment.sync_training --check` checks the shared source layout.
 
 # Recording services in the student day template (offline demo)
 

@@ -43,7 +43,7 @@
   }
   function heading(row){
     const item=lesson(row);
-    return '<div class="rf-shared-lesson-heading"><strong class="rf-shared-lesson-title">'+escape(item.title)+'</strong><small class="rf-shared-lesson-code">'+escape(item.code)+'</small></div>';
+    return '<div class="rf-shared-lesson-heading">'+title(item)+'<small class="rf-shared-lesson-code">'+escape(item.code)+'</small></div>';
   }
   function mount(root,source){
     const data=source.getSchedule();
