@@ -22,7 +22,7 @@ YEARS = {str(y) for y in range(7, 13)}
 
 
 def valid_scope(scope, value):
-    return ((scope == "school" and value == "") or
+    return isinstance(value, str) and ((scope == "school" and value == "") or
             (scope == "faculty" and isinstance(value, str) and bool(value.strip()) and value == value.strip()) or
             (scope == "year" and value in YEARS))
 
@@ -69,7 +69,7 @@ def scoped_rows(grants, module):
             return qs
         if g.scope == "faculty":
             # Faculty refers to the assigned staff member, not inferred subject ownership.
-            field = "faculty__iexact" if module == "staff" else "teacher__staff_profile__faculty__iexact"
+            field = "faculty__iexact" if module == "staff" else ("school_class__teacher__staff_profile__faculty__iexact" if module == "timetable" else "teacher__staff_profile__faculty__iexact")
             condition |= Q(**{field: g.scope_value})
         if g.scope == "year":
             field = "school_class__year_level" if module == "timetable" else "year_level"

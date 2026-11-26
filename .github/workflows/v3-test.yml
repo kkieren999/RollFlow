@@ -2,9 +2,9 @@ name: V3 foundation tests
 on:
   workflow_dispatch:
   push:
-    branches: [windows-release, v3.0-foundation, feature/v3.6.5-connected-school-data, feature/v3.6.6-automated-school-setup, feature/v3.6.7-unified-ui, feature/v3.6.7-student-movements-dashboard, feature/v3.6.7-varied-fictional-movements, feature/admin-movement-destinations-windows, feature/v3.6.7-movement-student-day-template, feature/v3.6.7-log-services-into-day-template]
+    branches: [feature/v3.7-staff-access, windows-release, v3.0-foundation, feature/v3.6.5-connected-school-data, feature/v3.6.6-automated-school-setup, feature/v3.6.7-unified-ui, feature/v3.6.7-student-movements-dashboard, feature/v3.6.7-varied-fictional-movements, feature/admin-movement-destinations-windows, feature/v3.6.7-movement-student-day-template, feature/v3.6.7-log-services-into-day-template]
   pull_request:
-    branches: [main, v3.0-foundation, integration/v3.6.1-windows-teacher-portal, feature/v3.6.2-oneschool-import-centre, feature/v3.6.4-real-oneschool-format-support, fix/v3.6.4-oneschool-unknown-worksheet-size, fix/v3.6.4.2-empty-staff-pdf-legends, fix/v3.6.4.3-cross-line-alignment, feature/v3.6.5-connected-school-data, feature/v3.6.6-automated-school-setup, feature/v3.6.7-unified-ui]
+    branches: [windows-release, main, v3.0-foundation, integration/v3.6.1-windows-teacher-portal, feature/v3.6.2-oneschool-import-centre, feature/v3.6.4-real-oneschool-format-support, fix/v3.6.4-oneschool-unknown-worksheet-size, fix/v3.6.4.2-empty-staff-pdf-legends, fix/v3.6.4.3-cross-line-alignment, feature/v3.6.5-connected-school-data, feature/v3.6.6-automated-school-setup, feature/v3.6.7-unified-ui]
 permissions:
   contents: read
 jobs:
@@ -52,7 +52,7 @@ jobs:
       - run: python deployment/ci_smoke.py
 
   windows-offline-bundle:
-    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/windows-release' || github.ref == 'refs/heads/v3.0-foundation' || github.ref == 'refs/heads/feature/v3.6.5-connected-school-data' || github.ref == 'refs/heads/feature/v3.6.6-automated-school-setup' || github.ref == 'refs/heads/feature/v3.6.7-unified-ui' || github.ref == 'refs/heads/feature/v3.6.7-student-movements-dashboard' || github.ref == 'refs/heads/feature/v3.6.7-varied-fictional-movements' || github.ref == 'refs/heads/feature/admin-movement-destinations-windows' || github.ref == 'refs/heads/feature/v3.6.7-movement-student-day-template' || github.ref == 'refs/heads/feature/v3.6.7-log-services-into-day-template'
+    if: github.ref == 'refs/heads/feature/v3.7-staff-access' || github.event_name == 'pull_request' || github.ref == 'refs/heads/windows-release' || github.ref == 'refs/heads/v3.0-foundation' || github.ref == 'refs/heads/feature/v3.6.5-connected-school-data' || github.ref == 'refs/heads/feature/v3.6.6-automated-school-setup' || github.ref == 'refs/heads/feature/v3.6.7-unified-ui' || github.ref == 'refs/heads/feature/v3.6.7-student-movements-dashboard' || github.ref == 'refs/heads/feature/v3.6.7-varied-fictional-movements' || github.ref == 'refs/heads/feature/admin-movement-destinations-windows' || github.ref == 'refs/heads/feature/v3.6.7-movement-student-day-template' || github.ref == 'refs/heads/feature/v3.6.7-log-services-into-day-template'
     runs-on: windows-2025
     timeout-minutes: 25
     steps:
@@ -142,7 +142,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'V3.6.7 unified design system, portal template or legacy teacher bootstrap missing' }
       - uses: actions/upload-artifact@v4
         with:
-          name: RollFlow-V3.7.0-Windows-x64-STAGING
+          name: RollFlow-V3.7.0-Staff-Access-Windows-x64-STAGING
           path: ${{ runner.temp }}/RollFlow/
           if-no-files-found: error
           retention-days: 14

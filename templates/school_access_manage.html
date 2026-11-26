@@ -1,6 +1,6 @@
 {% include "school_access_head.html" with title="Roles and permissions" %}
-<header><strong>RollFlow · Roles &amp; permissions</strong><a href="{% url 'management-dashboard' %}">Administration</a></header>
-<main><h1>Staff access grants</h1>
+<header><strong>RollFlow · Roles &amp; permissions</strong><a href="{% url 'management-dashboard' %}">Administration</a><form method="post" action="{% url 'logout' %}">{% csrf_token %}<button>Sign out</button></form></header>
+<main id="main-content"><h1>Staff access grants</h1>
 <p>Assign explicit read-only modules and a scope. Multiple grants combine only within the selected module. Existing administrator and teaching permissions are separate. Faculty classes and timetables refer to the assigned staff member’s faculty, not inferred subject ownership.</p>
 {% for message in messages %}<p role="status">{{ message }}</p>{% endfor %}
 <section><h2>Add access</h2><form method="post">{% csrf_token %}<input type="hidden" name="action" value="grant">{{ form.as_p }}<button>Grant access</button></form></section>

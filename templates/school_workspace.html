@@ -1,6 +1,6 @@
 {% include "school_access_head.html" with title="Staff workspace" %}
 <header><strong>RollFlow · School Management System</strong><form method="post" action="{% url 'logout' %}">{% csrf_token %}<button>Sign out</button></form></header>
-<main><h1>Staff workspace</h1><p>Welcome, {{ request.user.get_full_name|default:request.user.username }}.</p>
+<main id="main-content"><h1>Staff workspace</h1><p>Welcome, {{ request.user.get_full_name|default:request.user.username }}.</p>
 <nav><a href="{% url 'school-workspace' %}">Workspace home</a>{% if teaching %}<a href="{% url 'teacher' %}">My teaching</a>{% endif %}{% if admin_access %}<a href="{% url 'management-dashboard' %}">Administration</a>{% endif %}</nav>
 <section><h2>Your assigned roles</h2><ul>{% for grant in grants %}<li>{{ grant.role }} — {{ grant.scope }} {{ grant.scope_value }}</li>{% endfor %}</ul><nav>{% for code,label in modules.items %}<a href="{% url 'school-workspace-module' code %}">{{ label }}</a>{% endfor %}</nav></section>
 {% if module %}<section><h2>Scoped records</h2><p>Read-only. Manual classes and timetable are separate from published OneSchool data. No attendance or movement data is available through these modules.</p>

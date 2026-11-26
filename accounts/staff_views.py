@@ -42,7 +42,8 @@ def page(request, section, **context):
         available={"dashboard","staff","students","classes","timetable","master","data","oneschool","audit","roles"}
         navigation=tuple((group,tuple(item for item in items if item[0] in available)) for group,items in NAVIGATION)
         navigation=tuple((group,items) for group,items in navigation if items)
-    return render(request, "staff_portal.html", {"section": section, "title": TITLES[section], "navigation": navigation, "live_timetable": settings.ROLLFLOW_LIVE_TIMETABLE, **context})
+    from .school_access import has_workspace
+    return render(request, "staff_portal.html", {"has_staff_workspace": has_workspace(request.user), "can_access_teaching": can_teach(request.user), "section": section, "title": TITLES[section], "navigation": navigation, "live_timetable": settings.ROLLFLOW_LIVE_TIMETABLE, **context})
 
 def revoke_sessions(user):
     # Development implementation: database sessions only.
