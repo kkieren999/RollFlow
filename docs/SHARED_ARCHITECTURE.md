@@ -23,3 +23,9 @@ The historical Windows PR chain is included by the integration commit's second p
 
 ## Baseline browser regression audit
 The current main commit bbb40b56b2d6c70b660ff894d59db8b7cb250298 already failed two public browser regressions (run 45758680306): the Principal compact menu count (11 vs expected 10) and an obsolete incident form type selector. The initial shared integration run 45760412576 reproduces both failures. Do not suppress or weaken these checks to release. Reconcile the intended permission/navigation inventory and the simplified classroom action/referral workflow; run the full suite again. A dedicated shared schedule browser smoke isolates the new vertical slice from these pre-existing failures.
+
+## Phase 1B regression repair and promotion
+
+The permission-filtered route inventory replaces stale menu counts with explicit expected primary routes for all thirteen accounts. Class Finder and Classroom Management remain standalone; removed Seating Plans and Class Lists routes are deliberately excluded from visible navigation. Custom incidents retain configured type and response fields, and their class selection and submission are checked against the permitted classroom scope. Built-in late, uniform, departure and truancy actions continue to use their simplified forms; referrals use a separate support action.
+
+The Pages publishing workflow now queries the repository's actual build_type using read-only Pages access and fails its publishing-boundary gate unless the source is GitHub Actions. It builds the allowlisted artifact independently on the integration branch; it never deploys from the integration branch or a pull request. Promote PR #33 only after both browser and server/Windows checks pass and this configuration gate passes. Do not bypass the gate or use a token in source code.
