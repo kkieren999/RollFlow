@@ -56,7 +56,7 @@ def manage_access(request):
         if action == "revoke":
             with transaction.atomic():
                 grant = get_object_or_404(StaffAccessGrant.objects.select_for_update(), pk=request.POST.get("grant_id"))
-                SecurityEvent.objects.create(actor=request.user, event="school_access_revoked", subject=str(grant.pk))
+                SecurityEvent.objects.create(actor=request.user, event="school_access_revoked", subject=f"{grant.pk} {grant.user.username} {grant.role} {grant.scope} {grant.scope_value}"[:150])
                 grant.delete()
             messages.success(request, "Access revoked immediately.")
             return redirect("school-access-manage")

@@ -5,7 +5,8 @@ from .models import StaffAccessGrant, StaffProfile, Student, SchoolClass, Timeta
 ROLES = (
     "Principal", "Deputy Principal", "Head of Department", "Head of Year",
     "Teacher", "Relief Teacher", "Teacher Aide", "Administration Officer",
-    "Student Services", "Attendance Officer", "Guidance Officer", "Custom",
+    "Student Services", "Attendance Officer", "Guidance Officer", "Business Manager",
+    "Learning Support Teacher", "Custom",
 )
 CAPABILITIES = {
     "staff": "Staff directory",
