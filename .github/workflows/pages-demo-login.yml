@@ -46,3 +46,13 @@ jobs:
         run: npm install --no-save --no-audit --no-fund playwright-core@1.56.1
       - name: Check shared role workspaces in headless Google Chrome
         run: node tests/shared-workspace-browser.cjs
+        env:
+          RF_UI_SCREENSHOTS: qa-screenshots
+      - name: Upload UI screenshots for visual review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rollflow-ui-screenshots
+          path: qa-screenshots/
+          if-no-files-found: warn
+          retention-days: 14
