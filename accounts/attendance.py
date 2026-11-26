@@ -24,6 +24,9 @@ def can_monitor(user):
 def publication_ready(pub):
     if not pub or pub.snapshot.get("source") != "dated":
         return False
+    from .data_reconciliation import source_issues
+    if (pub.snapshot.get("data_validation") == 1 or pub.source_batches) and source_issues(pub):
+        return False
     stats = pub.snapshot.get("stats", {})
     return (stats.get("rosters_ready") is True and stats.get("skipped_pairs") == 0
             and ImportedTimetable.objects.filter(pk=pub.snapshot.get("timetable_version"),

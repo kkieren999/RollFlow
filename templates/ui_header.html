@@ -19,6 +19,7 @@
       <a class="rf-navlink" href="{% url 'management-student-directory' %}" {% if active == 'students' %}aria-current="page"{% endif %}>Students</a>
       <a class="rf-navlink" href="{% url 'management-class-directory' %}" {% if active == 'classes' %}aria-current="page"{% endif %}>Classes</a>
       <a class="rf-navlink" href="{% url 'management-master' %}" {% if active == 'master' %}aria-current="page"{% endif %}>Master timetable</a>
+      <a class="rf-navlink" href="{% url 'school-data-overview' %}">School data centre</a>
       <a class="rf-navlink" href="{% url 'oneschool-documents' %}" {% if active == 'imports' %}aria-current="page"{% endif %}>OneSchool imports</a>
       <a class="rf-navlink" href="{% url 'automated-school-setup' %}" {% if active == 'setup' %}aria-current="page"{% endif %}>Automated setup</a>
       <a class="rf-navlink" href="{% url 'connected-school' %}" {% if active == 'publish' %}aria-current="page"{% endif %}>Publish</a>

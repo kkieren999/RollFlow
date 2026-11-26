@@ -339,3 +339,17 @@ class AttendanceRevision(models.Model):
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["roll", "revision"], name="unique_attendance_revision")]
+
+
+class AttendanceTransferReview(models.Model):
+    """Local review manifest only; never proof of a successful OneSchool upload."""
+    roll = models.ForeignKey(AttendanceRoll, on_delete=models.PROTECT, related_name="transfer_reviews")
+    revision = models.PositiveIntegerField()
+    digest = models.CharField(max_length=64)
+    row_count = models.PositiveIntegerField()
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    reviewed_at = models.DateTimeField(auto_now_add=True)
+    reconciled_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+", null=True, blank=True)
+    reconciled_at = models.DateTimeField(null=True, blank=True)
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["roll", "revision", "digest"], name="unique_attendance_transfer_review")]

@@ -1,3 +1,7 @@
+# V4.1 school data staging
+
+See [V4.1 notes](../docs/v4.1-school-data.md). Use the protected School data centre to review source imports and publication history. Existing database paths remain unchanged. No real school data in staging.
+
 # V4.0 security foundation staging
 
 See [V4.0 notes](../docs/v4.0-security.md). Account changes and role templates are managed through the protected workspace. All prior instructions are historical; existing instance state paths remain unchanged.
