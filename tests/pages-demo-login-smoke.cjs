@@ -26,10 +26,7 @@ console.log('PASS: semester and enrolment boundaries, late counted present, unsu
 
 function startServer() {
   return new Promise((resolve, reject) => {
-    const server = http.createServer((_req, res) => {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(html);
-    });
+    const server = http.createServer(require('./static-demo-server.cjs')(html));
     server.once('error', reject);
     server.listen(0, '127.0.0.1', () => {
       resolve({ server, url: 'http://127.0.0.1:' + server.address().port + '/' });

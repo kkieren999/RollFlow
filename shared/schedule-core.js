@@ -37,6 +37,10 @@
     if(typeof load!=="function")throw new TypeError("Schedule loader required");
     return Object.freeze({getSchedule:()=>snapshot(load())});
   }
+  function title(row){
+    const item=lesson(row);
+    return '<h3 class="rf-shared-lesson-title">'+escape(item.title)+'</h3>';
+  }
   function heading(row){
     const item=lesson(row);
     return '<div class="rf-shared-lesson-heading"><strong class="rf-shared-lesson-title">'+escape(item.title)+'</strong><small class="rf-shared-lesson-code">'+escape(item.code)+'</small></div>';
@@ -52,5 +56,5 @@
     }
     return data;
   }
-  return Object.freeze({VERSION,validDate,lesson,snapshot,provider,heading,mount});
+  return Object.freeze({VERSION,validDate,lesson,snapshot,provider,title,heading,mount});
 });

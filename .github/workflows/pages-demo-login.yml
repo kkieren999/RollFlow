@@ -2,9 +2,12 @@ name: Public Pages demo login smoke
 
 on:
   push:
-    branches: [main, 'feature/**']
+    branches: [main, 'feature/**', 'integration/**']
     paths:
       - 'index.html'
+      - 'shared/**'
+      - 'styles/**'
+      - 'tests/static-demo-server.cjs'
       - 'tests/pages-demo-login-smoke.cjs'
       - 'tests/shared-workspace-browser.cjs'
       - '.github/workflows/pages-demo-login.yml'
@@ -12,6 +15,9 @@ on:
     branches: [main]
     paths:
       - 'index.html'
+      - 'shared/**'
+      - 'styles/**'
+      - 'tests/static-demo-server.cjs'
       - 'tests/pages-demo-login-smoke.cjs'
       - 'tests/shared-workspace-browser.cjs'
       - '.github/workflows/pages-demo-login.yml'

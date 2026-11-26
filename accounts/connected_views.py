@@ -16,6 +16,7 @@ from .models import ConnectedSchoolPublication, ConnectedStaffMapping, StaffProf
 from .staff_views import administrator
 from .views import role_for
 from .permissions import can_teach
+from .schedule_contract import project_days
 
 
 class PublishForm(forms.Form):
@@ -202,6 +203,7 @@ def teacher_schedule(request, week=False):
     if week or context["day"].weekday() < 5:
         context["days"] = schedule_context(publication, request, codes, True)["days"]
         context["native_cards"] = True
+    context["shared_schedule"] = project_days(context["days"])
     return render(request, "connected_school.html", {"mode": "teacher", **context})
 
 

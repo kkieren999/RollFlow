@@ -85,10 +85,10 @@ input[type=checkbox]{margin-right:6px}table{width:100%;text-align:left;border-co
 <div class="day-head"><h2>{{ d.date|date:"l j F" }}</h2><a class="btn" href="{% url 'teacher-timetable' %}?date={{ d.date|date:'Y-m-d' }}">Day view</a></div>
 <div class="day-body">{% for row in d.rows %}
 <div class="lesson" data-rf-native-card data-rf-period="{{ row.period_label }}" data-rf-code="{{ row.code }}" data-rf-key="{{ d.date|date:'Y-m-d' }}|{{ row.period }}|{{ row.code }}|{{ row.start }}|{{ row.end }}">
-<span class="time">{{ row.period_label }} · {{ row.start }}–{{ row.end }}</span><strong>{{ row.name }}</strong><small>{{ row.code }} · Room {{ row.room|default:"Unassigned" }}</small>
+<span class="time">{{ row.period_label }} · {{ row.start }}–{{ row.end }}</span><div data-rf-shared-lesson data-date="{{ d.date|date:'Y-m-d' }}" data-code="{{ row.code }}" data-period="{{ row.period_label }}" data-time="{{ row.start }}–{{ row.end }}"><strong>{{ row.name }}</strong><small>{{ row.code }}</small></div><small>Room {{ row.room|default:"Unassigned" }}</small>
 <a href="{% url 'connected-teacher-roster' row.code %}?date={{ d.date|date:'Y-m-d' }}">My class roster</a></div>
 {% empty %}<p class="muted">No scheduled lessons for this date.</p>{% endfor %}</div></section>{% endfor %}
-</div>{% include "weekly_cards.html" %}
+</div>{% load static %}{{ shared_schedule|json_script:"rf-shared-schedule" }}<script src="{% static 'rf-shared/schedule-core.js' %}"></script><script src="{% static 'rf-shared/schedule-mount.js' %}"></script>{% include "weekly_cards.html" %}
 {% else %}
 {% if mode == 'teacher' %}<div class="rf-page-actions"><a class="btn primary" href="{% url 'teacher-week' %}?date={{ day|date:'Y-m-d' }}">Week view</a></div>{% endif %}
 {% for d in days %}<section class="panel"><h2>{{ d.date|date:"l j F" }}</h2><div class="scroll"><table><thead><tr><th>Period</th><th>Time</th><th>Class</th><th>Subject / class name</th><th>Room</th>{% if mode == 'master' %}<th>Source staff code</th>{% endif %}<th></th></tr></thead><tbody>
