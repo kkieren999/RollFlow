@@ -31,7 +31,7 @@ def main():
                                  autocommit=True) as conn:
                 conn.execute("ALTER ROLE rollflow_app CREATEDB")
                 try:
-                    call("manage.py", "test", "accounts", env=config_env(cfg))
+                    call("manage.py", "test", "accounts", env={**config_env(cfg), "ROLLFLOW_PROTECTED_WORKSPACE": "0"})
                 finally:
                     conn.execute("ALTER ROLE rollflow_app NOCREATEDB")
                 assert conn.execute("SELECT rolsuper, rolcreatedb, rolcreaterole FROM pg_roles WHERE rolname = 'rollflow_app'").fetchone() == (False, False, False)
@@ -40,7 +40,7 @@ def main():
             env.update(DJANGO_SUPERUSER_USERNAME="ci_local_admin", DJANGO_SUPERUSER_EMAIL="ci@example.invalid",
                        DJANGO_SUPERUSER_PASSWORD=secrets.token_urlsafe(32))
             call("manage.py", "createsuperuser", "--noinput", env=env)
-            call("manage.py", "shell", "-c", "import os; from django.test import Client; from django.contrib.auth import get_user_model; from django.contrib.auth.hashers import identify_hasher; u=get_user_model().objects.get(username='ci_local_admin'); assert identify_hasher(u.password).algorithm == 'argon2'; assert Client().login(username=u.username,password=os.environ['DJANGO_SUPERUSER_PASSWORD']); print('Local hashed accounts verified')", env=env)
+            call("manage.py", "shell", "-c", "import os; from django.test import Client; from django.contrib.auth import get_user_model; from django.contrib.auth.hashers import identify_hasher; u=get_user_model().objects.get(username='ci_local_admin'); assert identify_hasher(u.password).algorithm == 'argon2'; assert Client().login(username=u.username,password=os.environ['DJANGO_SUPERUSER_PASSWORD']); c=Client(HTTP_HOST='localhost'); assert c.login(username=u.username,password=os.environ['DJANGO_SUPERUSER_PASSWORD']); response=c.get('/'); assert response.status_code == 302, response.status_code; assert response['Location'] == '/live/'; assert c.get('/live/').status_code == 200; print('Local hashed accounts and protected workspace verified')", env=env)
             child = subprocess.Popen([sys.executable, "-m", "deployment.serve_instance", str(state)],
                                      cwd=ROOT, env=config_env(cfg))
             try:
