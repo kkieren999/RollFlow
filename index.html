@@ -442,7 +442,7 @@ const RFU_ROLES={
  learning:{label:'Learning Support Teacher',grants:{'classroom-management':'assigned:create',dashboard:'assigned:view',schedule:'assigned:view',master:'school:view',classes:'assigned:view',students:'assigned:view',observations:'assigned:create',tasks:'assigned:manage',referrals:'assigned:review',followups:'assigned:manage',supervision:'assigned:view',calendar:'school:view',approvals:'assigned:create'}},
  aide:{label:'Teacher Aide',grants:{'classroom-management':'assigned:create',dashboard:'assigned:view',schedule:'assigned:view',classes:'assigned:view',students:'assigned:view',observations:'assigned:create',tasks:'assigned:complete',supervision:'assigned:view',calendar:'school:view',approvals:'assigned:create'}},
  relief:{label:'Relief Teacher',grants:{'classroom-management':'assigned:create',dashboard:'assigned:view',schedule:'assigned:view',classes:'assigned:view',students:'assigned:view',approvals:'assigned:create',supervision:'assigned:view',calendar:'school:view'}},
- guidance:{label:'Guidance Officer',grants:{'classroom-management':'referred:create',dashboard:'referred:view',students:'referred:view',referrals:'referred:review',observations:'referred:create',followups:'referred:manage',calendar:'school:view'}}
+ guidance:{label:'Guidance Officer',grants:{dashboard:'referred:view',students:'referred:view',referrals:'referred:review',observations:'referred:create',followups:'referred:manage',calendar:'school:view'}}
 };
 const RFU_IDENTITIES=[
  ['admin','Workspace Administrator','system'],['principal','Jordan Williams','principal'],['deputy','Morgan Lee','deputy'],['hod','Casey Nguyen','hod'],['ylc','Riley Patel','ylc'],['business','Chris Wilson','business'],['office','Sam Taylor','office'],['teacher','Alex Morgan','teacher'],['swilliams','Sarah Williams','teacher'],['learning','Jamie Brooks','learning'],['aide','Robin Chen','aide'],['relief','Taylor Ross','relief'],['guidance','Avery Scott','guidance']
@@ -2962,7 +2962,8 @@ document.addEventListener('submit',e=>{
   const next={...old,id:old?.id||'custom-'+Date.now()+'-'+Math.random().toString(36).slice(2,8),name,kind,active:data.has('active'),...(kind==='incident'?{types,responses,time:data.has('time'),refer:data.has('refer')}:{})};
   if(rfWriteStudentLocal(RF_STUDENT_ACTION_KEY,old?all.map(a=>a.id===old.id?next:a):[...all,next])){rfStudentActionEdit='';adminMessage='Student action saved.'}render();return;
  }
- if(form.id!=='rf-student-incident-form'||!['teacher','staff'].includes(demoRole))return;
+ if(form.id!=='rf-student-incident-form')return;
+ if(!['teacher','staff'].includes(demoRole)){e.preventDefault();e.stopImmediatePropagation();return}
  e.preventDefault();e.stopImmediatePropagation();const data=new FormData(form),p=rfModuleCurrentPerson(),a=rfStudentActions().find(x=>x.id===form.dataset.rfActionId&&x.active&&x.kind==='incident');
   if(!a||demoRole==='staff'&&(!rfClassroomRoute()||a.refer)||!a.refer&&(!rfClassroomAllowed()||!rfClassroomPeople().some(x=>x.id===p?.id))){showToast('This classroom action is outside your assigned access.');return}
  const val=k=>String(data.get(k)||'').trim(),date=val('date'),time=val('time'),code=val('classCode'),quick=rfQuickIncident(a),type=quick?(a.id==='uniform'?val('type'):({'late':'Late arrival','left':'Left classroom','truant':'Missed class'})[a.id]||a.name):val('type'),response=quick?'Record only':val('response'),notes=quick?'':val('notes');
