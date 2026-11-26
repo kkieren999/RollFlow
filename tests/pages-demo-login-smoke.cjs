@@ -420,8 +420,8 @@ async function test() {
       'Currently out, Returned and Total passes summaries are required');
     assert.equal(await page.locator('#movementStudentSearch').count(), 1,
       'Existing student autocomplete must remain on the new page');
-    assert.equal(await page.locator('#movementDestination').count(), 1);
-    assert.equal(await page.locator('#movementIssueButton').count(), 1);
+    assert.equal(await page.locator('.rf-move-wiz [aria-current="step"]').innerText().then(t=>t.trim().endsWith('Select student')),true);
+    assert.equal(await page.locator('#movementIssueButton').count(),0,'Issue control appears only after destination selection');
     assert.equal(await page.locator('#rfMovementView').count(), 1,
       'Movement status filter must remain usable');
 
@@ -473,8 +473,10 @@ async function test() {
 
     await page.locator('#movementStudentSearch').fill('S7001');
     await page.locator('[data-movement-choice="S7001"]').click();
+    assert.equal(await page.locator('.rf-move-wiz [aria-current="step"]').innerText().then(t=>t.trim().endsWith('Choose destination')),true);
+    await page.locator('[data-rf-move-dest="Library"]').click();
+    assert.equal(await page.locator('#movementDestination').inputValue(),'Library');
     assert(await page.locator('#movementIssueButton').isEnabled());
-    await page.locator('#movementDestination').selectOption('Library');
     await page.locator('#movementIssueButton').click();
     assert.equal(await page.locator('.rf-movement-stat-out strong').innerText(), '1');
     assert.equal(Number(await page.locator('.rf-movement-stat-total strong').innerText()), initialTotal + 1);
@@ -522,9 +524,10 @@ async function test() {
     await page.locator('#rf-movements-date').dispatchEvent('change');
     await page.locator('#movementStudentSearch').fill('S7001');
     await page.locator('[data-movement-choice="S7001"]').click();
+    await page.locator('[data-rf-move-dest="Library"]').click();
     assert(await page.locator('#movementIssueButton').isDisabled(),
       'Historical dates must not allow new live movement passes');
-    assert.match(await page.locator('#movementFeedback').innerText(), /selected/);
+    assert.match(await page.locator('.rf-move-wiz .rf-wiz-person').first().innerText(),/S7001/);
 
     // A read-only student day template sits below the main movement log.
     const studentDaySection = page.locator('.rf-day-review');
@@ -692,14 +695,12 @@ async function test() {
     await openRoute(page,'data-nav','movements');
     await page.locator('#rf-movements-date').fill(today);
     await page.locator('#rf-movements-date').dispatchEvent('change');
-    assert(await page.locator('#movementDestination option[value="Wellbeing Centre"]').count(),
-      'Teacher should see the new administrator destination');
     assert.equal(await page.locator('[data-rf-remove-movement-destination]').count(), 0,
       'Teacher page must not expose admin removal controls');
-
     await page.locator('#movementStudentSearch').fill('S7001');
     await page.locator('[data-movement-choice="S7001"]').click();
-    await page.locator('#movementDestination').selectOption('Wellbeing Centre');
+    assert.equal(await page.locator('[data-rf-move-dest="Wellbeing Centre"]').count(),1,'Teacher sees the new administrator destination');
+    await page.locator('[data-rf-move-dest="Wellbeing Centre"]').click();
     await page.locator('#movementIssueButton').click();
     assert.equal(await page.locator('.rf-movement-return-button').count(), 1,
       'New destination needs to work with the existing live pass action');
@@ -724,18 +725,13 @@ async function test() {
     await openRoute(page,'data-nav','movements');
     await page.locator('#rf-movements-date').fill(today);
     await page.locator('#rf-movements-date').dispatchEvent('change');
-    assert.equal(await page.locator('#movementDestination option[value="Wellbeing Centre"]').count(), 0,
-      'Removed destination must not be selectable for new passes');
     assert.match(await page.locator('.rf-movement-table tbody').innerText(), /Wellbeing Centre/,
       'Previously returned passes must keep their destination after deletion');
-
     await page.locator('#movementStudentSearch').fill('S7001');
     await page.locator('[data-movement-choice="S7001"]').click();
-    await page.evaluate(() => {
-      const select = document.getElementById('movementDestination');
-      select.add(new Option('Wellbeing Centre', 'Wellbeing Centre'));
-      select.value = 'Wellbeing Centre';
-    });
+    assert.equal(await page.locator('[data-rf-move-dest="Wellbeing Centre"]').count(),0,'Removed destination cannot be selected');
+    await page.locator('[data-rf-move-dest="Library"]').click();
+    await page.evaluate(()=>{document.getElementById('movementDestination').value='Wellbeing Centre'});
     const beforeInvalid = await page.locator('.rf-movement-stat-total strong').innerText();
     await page.locator('#movementIssueButton').click();
     assert.equal(await page.locator('.rf-movement-stat-total strong').innerText(), beforeInvalid,
