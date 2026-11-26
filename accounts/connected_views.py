@@ -250,20 +250,26 @@ def dated_centre(request):
     from datetime import date
     from django.contrib.auth.models import User
     from .dated_school import published_version, build_dated_candidate
-    from .models import ImportedTimetable
+    from .data_reconciliation import compare_publications, diagnostics
+    from .models import ImportedTimetable, AttendanceRoll, OneSchoolArchiveBatch
+    from .security_service import lock_administrator
     version = published_version()
     preview = None
     error = ""
     try:
         with transaction.atomic():
             if request.method == "POST":
+                if not lock_administrator(request.user):
+                    return HttpResponseForbidden("Administrator access revoked.")
                 # Serialize against dated import publication and concurrent refreshes.
                 list(ImportedTimetable.objects.select_for_update().order_by("pk").values_list("pk", flat=True))
+                list(OneSchoolArchiveBatch.objects.select_for_update().order_by("pk"))
                 version = published_version()
             sources, snapshot, digest = build_dated_candidate(version)
             preview = {"stats": snapshot["stats"], "digest": digest,
                        "starts": snapshot["calendar"]["dates"][0],
-                       "ends": snapshot["calendar"]["dates"][-1]}
+                       "ends": snapshot["calendar"]["dates"][-1],
+                       "changes": compare_publications(current(), snapshot), "diagnostics": diagnostics(snapshot)}
             if request.method == "POST":
                 action = request.POST.get("action")
                 if action not in ("publish", "prepare"):
@@ -287,7 +293,13 @@ def dated_centre(request):
                         count += 1
                     messages.success(request, f"Prepared {count} inactive staff accounts. Verify identity, set a password, grant teaching and activate separately.")
                 else:
-                    list(ConnectedSchoolPublication.objects.select_for_update().values_list("pk", flat=True))
+                    list(ConnectedSchoolPublication.objects.select_for_update().order_by("pk").values_list("pk", flat=True))
+                    active = current()
+                    if active and active.digest == digest:
+                        messages.info(request, "This exact reviewed publication is already active. Existing attendance was preserved.")
+                        return redirect("connected-dated")
+                    if active and AttendanceRoll.objects.filter(publication=active).exists() and request.POST.get("acknowledge_rolls") != "yes":
+                        raise ValueError("Existing attendance refers to this publication. Review the impact and explicitly acknowledge before replacement.")
                     ConnectedSchoolPublication.objects.filter(active=True).update(active=False)
                     publication = ConnectedSchoolPublication.objects.create(
                         name=version.name, starts=date.fromisoformat(preview["starts"]),

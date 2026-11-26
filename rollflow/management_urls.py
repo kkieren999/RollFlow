@@ -1,8 +1,12 @@
 from django.urls import path
-from accounts import connected_views, automated_views
+from accounts import connected_views, automated_views, data_views
 from accounts import staff_views, student_views, timetable_views, master_views, oneschool_views, oneschool_document_views
 
 urlpatterns = [
+    path('school-data/', data_views.overview, name='school-data-overview'),
+    path('school-data/restore/<int:pk>/', data_views.restore, name='school-data-restore'),
+    path('school-data/transfers/', data_views.transfer_list, name='school-data-transfers'),
+    path('school-data/transfers/<int:pk>/', data_views.transfer, name='school-data-transfer'),
     path("", staff_views.dashboard, name="management-dashboard"),
     path("connected/", connected_views.centre, name="connected-school"),
     path("connected/dated/", connected_views.dated_centre, name="connected-dated"),
