@@ -4753,10 +4753,10 @@ function rfCalGrid(month,selected,focus,min,max,events,range='',full=false,step=
  }).join('')+'</div>';
 }
 function rfCalRangeAnchor(input){
- const form=input.form||input.closest('section')||input.parentElement?.parentElement;
+ const form=input.form||input.closest('.student-filter-grid,.rf-module-controls,.rf-table-controls,.v31-search,.rf-unified-search,section')||input.parentElement?.parentElement;
  if(!form)return '';
  if(input.name==='end'&&form.id==='rf-room-form')return form.elements.date?.value||'';
- const keys=['name','data-student-filter','data-individual','data-report','data-rf-unified-filter','data-rf-admin-filter','id'];
+ const keys=['name','data-student-filter','data-individual','data-report','data-rf-unified-filter','data-rf-admin-filter','data-rfa-filter','data-rf-overview','id'];
  for(const key of keys){
   const value=input.getAttribute(key)||'',pair=/^(from|start)(date)?$/i.test(value)?['to','end','todate','enddate']:/^(to|end)(date)?$/i.test(value)?['from','start','fromdate','startdate']:null;
   if(pair){const other=[...form.querySelectorAll('input[type=date]')].find(el=>el!==input&&pair.includes((el.getAttribute(key)||'').toLowerCase()));if(other&&rfCalValid(other.value))return other.value}
@@ -4774,8 +4774,8 @@ function rfCalOpen(input=null,full=false){
  let selected=input&&rfCalValid(input.value)?input.value:full?today:'',focus=selected||today;
  if(min&&focus<min)focus=min;if(max&&focus>max)focus=max;
  let month=rfCalMonth(focus);
- const events=rfScheduleAllowed()?rfScheduleExceptions():[];
- const returnFocus=input||document.activeElement,dialog=document.createElement('dialog');rfCalDialog=dialog;dialog.className='rf-ui-dialog rf-ui-calendar-dialog'+(full?' rf-ui-calendar-dialog--full rf-cal-full':'');dialog.setAttribute('aria-labelledby','rf-cal-title');document.body.append(dialog);
+ const exceptions=rfScheduleAllowed()?rfScheduleExceptions():[],events=rfScheduleAllowed()?[...exceptions,...rfCalendarEvents().filter(e=>e&&rfCalValid(e.date)&&!exceptions.some(x=>x.id===e.id)).map(e=>({...e,end:rfCalValid(e.end)&&e.end>=e.date?e.end:e.date}))]:[];
+ let nativeFallback=false;const returnFocus=input||document.activeElement,dialog=document.createElement('dialog');rfCalDialog=dialog;dialog.className='rf-ui-dialog rf-ui-calendar-dialog'+(full?' rf-ui-calendar-dialog--full rf-cal-full':'');dialog.setAttribute('aria-labelledby','rf-cal-title');document.body.append(dialog);
  function paint(focusDay=false){
   const info=rfCalInfo(selected||focus,events),term=rfCalTerm(month+'-15'),known=month.startsWith('2026-');
   const minMonth=min?rfCalMonth(min):'1900-01',maxMonth=max?rfCalMonth(max):'2099-12';
@@ -4794,7 +4794,7 @@ function rfCalOpen(input=null,full=false){
  dialog.addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b||b.disabled)return;
   if(b.hasAttribute('data-rf-cal-close')){dialog.close();return}
-  if(b.hasAttribute('data-rf-cal-native')){dialog.close();if(input?.isConnected){input.focus();try{input.showPicker?.()}catch{}}return}
+  if(b.hasAttribute('data-rf-cal-native')){nativeFallback=true;dialog.close();if(input?.isConnected){input.focus();try{if(typeof input.showPicker==='function')input.showPicker();else{input.setAttribute('data-rf-native-date','');input.click();input.removeAttribute('data-rf-native-date')}}catch{input.removeAttribute('data-rf-native-date')}}return}
   if(b.hasAttribute('data-rf-cal-clear')){choose('');return}
   if(b.hasAttribute('data-rf-cal-today')){choose(today);return}
   if(b.dataset.rfCalDay){choose(b.dataset.rfCalDay);return}
@@ -4809,7 +4809,7 @@ function rfCalOpen(input=null,full=false){
   else if(e.key==='PageUp'||e.key==='PageDown'){const m=rfCalShift(rfCalMonth(day),(e.key==='PageUp'?-1:1)*(e.shiftKey?12:1));next=m+'-'+String(Math.min(Number(day.slice(-2)),new Date(Date.UTC(Number(m.slice(0,4)),Number(m.slice(5)),0)).getUTCDate())).padStart(2,'0')}
   if(!next)return;e.preventDefault();if(!valid(next))return;focus=next;month=rfCalMonth(next);paint(true);
  });
- dialog.addEventListener('close',()=>{dialog.remove();if(rfCalDialog===dialog)rfCalDialog=null;if(returnFocus?.isConnected)returnFocus.focus({preventScroll:true})});
+ dialog.addEventListener('close',()=>{dialog.remove();if(rfCalDialog===dialog)rfCalDialog=null;if(!nativeFallback&&returnFocus?.isConnected)returnFocus.focus({preventScroll:true})});
  paint();dialog.showModal();dialog.querySelector('[data-rf-cal-day][tabindex="0"]')?.focus();
 }
 /* Capture date clicks only; all underlying form names, min/max and handlers remain. */
