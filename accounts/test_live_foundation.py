@@ -133,3 +133,50 @@ class LiveFoundationTests(TestCase):
         self.assertRedirects(self.client.get("/teacher/"),"/live/day/")
         self.assertContains(self.client.get("/live/day/"),"No unambiguous verified lessons")
         self.assertNotContains(self.client.get("/live/day/"),"rollflow-server-identity")
+
+    def test_local_transfer_requires_admin_and_exact_submitted_revision(self):
+        from .models import AttendanceTransferReview, AccessAudit
+        self.assertEqual(self.client.post(self.url,self.payload("submit")).status_code,302)
+        roll=AttendanceRoll.objects.get()
+        path=f"/manage/school-data/transfers/{roll.pk}/"
+        self.assertEqual(self.client.get(path).status_code,403)
+        self.client.force_login(self.monitor)
+        self.assertEqual(self.client.get(path).status_code,403)
+        self.client.force_login(self.admin)
+        r=self.client.get(path)
+        self.assertContains(r,"not an approved OneSchool import format")
+        digest=r.context["digest"]
+        self.assertTrue(digest)
+        self.assertEqual(self.client.post(path,{"confirm":"yes","action":"export","digest":"bad"}).status_code,200)
+        self.assertFalse(AttendanceTransferReview.objects.exists())
+        self.assertContains(self.client.post(path,{"confirm":"yes","action":"reconcile","digest":digest}),"Export and review")
+        r=self.client.post(path,{"confirm":"yes","action":"export","digest":digest})
+        self.assertEqual(r.status_code,200)
+        self.assertEqual(r["Content-Type"],"text/csv; charset=utf-8")
+        self.assertIn("LOCAL-REVIEW",r["Content-Disposition"])
+        self.assertIn(b"FICTIONAL001",r.content)
+        self.assertNotIn(b"FICTIONAL002",r.content)
+        self.assertNotIn(b"FictionalPupil",r.content)
+        self.assertEqual(AttendanceTransferReview.objects.count(),1)
+        self.assertEqual(self.client.post(path,{"confirm":"yes","action":"reconcile","digest":digest}).status_code,302)
+        self.assertIsNotNone(AttendanceTransferReview.objects.get().reconciled_at)
+        self.assertContains(self.client.post(path,{"confirm":"yes","action":"reconcile","digest":digest}),"already been")
+        self.assertTrue(AccessAudit.objects.filter(action="attendance_manual_reconcile").exists())
+
+    def test_local_transfer_rejects_identity_change_and_csv_injection(self):
+        from .data_views import safe_csv_cell
+        for value in ("=HYPERLINK(1)"," +1","@SUM(1)","-1","tab\tvalue"):
+            with self.assertRaises(ValueError):
+                safe_csv_cell(value)
+        self.assertEqual(self.client.post(self.url,self.payload("submit")).status_code,302)
+        roll=AttendanceRoll.objects.get()
+        self.client.force_login(self.admin)
+        self.student.student_id="REPLACED"
+        self.student.save()
+        self.assertContains(self.client.get(f"/manage/school-data/transfers/{roll.pk}/"),"Student identity changed")
+
+    def test_restore_rejects_existing_attendance(self):
+        self.assertEqual(self.client.post(self.url,self.payload("submit")).status_code,302)
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.post(f"/manage/school-data/restore/{self.pub.pk}/",
+            {"confirm":"yes","digest":"wrong"}).status_code,400)

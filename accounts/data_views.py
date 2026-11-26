@@ -91,11 +91,11 @@ def transfer_content(roll, lock=False):
     if len(set(roll.roster))!=len(roll.roster) or any(v not in ("P","A","L") for v in roll.marks.values()):
         raise ValueError("Invalid or incomplete attendance marks.")
     latest=AttendanceRevision.objects.filter(roll=roll,revision=roll.revision,action="submit").first()
-    if not latest or latest.marks!=roll.marks:
+    if not latest or latest.marks!=roll.marks or latest.actor_id!=roll.teacher_id:
         raise ValueError("Submission history does not match. Administrator review required.")
     pub=roll.publication
     records=[c for c in pub.snapshot.get("classes",[]) if c.get("code")==roll.class_code]
-    if len(records)!=1 or not set(roll.roster).issubset(set(records[0].get("students",[]))):
+    if len(records)!=1 or set(roll.roster)!=set(records[0].get("students",[])):
         raise ValueError("Frozen roster does not match its original publication.")
     identities=pub.snapshot.get("student_identity",{})
     qs=Student.objects.filter(pk__in=roll.roster).order_by("pk")

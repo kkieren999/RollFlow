@@ -1,5 +1,6 @@
 """First protected attendance workflow: reviewed dated publication, today's own lessons."""
 from collections import Counter
+from django.conf import settings
 from datetime import time
 from django.utils import timezone
 from .connected_school import canonical, personal_codes, visible_slots
@@ -25,7 +26,7 @@ def publication_ready(pub):
     if not pub or pub.snapshot.get("source") != "dated":
         return False
     from .data_reconciliation import source_issues
-    if (pub.snapshot.get("data_validation") == 1 or pub.source_batches) and source_issues(pub):
+    if (settings.ROLLFLOW_SCHOOL_MODE or pub.snapshot.get("data_validation") == 1 or pub.source_batches) and source_issues(pub):
         return False
     stats = pub.snapshot.get("stats", {})
     return (stats.get("rosters_ready") is True and stats.get("skipped_pairs") == 0
