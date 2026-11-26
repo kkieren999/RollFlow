@@ -14,7 +14,8 @@ from .models import LoginWindow, SecurityEvent
 from .permissions import can_teach
 
 def role_for(user):
-    if not user.is_authenticated or not user.is_active:
+    from .security_service import eligible_account
+    if not eligible_account(user):
         return None
     if user.is_staff and user.is_superuser:
         return "admin"

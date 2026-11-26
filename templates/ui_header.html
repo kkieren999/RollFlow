@@ -24,6 +24,7 @@
       <a class="rf-navlink" href="{% url 'connected-school' %}" {% if active == 'publish' %}aria-current="page"{% endif %}>Publish</a>
     {% endif %}
   </nav>
+  <a class="rf-navlink" href="{% url 'security-password' %}">Change password</a>
   <form method="post" action="{% url 'logout' %}">{% csrf_token %}
     <button class="rf-signout" type="submit">Sign out</button>
   </form>

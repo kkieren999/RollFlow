@@ -17,6 +17,7 @@ from .models import SecurityEvent, StaffProfile, Student, SchoolClass, Timetable
 from .staff_forms import StaffForm, ResetPasswordForm, StaffImportForm
 from .views import role_for
 from .permissions import can_teach, teaching_users
+from .security_service import audit, account_state, lock_administrator, revoke_account_grants
 
 NAVIGATION = (
     ("SCHOOL MANAGEMENT", (("dashboard", "Dashboard"), ("staff", "Staff Management"), ("students", "Student Management"), ("classes", "Class Management"), ("timetable", "Timetable Management"), ("master", "Master Timetable"), ("relief", "Relief & Supervision"))),
@@ -157,8 +158,14 @@ def staff_edit(request, pk=None):
         c = form.cleaned_data
         try:
             with transaction.atomic():
+                if not lock_administrator(request.user):
+                    return HttpResponseForbidden("Administrator access revoked.")
+                before = {}
                 if target:
                     user = User.objects.select_for_update().get(pk=target.pk)
+                    before = account_state(user)
+                    if user.pk == request.user.pk and (c["role"] != "admin" or not c["active"]):
+                        return HttpResponseForbidden("Cannot remove your own administrator access.")
                     old_role = (user.is_staff, user.is_superuser)
                     old_active = user.is_active
                     user.first_name, user.last_name = c["first_name"], c["last_name"]
@@ -202,6 +209,9 @@ def staff_edit(request, pk=None):
                     revoke_sessions(user)
                 if teaching_enabled != (existing_profile.teaching_enabled if existing_profile else None):
                     SecurityEvent.objects.create(actor=request.user, event="teaching_permission_changed", subject=user.username)
+                if not user.is_active:
+                    revoke_account_grants(request.user, user)
+                audit(request.user, "account_updated" if target else "account_created", user, before=before, after=account_state(user))
                 log(request, "staff_updated" if target else "staff_created", user)
             messages.success(request, "Staff details saved.")
             return redirect("management-section", section="staff")
@@ -218,10 +228,13 @@ def staff_reset(request, pk):
     form = ResetPasswordForm(request.POST if request.method == "POST" else None, target=target)
     if request.method == "POST" and form.is_valid():
         with transaction.atomic():
+            if not lock_administrator(request.user):
+                return HttpResponseForbidden("Administrator access revoked.")
             target = User.objects.select_for_update().get(pk=pk)
             target.set_password(form.cleaned_data["password"])
             target.save(update_fields=["password"])
             revoke_sessions(target)
+            audit(request.user, "password_reset", target)
             log(request, "password_reset", target)
         messages.success(request, "Password reset. Existing sessions have been revoked. Share credentials only through an approved channel.")
         return redirect("management-section", section="staff")
@@ -231,7 +244,10 @@ def staff_reset(request, pk):
 @require_POST
 def staff_status(request, pk):
     with transaction.atomic():
+        if not lock_administrator(request.user):
+            return HttpResponseForbidden("Administrator access revoked.")
         target = get_object_or_404(User.objects.select_for_update(), pk=pk)
+        before = account_state(target)
         if target.pk == request.user.pk:
             return HttpResponseForbidden("You cannot deactivate your own administrator account.")
         value = request.POST.get("active")
@@ -250,7 +266,10 @@ def staff_status(request, pk):
             from .models import ConnectedStaffMapping
             if ConnectedStaffMapping.objects.filter(profile__user=target).delete()[0]:
                 SecurityEvent.objects.create(actor=request.user, event="connected_mapping_revoked", subject=target.username)
+        if not target.is_active:
+            revoke_account_grants(request.user, target)
         revoke_sessions(target)
+        audit(request.user, "account_status_changed", target, before=before, after=account_state(target))
         log(request, "account_activated" if target.is_active else "account_deactivated", target)
     messages.success(request, "Account status updated.")
     return redirect("management-section", section="staff")

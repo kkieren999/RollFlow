@@ -267,8 +267,32 @@ class PendingTeacherSetup(models.Model):
     activated_at = models.DateTimeField(null=True, blank=True)
 
 
+class RoleTemplate(models.Model):
+    """Reusable, reviewed capability bundle. Assignment copies, never inherits, rights."""
+    name = models.CharField(max_length=80, unique=True)
+    scope = models.CharField(max_length=12)
+    capabilities = models.JSONField(default=list)
+    active = models.BooleanField(default=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class AccessAudit(models.Model):
+    """Structured, application-append-only permission and account change record."""
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    target = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
+                               on_delete=models.PROTECT, related_name="+")
+    action = models.CharField(max_length=40)
+    before = models.JSONField(default=dict)
+    after = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
 class StaffAccessGrant(models.Model):
     """Explicit, bounded read access. Never confers Django admin or teaching."""
+    template = models.ForeignKey(RoleTemplate, null=True, blank=True, on_delete=models.PROTECT)
+    starts_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
                              related_name="school_access_grants")
     role = models.CharField(max_length=80)
@@ -278,6 +302,9 @@ class StaffAccessGrant(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     granted_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
                                    related_name="+")
+
+    class Meta:
+        constraints = [models.CheckConstraint(condition=models.Q(starts_at__isnull=True) | models.Q(expires_at__isnull=True) | models.Q(expires_at__gt=models.F("starts_at")), name="staff_grant_time_order")]
 
 
 class AttendanceRoll(models.Model):

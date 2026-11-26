@@ -1,3 +1,7 @@
+# V4.0 security foundation staging
+
+See [V4.0 notes](../docs/v4.0-security.md). Account changes and role templates are managed through the protected workspace. All prior instructions are historical; existing instance state paths remain unchanged.
+
 # V3.9 protected foundation staging
 
 Start RollFlow.cmd now opens the protected database menu. Open Training Demo.cmd opens only fictional public website data. See [V3.9 notes](../docs/v3.9-live-foundation.md). Prior version instructions below are historical.

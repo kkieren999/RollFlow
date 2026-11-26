@@ -1,5 +1,6 @@
 """Fail-closed scoped grants, independent of existing teacher and administrator rights."""
 from django.db.models import Q
+from django.utils import timezone
 from .models import StaffAccessGrant, StaffProfile, Student, SchoolClass, TimetableSlot
 
 ROLES = (
@@ -21,6 +22,7 @@ SCOPES = {
     "school": set(CAPABILITIES),
     "faculty": {"staff", "classes", "timetable", "published_classes", "published_timetable"},
     "year": {"students", "classes", "timetable", "published_classes", "published_timetable"},
+    "class": {"published_classes", "published_timetable"},
 }
 YEARS = {str(y) for y in range(7, 13)}
 
@@ -28,11 +30,15 @@ YEARS = {str(y) for y in range(7, 13)}
 def valid_scope(scope, value):
     return isinstance(value, str) and ((scope == "school" and value == "") or
             (scope == "faculty" and isinstance(value, str) and bool(value.strip()) and value == value.strip()) or
-            (scope == "year" and value in YEARS))
+            (scope == "year" and value in YEARS) or
+            (scope == "class" and bool(value) and len(value) <= 30 and value == value.strip().upper()))
 
 
 def valid_grant(grant):
     caps = grant.capabilities
+    now = timezone.now()
+    if (grant.starts_at and grant.starts_at > now) or (grant.expires_at and grant.expires_at <= now):
+        return False
     return (valid_scope(grant.scope, grant.scope_value) and isinstance(caps, list)
             and bool(caps) and all(isinstance(c, str) and c in SCOPES[grant.scope] for c in caps))
 
@@ -53,7 +59,7 @@ def has_workspace(user):
 
 def visible_modules(grants):
     return {code: label for code, label in CAPABILITIES.items()
-            if any(code in g.capabilities for g in grants)}
+            if any(valid_grant(g) and code in g.capabilities for g in grants)}
 
 
 def scoped_rows(grants, module):
@@ -87,6 +93,7 @@ def published_rows(publication, grants, module, day):
     applicable = [g for g in grants if valid_grant(g) and module in g.capabilities]
     whole = any(g.scope == "school" for g in applicable)
     years = {int(g.scope_value) for g in applicable if g.scope == "year"}
+    class_codes = {g.scope_value for g in applicable if g.scope == "class"}
     faculties = {g.scope_value.casefold() for g in applicable if g.scope == "faculty"}
     codes = set()
     if faculties and not whole:
@@ -101,11 +108,11 @@ def published_rows(publication, grants, module, day):
         values = classes.get(code, {}).get("years", [])
         return bool(values) and all(type(y) is int and y in years for y in values)
     def slot_allowed(slot):
-        return whole or slot.get("staff") in codes or year_allowed(slot.get("code"))
+        return whole or slot.get("staff") in codes or slot.get("code") in class_codes or year_allowed(slot.get("code"))
     if module == "published_classes":
         permitted_codes = {s["code"] for s in publication.snapshot.get("slots", []) if s.get("staff") in codes}
         return [{"code": c["code"], "name": c["name"], "years": c.get("years", [])}
-                for c in classes.values() if whole or c["code"] in permitted_codes or year_allowed(c["code"])]
+                for c in classes.values() if whole or c["code"] in permitted_codes or c["code"] in class_codes or year_allowed(c["code"])]
     return [{"code": s["code"], "period_label": s.get("period_label", ""), "room": s.get("room", ""),
              "start": s.get("start", ""), "end": s.get("end", "")}
             for s in visible_slots(publication, day) if slot_allowed(s)]
