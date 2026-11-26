@@ -3,7 +3,7 @@
 **Last reviewed:** 27 November 2026 (Australia/Brisbane)  
 **Project:** kkieren999/RollFlow  
 **Goal:** Deliver a secure, school-wide Windows/browser application suitable for an approved Queensland secondary school pilot and eventually live deployment. The current website is the UX reference, not the production data layer.  
-**Status:** V3.9 implementation committed; release validation blocked. No production launch or real school data authorised.
+**Status:** V3.9 implementation and native hostname repair committed; new release validation running. No production launch or real school data authorised.
 
 ## 0. Start here — instructions for the next ChatGPT session
 
@@ -27,14 +27,15 @@ Stable handover URL: https://github.com/kkieren999/RollFlow/blob/development-han
 | Previous Windows release branch (unchanged by these phases) | `windows-release` — `6ac9059306f2e77880b94d549005d738cf77eb17` |
 | Cumulative V3.7 access work | `feature/v3.7-staff-access` — draft PR #34 |
 | Cumulative V3.8 packaging work | `feature/v3.8-windows-rebuild` — draft PR #35 |
-| **Current cumulative development source** | `feature/v3.9-live-foundation` — `e45bb9ebe059154bf14f3b50e820c3d0adc81096`, draft PR #36 |
+| **Current cumulative development source** | `feature/v3.9-live-foundation` — `d3940a8f51d8db08e2c8d9954c0e9803449c127f`, draft PR #36 |
 | Other overlapping shared-core work | `integration/shared-core`, draft PR #33 to main — inspect independently, do not assume merged |
 
 Links:
 - Website: https://kkieren999.github.io/RollFlow/
 - Current source: https://github.com/kkieren999/RollFlow/tree/feature/v3.9-live-foundation
 - Draft PR: https://github.com/kkieren999/RollFlow/pull/36
-- Latest V3.9 push run: https://github.com/kkieren999/RollFlow/actions/runs/45892345586
+- Latest V3.9 repair run #304: https://github.com/kkieren999/RollFlow/actions/runs/45892929577 (running when recorded)
+- Previous failed V3.9 push run: https://github.com/kkieren999/RollFlow/actions/runs/45892345586
 - Same-commit PR run: https://github.com/kkieren999/RollFlow/actions/runs/45892352243
 - Last known successful previous Windows release run: https://github.com/kkieren999/RollFlow/actions/runs/45759753362#artifacts (recheck expiration).
 
@@ -52,14 +53,15 @@ PR #36 includes the previous V3.7/V3.8 changes. Do not merge all three independe
 
 ## 2. NEXT ACTION — V3.9 release repair and verification (do this first)
 
-**Verified CI result:** latest runs 45892345586 and 45892352243 completed with failure; Windows packaging was skipped. The standard tests job passed, including 124 Django tests (SQLite). The native PostgreSQL smoke ran all 124 Django tests successfully, then failed in its subsequent shell smoke. Thus V3.9 has no confirmed downloadable Windows artifact.
+**Verified CI result:** previous runs 45892345586 and 45892352243 completed with failure; Windows packaging was skipped. Repair d3940a8 has now been committed and run 45892929577 started. First next action: inspect that exact commit's CI result, then continue section 2B if native validation passes. The standard tests job passed, including 124 Django tests (SQLite). The native PostgreSQL smoke ran all 124 Django tests successfully, then failed in its subsequent shell smoke. Thus V3.9 has no confirmed downloadable Windows artifact.
 
 ### 2A. Fix specific native smoke regression
 
-- [ ] Read `deployment/ci_smoke.py`, `deployment/native.py`, `rollflow/settings.py` and the failing job log (job 140157794213 in run 45892345586).
-- [ ] Root cause: after successful authentication, the new smoke uses `c=Client()` then `c.get('/').url`. Django's test client defaults to host `testserver`, which is intentionally not in the native instance's ALLOWED_HOSTS (localhost). Response is HTTP 400, then AttributeError: 'HttpResponse' object has no attribute 'url'.
-- [ ] Use `Client(HTTP_HOST="localhost")` (or explicit configured local hostname on each request) for that local smoke. Assert status 302 and Location /live/, then HTTP 200 for /live/. Do **not** add testserver or wildcard to deployment ALLOWED_HOSTS, disable host validation, or remove protected-route checks.
-- [ ] Commit repair on the cumulative V3.9 branch, re-run required CI, inspect outcomes.
+- [x] Inspect `deployment/ci_smoke.py`, native configuration and the failing job log (job 140157794213 in run 45892345586).
+- [x] Root cause: after successful authentication, the new smoke uses `c=Client()` then `c.get('/').url`. Django's test client defaults to host `testserver`, which is intentionally not in the native instance's ALLOWED_HOSTS (localhost). Response is HTTP 400, then AttributeError: 'HttpResponse' object has no attribute 'url'.
+- [x] Use `Client(HTTP_HOST="localhost")` (or explicit configured local hostname on each request) for that local smoke. Assert status 302 and Location /live/, then HTTP 200 for /live/. Do **not** add testserver or wildcard to deployment ALLOWED_HOSTS, disable host validation, or remove protected-route checks.
+- [x] Commit repair on cumulative V3.9 branch: d3940a8f51d8db08e2c8d9954c0e9803449c127f. CI run #304 triggered.
+- [ ] Inspect new CI results; do not mark resolved until native smoke passes. If successful, continue section 2B.
 
 ### 2B. Verify the actual packaged Windows application
 
@@ -156,6 +158,12 @@ Use ROLLFLOW_DEBUG=1 for isolated dev checks as appropriate. PostgreSQL CI: `pyt
 - Official references to recheck for current requirements: https://ppr.qed.qld.gov.au/pp/roll-marking-in-state-schools-procedure and https://ppr.qed.qld.gov.au/pp/non-departmental-ict-service-providers-procedure .
 
 ## 7. Session log (newest first)
+
+### 27 Nov 2026 — native hostname repair committed
+- Cumulative head: d3940a8f51d8db08e2c8d9954c0e9803449c127f on feature/v3.9-live-foundation, draft PR #36.
+- Changed deployment/ci_smoke.py to use Client(HTTP_HOST='localhost'), explicit HTTP 302 and Location checks, then HTTP 200 for /live/. No deployment security settings changed.
+- New CI run #304: https://github.com/kkieren999/RollFlow/actions/runs/45892929577. In progress when recorded. No new Windows artifact verified yet.
+- Next: inspect native and Windows jobs, fix any remaining failures, complete section 2B before V4.0.
 
 ### 27 Nov 2026 — handover created
 - Rechecked cumulative branch and exact CI jobs: SQLite and PostgreSQL 124 Django tests passed; native smoke failed on testserver host; Windows skipped. First action is section 2A, not a new feature phase.
