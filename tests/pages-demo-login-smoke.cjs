@@ -56,7 +56,7 @@ async function openRoute(page,attr,route){
  }
  if(teacher&&route==='alerts'){await page.locator('.rf-compact-header-action').click();return;}
  if(teacher&&route==='home')route='timetable';
- const parents=teacher?{'classroom-management':'finder','seating-plans':'finder','class-lists':'finder','follow-ups':'student-support'}:{'student-actions':'students','master':'timetable','classes':'timetable','roles':'accounts','audit':'security','data':'oneschool'};
+ const parents=teacher?{'seating-plans':'finder','class-lists':'finder','follow-ups':'student-support'}:{'student-actions':'students','master':'timetable','classes':'timetable','roles':'accounts','audit':'security','data':'oneschool'};
  const primary=parents[route]||route;
  const nav=page.locator('.nav-primary ['+attr+'="'+primary+'"]');
  if(!await nav.isVisible())await page.locator('[data-rf-portal-menu]').click();
@@ -137,16 +137,37 @@ async function test() {
     await page.locator('[data-rf-classroom-picker]').click();
     await page.locator('#review-dialog [data-rf-student-action="late"]').click();
     assert(await page.locator('#rf-student-incident-form [name="time"]').isVisible());
-    await page.locator('#rf-student-incident-form [name="type"]').selectOption('Late arrival');
-    await page.locator('#rf-student-incident-form [name="response"]').selectOption('Refer to admin support');
-    await page.locator('#rf-student-incident-form button[type="submit"]').click();
+    // Quick incidents use a date/time and an authorised scheduled class, not a response selector.
+    const incident=page.locator('#rf-student-incident-form');
+    assert.equal(await incident.locator('[name="type"],[name="response"]').count(),0);
+    await incident.locator('[name="date"]').fill('2026-11-25');
+    let selectedClass='';
+    for(const time of ['08:40','09:10','10:20','11:40','13:30']){
+      await incident.locator('[name="time"]').fill(time);
+      const options=await incident.locator('[name="classCode"] option').evaluateAll(xs=>xs.map(x=>x.value).filter(Boolean));
+      if(options.length){selectedClass=options[0];await incident.locator('[name="classCode"]').selectOption(selectedClass);break}
+    }
+    assert(selectedClass,'Fictional student has an authorised lesson on the fixed date');
+    await incident.locator('button[type="submit"]').click();
     assert.equal(await page.locator('#review-dialog').count(),0);
+    const savedQuick=await page.evaluate(()=>JSON.parse(localStorage.getItem('rollflow_student_incidents_v1')).filter(r=>r.actionId==='late').at(-1));
+    assert.equal(savedQuick.studentId,'S7001');assert.equal(savedQuick.classCode,selectedClass);assert.equal(savedQuick.response,'Record only');assert.equal(savedQuick.refer,false);
+    // Explicit referral remains a distinct action and must reach the same admin queue.
+    await page.locator('#overlay [data-rf-student-action="support"]').click();
+    await incident.locator('[name="type"]').selectOption('Attendance concern');
+    await incident.locator('[name="response"]').selectOption('Request admin follow-up');
+    await incident.locator('[name="notes"]').fill('QA shared referral round trip');
+    await incident.locator('button[type="submit"]').click();
+    assert.equal(await page.locator('#review-dialog').count(),0);
+    const referral=await page.evaluate(()=>JSON.parse(localStorage.getItem('rollflow_student_incidents_v1')).find(r=>r.notes==='QA shared referral round trip'));
+    assert(referral?.refer&&!referral.resolved);
     await page.locator('#overlay [data-action="closeDrawer"]').click();
     await signOut(page);
     await logIn(page,'admin','admin','.v31-admin');
     await openRoute(page,'data-admin-page','student-actions');
     assert.match(await page.locator('.v31-content main').innerText(),/Awaiting support/);
-    await page.locator('[data-rf-resolve-referral]').first().click();
+    await page.locator('[data-rf-resolve-referral="'+referral.id+'"]').click();
+    assert(await page.evaluate(id=>JSON.parse(localStorage.getItem('rollflow_student_incidents_v1')).find(r=>r.id===id)?.resolved,referral.id),'Exact referral resolved');
     assert.match(await page.locator('.v31-content main').innerText(),/Resolved/);
     await page.locator('[data-rf-action-config="new"]').click();
     await page.locator('#rf-action-config-form [name="name"]').fill('Classroom follow-up');
@@ -175,9 +196,10 @@ async function test() {
     await openRoute(page,'data-nav','follow-ups');
     await page.locator('#rf-followup-form [name="title"]').fill('Fictional follow-up');
     await page.locator('#rf-followup-form button[type="submit"],#rf-followup-form button').first().click();
-    assert.match(await page.locator('.rf-module-task').innerText(),/Fictional follow-up/);
-    await page.locator('[data-rf-followup-toggle]').first().click();
-    assert.match(await page.locator('[data-rf-followup-toggle]').first().innerText(),/Reopen/);
+    assert.match(await page.locator('.rf-module-task').filter({hasText:'Fictional follow-up'}).innerText(),/Fictional follow-up/);
+    const task=page.locator('.rf-module-task').filter({hasText:'Fictional follow-up'});
+    await task.locator('[data-rf-followup-toggle]').click();
+    assert.match(await task.locator('[data-rf-followup-toggle]').innerText(),/Reopen/);
     await openRoute(page,'data-nav','seating-plans');
     const seats=page.locator('[data-rf-seat-id]');
     if(await seats.count()>1){
@@ -201,8 +223,8 @@ async function test() {
     await signOut(page);
     await logIn(page,'swilliams','swilliams');
     assert.equal(await page.locator('[data-nav="class-lists"]').count(),0);
-    await openRoute(page,'data-nav');
-    assert.match(await page.locator('.rf-module-root').innerText(),/Fictional assembly/);
+    await openRoute(page,'data-nav','timetable');
+    assert.match(await page.locator('.rf-scheduling-notices').innerText(),/Fictional assembly/);
     console.log('PASS: teacher modules, follow-up completion, seating swaps, admin visibility and contextual scheduling exceptions.');
     await signOut(page);
     await logIn(page,'admin','admin','.v31-admin');
