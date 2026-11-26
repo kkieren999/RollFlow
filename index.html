@@ -3814,8 +3814,13 @@ function rfCompactNavigation(){
    const avatar=top.querySelector('.circle-user');if(avatar)summary.append(avatar);
    summary.insertAdjacentHTML('beforeend',navSvg('chevrons-up-down'));
    const panel=document.createElement('div');panel.className='rf-compact-account-panel';
-   for(const original of personal){
-    const b=original.cloneNode(true);b.className='rf-compact-personal-action';b.textContent=name(original);panel.append(b);
+   const items=[['profile','My Profile','users'],['preferences','My Preferences','settings'],['help','Help & Support','circle-help'],['signout','Sign out','log-out']];
+   for(const [id,label,icon] of items){
+    const original=id==='signout'?personal.find(b=>b.hasAttribute('data-demo-signout')):kind==='teacher'?personal.find(b=>b.dataset.nav===id):null;
+    const b=original?original.cloneNode(true):document.createElement('button');
+    b.type='button';b.className='rf-compact-personal-action';b.title=label;b.setAttribute('aria-label',label);
+    if(!original){if(id==='signout')b.setAttribute('data-demo-signout','');else if(kind==='teacher')b.dataset.nav=id;else b.dataset.rfPersonal=id}
+    b.innerHTML=(id==='signout'?'<span aria-hidden="true">↪</span>':navSvg(icon))+'<span>'+esc(label)+'</span>';panel.append(b);
    }
    details.append(summary,panel);top.append(details);utility.replaceChildren();
   }
@@ -3835,6 +3840,60 @@ function rfCompactNavigation(){
  }
  rfKeepPortalNavVisible();
 }
+
+/* Personal account tools for every non-teacher access type. Teacher tools keep their existing routes. */
+const rfPersonalStyle=document.createElement('style');
+rfPersonalStyle.textContent=`
+.rf-personal-dialog{width:min(520px,calc(100vw - 32px));max-height:calc(100dvh - 40px);overflow:auto;padding:0;border:1px solid var(--rf-border,#d9e0e5);border-radius:12px;background:var(--rf-surface,#fff);color:var(--rf-text,#243a48);box-shadow:0 16px 48px #0004;font:inherit}
+.rf-personal-dialog::backdrop{background:#101d2c88}
+.rf-personal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 20px;border-bottom:1px solid var(--rf-border,#d9e0e5)}
+.rf-personal-head h2{font-size:20px;margin:0}
+.rf-personal-head button,.rf-personal-body button{border:1px solid var(--rf-border,#d9e0e5);border-radius:6px;background:var(--rf-surface,#fff);color:inherit;padding:8px 12px;min-height:36px;cursor:pointer}
+.rf-personal-body{padding:20px;display:grid;gap:15px;line-height:1.5}
+.rf-personal-body dl{margin:0;display:grid;grid-template-columns:minmax(100px,1fr) 2fr;gap:10px 14px}
+.rf-personal-body dt{font-weight:600}.rf-personal-body dd{margin:0;overflow-wrap:anywhere}
+.rf-personal-body label{display:grid;gap:6px;font-weight:600}
+.rf-personal-body select{background:var(--rf-surface,#fff);color:inherit;border:1px solid var(--rf-border,#d9e0e5);border-radius:6px;padding:9px;font:inherit}
+.rf-personal-body details{border-top:1px solid var(--rf-border,#d9e0e5);padding-top:10px}
+.rf-personal-body summary{cursor:pointer;font-weight:600}.rf-personal-body details p{margin:8px 0 0}
+.rf-personal-body .rf-personal-save{background:var(--school-primary,#168a38);color:var(--school-on-brand,#fff);border-color:transparent;justify-self:start;font-weight:600}
+`;
+document.head.appendChild(rfPersonalStyle);
+const rfPersonalThemeKey=()=> 'rollflow_personal_theme_v1_'+rfuActor;
+function rfPersonalOpen(id){
+ if(!['admin','staff'].includes(demoRole)||!['profile','preferences','help'].includes(id))return;
+ document.querySelector('.rf-personal-dialog')?.remove();
+ const actor=rfuIdentity(rfuActor),cfg=rfuConfig(),role=rfuRoleText(),titles={profile:'My Profile',preferences:'My Preferences',help:'Help & Support'};
+ const dialog=document.createElement('dialog');dialog.className='rf-personal-dialog';dialog.setAttribute('aria-labelledby','rf-personal-title');
+ const field=(label,value)=>'<dt>'+esc(label)+'</dt><dd>'+esc(value||'Not specified')+'</dd>';
+ let body='';
+ if(id==='profile'){
+  body='<dl>'+field('Name',actor?.name)+field('Username',actor?.id)+field('Access type',role)+field('Access expiry',cfg.expires||'No expiry')+'</dl><p>Your assigned roles and account access are managed by the workspace administrator.</p>';
+ }else if(id==='preferences'){
+  body='<form id="rf-personal-preferences" class="rf-personal-body" style="padding:0"><label>Appearance<select name="theme"><option value="light" '+(!rfAdminDark?'selected':'')+'>Light mode</option><option value="dark" '+(rfAdminDark?'selected':'')+'>Dark mode</option></select></label><p>Your display preference is saved for this account in this browser.</p><button type="submit" class="rf-personal-save">Save preferences</button></form>';
+ }else{
+  body='<p>Use the sidebar to open the workspaces assigned to your account. Related features are grouped into tabs at the top of each workspace.</p>'+
+  '<details open><summary>How do I return to my workspace?</summary><p>Select the RollFlow logo or a sidebar menu option.</p></details>'+
+  '<details><summary>Why can’t I see a menu or record?</summary><p>Access depends on your assigned roles, duties and account restrictions. Contact your workspace administrator if you need a change.</p></details>'+
+  '<details><summary>How do I change my display settings?</summary><p>Open the account menu and select My Preferences.</p></details>'+
+  '<details><summary>Who can help with access or technical issues?</summary><p>Contact your school IT support or workspace administrator. Do not share passwords or real student records in this public demonstration.</p></details>';
+ }
+ dialog.innerHTML='<div class="rf-personal-head"><h2 id="rf-personal-title">'+titles[id]+'</h2><button type="button" data-rf-personal-close aria-label="Close '+titles[id]+'">Close</button></div><div class="rf-personal-body">'+body+'</div>';
+ app.append(dialog);
+ dialog.querySelector('[data-rf-personal-close]').addEventListener('click',()=>dialog.close());
+ dialog.addEventListener('close',()=>{dialog.remove();app.querySelector('.rf-compact-account summary')?.focus()},{once:true});
+ dialog.querySelector('form')?.addEventListener('submit',e=>{
+  e.preventDefault();const theme=new FormData(e.currentTarget).get('theme');if(!['light','dark'].includes(theme))return;
+  try{localStorage.setItem(rfPersonalThemeKey(),theme)}catch{const p=dialog.querySelector('form p');p.textContent='This browser could not save your preference.';return}
+  rfAdminDark=theme==='dark';dialog.close();render();app.querySelector('.rf-compact-account summary')?.focus();
+ });
+ dialog.showModal();dialog.querySelector('[data-rf-personal-close]')?.focus();
+}
+document.addEventListener('click',e=>{
+ const b=e.target.closest('[data-rf-personal]');if(!b||!['admin','staff'].includes(demoRole))return;
+ e.preventDefault();e.stopImmediatePropagation();const menu=b.closest('details');if(menu)menu.open=false;rfPersonalOpen(b.dataset.rfPersonal);
+},true);
+
 document.addEventListener('click',e=>{
  for(const menu of document.querySelectorAll('.rf-compact-account[open]'))if(!menu.contains(e.target))menu.open=false;
 });
@@ -3850,6 +3909,7 @@ render=function(){
  const identity=demoRole?demoRole+':'+rfuActor:null;
  if(identity!==rfCompactLastActor){
   rfCompactLastActor=identity;
+  if(['admin','staff'].includes(demoRole)){try{rfAdminDark=(localStorage.getItem(rfPersonalThemeKey())||localStorage.getItem('rollflow_admin_theme'))==='dark'}catch{rfAdminDark=false}}
   if(demoRole==='staff'&&rfuCan('schedule')&&rfuPage==='dashboard')rfuPage='schedule';
  }
  rfCompactPreviousRender();
