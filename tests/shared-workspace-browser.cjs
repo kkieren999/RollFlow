@@ -100,6 +100,19 @@ async function run(){
        const box=x=>{const r=x.getBoundingClientRect();return {l:r.left,r:r.right,t:r.top,b:r.bottom,w:r.width,h:r.height}};
        const heads=[...grid.querySelectorAll('.day-panel-heading')],days=[...grid.querySelectorAll('.timetable-day')];
        const headerRects=heads.map(box),slots=days.map(d=>[...d.querySelectorAll('.rf-week-slot')].map(box));
+       const luminance=color=>{
+        const rgb=color.match(/[\d.]+/g)?.slice(0,3).map(Number);
+        if(!rgb||rgb.length!==3)return NaN;
+        const linear=rgb.map(v=>{v/=255;return v<=0.04045?v/12.92:((v+0.055)/1.055)**2.4});
+        return .2126*linear[0]+.7152*linear[1]+.0722*linear[2];
+       };
+       const readable=heads.every(h=>{
+        const bg=getComputedStyle(h),name=h.querySelector('button strong'),date=h.querySelector('button small');
+        return [name,date].every(el=>{
+         const fg=getComputedStyle(el),r=box(el),l1=luminance(bg.backgroundColor),l2=luminance(fg.color);
+         return fg.visibility==='visible'&&Number(fg.opacity)>0&&r.w>0&&r.h>0&&r.t>=box(h).t-1&&r.b<=box(h).b+1&&(Math.max(l1,l2)+.05)/(Math.min(l1,l2)+.05)>=4.5;
+        });
+       });
        const timeHead=box(grid.querySelector('.rf-week-label-head')),timeRects=[...grid.querySelectorAll('.rf-week-label')].map(box);
        const timeOverlap=headerRects.some(h=>h.l<timeHead.r-2)||slots.some(rows=>rows.some((r,j)=>r.l<timeRects[j].r-2||Math.abs(r.t-timeRects[j].t)>2||Math.abs(r.b-timeRects[j].b)>2));
        const cardOverflow=[...grid.querySelectorAll('.rf-week-slot .rf-timetable-card')].some(el=>{const r=box(el),parent=box(el.closest('.rf-week-slot'));return r.l<parent.l-2||r.r>parent.r+2||r.t<parent.t-2||r.b>parent.b+2});
@@ -110,9 +123,10 @@ async function run(){
        const stickyTime=box(grid.querySelector('.rf-week-label-head'));
        const timeTop=document.elementFromPoint(stickyTime.l+stickyTime.w/2,stickyTime.t+stickyTime.h/2);
        const stickyTimeVisible=!!timeTop?.closest('.rf-week-label-head');
-       return {overlap,timeOverlap,cardOverflow,stickyTimeVisible,labels:heads.map(h=>h.querySelector('button strong').textContent),headerY:headerRects.map(r=>r.t),scrollWidth:scroll.scrollWidth,clientWidth:scroll.clientWidth,scrollBox,last,first};
+       return {overlap,timeOverlap,cardOverflow,stickyTimeVisible,readable,labels:heads.map(h=>h.querySelector('button strong').textContent),headerY:headerRects.map(r=>r.t),scrollWidth:scroll.scrollWidth,clientWidth:scroll.clientWidth,scrollBox,last,first};
       });
       assert.deepEqual(geometry.labels,['Monday','Tuesday','Wednesday','Thursday','Friday']);
+      assert(geometry.readable,'Weekday names and dates must be visible with at least 4.5:1 contrast '+width);
       assert(geometry.headerY.every(y=>Math.abs(y-geometry.headerY[0])<2),'Weekday header alignment '+width);
       assert(!geometry.overlap,'Overlapping grid cells '+width);
       assert(!geometry.timeOverlap,'Time labels must occupy a separate aligned column '+width);
