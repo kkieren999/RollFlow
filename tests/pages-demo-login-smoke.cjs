@@ -212,13 +212,14 @@ async function test() {
     await openRoute(page,'data-admin-page','teacher-modules');
     await page.locator('[data-rf-module-toggle="classroom-management"]').click();
     await openRoute(page,'data-admin-page','timetable');
-    await page.locator('.rf-scheduling-manage summary').first().click();
+    const exceptionManager=page.locator('details.rf-scheduling-manage').filter({has:page.locator('#rf-exception-form')});
+    if(!await exceptionManager.locator('#rf-exception-form').isVisible())await exceptionManager.locator('summary').click();
     await page.locator('#rf-exception-form [name="title"]').fill('Fictional assembly');
     await page.locator('#rf-exception-form [name="category"]').selectOption('Assembly');
     await page.locator('#rf-exception-form [name="date"]').fill('2026-01-01');
     await page.locator('#rf-exception-form [name="end"]').fill('2027-12-31');
     await page.locator('#rf-exception-form button[type="submit"]').click();
-    assert.match(await page.locator('.rf-scheduling-manage').innerText(),/Fictional assembly/);
+    assert.match(await exceptionManager.innerText(),/Fictional assembly/);
     await signOut(page);
     await logIn(page,'swilliams','swilliams');
     assert.equal(await page.locator('[data-nav="classroom-management"]').count(),0);
