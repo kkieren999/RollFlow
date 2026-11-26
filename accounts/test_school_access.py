@@ -86,9 +86,11 @@ class SchoolAccessTests(TestCase):
         self.assertNotIn("students", rows[0])
         self.client.force_login(self.staff)
         res = self.client.get("/workspace/published_timetable/", {"date": day.isoformat()})
-        self.assertContains(res, "Y7")
-        self.assertNotContains(res, "Y8")
-        self.assertNotContains(res, "MIX")
+        # Assert exact authorised projection and rendered cells, not substrings of random CSRF tokens.
+        self.assertEqual([r["code"] for r in res.context["rows"]], ["Y7"])
+        self.assertContains(res, "<td>Y7</td>", html=True)
+        self.assertNotContains(res, "<td>Y8</td>", html=True)
+        self.assertNotContains(res, "<td>MIX</td>", html=True)
         self.assertNotContains(res, "PRIVATECODE")
 
     def test_published_faculty_scope_requires_current_verified_binding(self):
