@@ -82,7 +82,29 @@ async function run(){
    if(teacher){
     await page.locator('.nav-primary [data-nav="timetable"]').click();
     assert.equal(await page.locator('.rf-compact-tabs').count(),0,id+' daily schedule has no redundant tabs');
-    assert(await page.locator('[data-rf-duty]').count()>0,id+' allocated supervision in daily schedule');
+    if(id==='teacher'){
+     await page.locator('[data-date]').fill('2026-11-25');
+     assert.equal(await page.locator('[data-timetable-class]').count(),4,'Alex Wednesday has home group and three classes');
+     assert(await page.locator('[data-rf-duty]').count()>0,'Alex Wednesday library duty');
+     const heights=await page.locator('.day-lessons .rf-timetable-card').evaluateAll(xs=>xs.map(x=>x.getBoundingClientRect().height));
+     assert(heights.every(h=>h<160),'Daily cards should not stretch: '+heights.join(','));
+     await page.locator('[data-timetable-view="week"]').click();
+     const order=await page.locator('.rf-week-grid .timetable-day').first().locator('.rf-week-slot').evaluateAll(xs=>xs.map(x=>x.dataset.rfPeriod));
+     assert(order.indexOf('2')<order.indexOf('duty:11:25')&&order.indexOf('duty:11:25')<order.indexOf('3'),'Duty at 11:25 between Period 2 and 3');
+     assert(order.indexOf('3')<order.indexOf('duty:12:45')&&order.indexOf('duty:12:45')<order.indexOf('4'),'Duty at 12:45 between Period 3 and 4');
+     await capture(page,'teacher-semester2-week');
+     await page.locator('[data-timetable-view="day"]').click();
+     for(const date of ['2026-07-13','2026-08-03','2026-09-14','2026-10-06','2026-11-25']){
+      await page.locator('[data-date]').fill(date);
+      assert(await page.locator('[data-timetable-class]').count()>=4,'Alex full school day '+date);
+     }
+     await page.locator('[data-date]').fill('2026-12-09');
+     assert(await page.locator('[data-timetable-class="MAT072D"]').count()>0,'Year 7 continues in December');
+     await page.locator('[data-date]').fill('2026-09-23');
+     assert.equal(await page.locator('[data-timetable-class]').count(),0,'School holidays have no classes');
+    }else{
+     assert(await page.locator('[data-rf-duty]').count()>0,id+' allocated supervision in daily schedule');
+    }
     await page.locator('.nav-primary [data-nav="finder"]').click();
     const code=id==='swilliams'?'ENG071A':'MAF102A';
     await page.locator('#finderQuery').fill(code);
