@@ -5,6 +5,12 @@ const http=require('node:http');
 const path=require('node:path');
 const {chromium}=require('playwright-core');
 const html=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
+const screenshotDir=process.env.RF_UI_SCREENSHOTS;
+if(screenshotDir)fs.mkdirSync(screenshotDir,{recursive:true});
+async function capture(page,name){
+ if(!screenshotDir)return;
+ await page.screenshot({path:path.join(screenshotDir,name.replace(/[^a-zA-Z0-9_-]/g,'-')+'.png'),animations:'disabled',fullPage:false});
+}
 const users=['admin','principal','deputy','hod','ylc','business','office','teacher','swilliams','learning','aide','relief','guidance'];
 const counts={admin:10,principal:10,deputy:10,hod:7,ylc:7,business:6,office:8,teacher:7,swilliams:7,learning:5,aide:4,relief:3,guidance:3};
 async function run(){
@@ -17,6 +23,7 @@ async function run(){
   for(const id of users){
    const context=await browser.newContext({viewport:{width:1440,height:1000}}),page=await context.newPage();
    const errors=[];page.on('pageerror',e=>errors.push(String(e)));
+   let stage='login';try{
    await page.goto(url);
    assert.match(await page.locator('.demo-auth-footer').innerText(),/Do not enter real school credentials or records/);
    await page.locator('#demo-username').fill(id);await page.locator('#demo-password').fill(id);await page.locator('#demo-login-form button[type="submit"]').click();
@@ -24,21 +31,27 @@ async function run(){
    assert.equal(await page.locator('.rf-training-notice').count(),0,'Persistent banner removed');
    assert.equal(await page.locator('.nav-primary button').count(),counts[id],id+' compact menu count');
    const teacher=['teacher','swilliams'].includes(id),attr=id==='admin'?'data-admin-page':teacher?'data-nav':'data-rfu-page';
+   await capture(page,id+'-desktop-landing');
    for(const label of ['My Profile','My Preferences','Help & Support']){
+    stage=label;
     await page.locator('.rf-compact-account summary').click();
     await page.locator('.rf-compact-account-panel').getByRole('button',{name:label,exact:true}).click();
     assert.equal(await page.locator('.page-bar h1').innerText(),label,id+' '+label);
     if(!teacher)assert(await page.locator('.rf-personal-main').isVisible(),id+' personal full page');
+    await capture(page,id+'-desktop-'+label);
    }
    if(!teacher){
     const routes=await page.locator('.nav-primary button').evaluateAll((bs,a)=>bs.map(b=>b.getAttribute(a)).filter(Boolean),attr);
     for(const route of routes){
+     stage='desktop '+route;
      await page.locator('.nav-primary ['+attr+'="'+route+'"]').click();
      assert((await page.locator('.content-shell>main').innerText()).trim().length>0,id+' '+route);
+     await capture(page,id+'-desktop-'+route);
      const tabs=await page.locator('.rf-compact-tabs button').evaluateAll((bs,a)=>bs.map(b=>b.getAttribute(a)).filter(Boolean),attr);
      for(const tab of tabs){
       await page.locator('.rf-compact-tabs ['+attr+'="'+tab+'"]').click();
       assert((await page.locator('.content-shell>main').innerText()).trim().length>0,id+' '+tab);
+      await capture(page,id+'-desktop-'+tab);
      }
     }
    }
@@ -56,8 +69,10 @@ async function run(){
    }
    // Representative full-page geometry and light/dark checks on each account.
    for(const size of [{width:1366,height:768},{width:1024,height:768},{width:820,height:1180},{width:390,height:844}]){
+    stage='responsive '+size.width+'x'+size.height;
     await page.setViewportSize(size);
     await page.locator('.rf-compact-account summary').click();
+    await capture(page,id+'-'+size.width+'-account-menu');
     await page.locator('.rf-compact-account-panel').getByRole('button',{name:'My Preferences',exact:true}).click();
     const theme=page.locator(teacher?'[data-v2-setting="theme"]':'[data-rf-personal-setting="theme"]');
     for(const value of ['Dark','Light']){
@@ -66,6 +81,7 @@ async function run(){
      const geometry=await page.locator('.content-shell>main').evaluate(el=>({width:el.clientWidth,scroll:el.scrollWidth,rect:el.getBoundingClientRect().right,viewport:innerWidth}));
      assert(geometry.rect<=geometry.viewport+3,id+' '+size.width+' page outside viewport');
      assert(geometry.scroll-geometry.width<=3,id+' '+size.width+' horizontal overflow: '+JSON.stringify(geometry));
+     await capture(page,id+'-'+size.width+'-preferences-'+value);
     }
    }
    if(!teacher&&['learning','aide','relief'].includes(id)){
@@ -79,13 +95,14 @@ async function run(){
     const scroll=await page.locator('.rf-unified-week-scroll').evaluate(el=>({client:el.clientWidth,scroll:el.scrollWidth}));
     assert(scroll.scroll>scroll.client,id+' mobile week has internal horizontal scrolling');
    }
-   await page.setViewportSize({width:1440,height:1000});
+   stage='mobile sign out';
+   await page.setViewportSize({width:390,height:844});
    await page.locator('.rf-compact-account summary').click();
    await page.locator('.rf-compact-account-panel').getByRole('button',{name:'Sign out',exact:true}).click();
    await page.locator('#demo-login-form').waitFor();
    assert.deepEqual(errors,[],id+' uncaught browser errors');
    console.log('PASS: '+id+' account pages, compact navigation and workspace rendering');
-   await context.close();
+   }catch(error){console.error('Failure on '+id+' at '+stage);await capture(page,id+'-failure').catch(()=>{});throw error}finally{await context.close();}
   }
  }finally{if(browser)await browser.close();server.close()}
 }
