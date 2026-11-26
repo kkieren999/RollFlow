@@ -221,7 +221,7 @@ def roster(request, code, admin_only=False):
         if publication.snapshot.get("source") == "dated":
             try:
                 from datetime import date
-                assigned_date = date.fromisoformat(request.GET.get("date", today.isoformat()))
+                assigned_date = date.fromisoformat(request.GET.get("date") or today.isoformat())
             except ValueError:
                 return HttpResponseForbidden("Invalid allocation date.")
             assigned = any(s["code"] == code for s in visible_slots(publication, assigned_date, codes))

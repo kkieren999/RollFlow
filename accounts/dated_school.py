@@ -21,9 +21,9 @@ def build_dated_candidate(version):
     batches = {}
     for kind in ("students", "class_members"):
         batch = OneSchoolArchiveBatch.objects.filter(kind=kind, status="applied").order_by("-applied_at", "-pk").first()
-        if batch is None:
-            raise ValueError("Apply the approved student directory and EQID/class membership reports before school publication: missing " + kind)
-        batches[kind] = batch
+        if batch is not None:
+            batches[kind] = batch
+    roster_ready = len(batches) == 2
     classes = {}
     slots = []
     dates = []
@@ -50,8 +50,10 @@ def build_dated_candidate(version):
                 rooms.add(row["room"])
     if not slots:
         raise ValueError("The published CSV has no lesson allocations.")
-    students, _ = parse_students(source_file(batches["students"]))
-    pairs, _ = parse_student_classes(source_file(batches["class_members"]))
+    students, pairs = [], []
+    if roster_ready:
+        students, _ = parse_students(source_file(batches["students"]))
+        pairs, _ = parse_student_classes(source_file(batches["class_members"]))
     source_ids = {canonical(row["student_id"]) for row in students}
     student_index = {}
     for student in Student.objects.only("pk", "student_id", "status"):
@@ -88,7 +90,9 @@ def build_dated_candidate(version):
             bindings[key] = {"profile": profile.pk, "user": profile.user_id, "staff_id": key}
     stats = {"classes": len(classes), "slots": len(slots), "days": len(dates), "staff": len(staff),
              "rooms": len(rooms), "memberships": sum(len(c["students"]) for c in classes.values()),
-             "skipped_pairs": skipped, "unmapped_codes": sorted(staff - set(bindings)),
+             "skipped_pairs": skipped, "rosters_ready": roster_ready,
+             "missing_roster_sources": sorted({"students", "class_members"} - set(batches)),
+             "unmapped_codes": sorted(staff - set(bindings)),
              "missing_profiles": sorted(staff - set(known)),
              "unassigned_slots": sum(not s["staff"] for s in slots),
              "legend_only": 0, "verified_mappings": len(bindings)}
