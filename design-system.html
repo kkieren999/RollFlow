@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en-AU">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>RollFlow Design System v1.0</title>
+<link rel="stylesheet" href="styles/rollflow-design.css">
+<style>
+body{margin:0;background:var(--rf-canvas);color:var(--rf-text);font:14px/1.5 system-ui,sans-serif}
+.gallery{max-width:1100px;margin:auto;padding:24px;display:grid;gap:20px}
+.gallery-top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1,h2,h3,p{margin:0}h1{font-size:28px}h2{font-size:18px}.gallery-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:16px}
+.swatch-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:8px}
+.swatch{display:grid;gap:4px}.swatch span{height:44px;border:1px solid var(--rf-border);border-radius:8px}
+.rf-ui-card{display:grid;gap:12px}.gallery-table{border-collapse:collapse;width:100%;font-size:13px}.gallery-table th,.gallery-table td{text-align:left;padding:10px 6px;border-bottom:1px solid var(--rf-border)}.gallery-table th{color:var(--rf-muted);background:var(--rf-context)}
+.notice{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--rf-border)}.notice>div{display:grid;flex:1}
+.demo-actions{display:flex;flex-wrap:wrap;gap:8px}.gallery input[type=radio]{accent-color:var(--rf-action)}.gallery .rf-ui-stack>p{margin:0}
+@media(max-width:480px){.gallery{padding:12px}}
+</style></head>
+<body><main class="gallery">
+<header class="gallery-top"><div><h1>RollFlow Design System</h1><p class="rf-ui-muted">v1.0 · Internal developer reference · Example data only</p></div><button type="button" class="rf-ui-button" id="theme">Switch to dark mode</button></header>
+<section class="rf-ui-card"><h2>Design tokens</h2><div class="swatch-grid" id="swatches"></div><p class="rf-ui-muted">Use semantic CSS variables, 4px spacing increments and the shared component classes rather than page-specific hard-coded styles.</p></section>
+<div class="gallery-grid">
+<section class="rf-ui-card"><h2>Typography &amp; controls</h2><h3 style="font-size:22px">Dialog heading</h3><strong>Card heading</strong><p>Standard body copy.</p><small class="rf-ui-muted">Secondary information</small><div class="demo-actions"><button class="rf-ui-button rf-ui-button--primary" id="open">Open example dialog</button><button class="rf-ui-button" id="reset">Reset example</button><button class="rf-ui-button" disabled>Disabled</button></div><label class="rf-ui-field">Search<input type="search" placeholder="Search class, teacher or room"></label><label class="rf-ui-field">Example select<select><option>Mathematics</option><option>English</option></select></label></section>
+<section class="rf-ui-card"><h2>Context &amp; status</h2><div class="rf-ui-context"><strong>MAT072D — Mathematics</strong><small>Thursday 26 November · Period 2</small></div><span class="rf-ui-status rf-ui-status--success">✓ Available</span><span class="rf-ui-status rf-ui-status--warning">⇄ Temporary room change</span><span class="rf-ui-status rf-ui-status--danger">! Unavailable</span><details class="rf-ui-disclosure"><summary><span>Duration<small>This lesson only</small></span></summary><div class="rf-ui-disclosure-content"><p>Additional options are revealed only when needed.</p></div></details></section>
+<section class="rf-ui-card"><h2>Lesson card</h2><small class="rf-ui-muted">Period 2 · 10:15 am</small><strong>Mathematics</strong><span class="rf-ui-muted">MAT072D · Room <u>C04</u> <span class="rf-ui-status rf-ui-status--warning">⇄</span></span><div class="rf-ui-footer"><span class="rf-ui-status rf-ui-status--success">✓ Submitted</span><button class="rf-ui-button" type="button" data-preview>View example</button></div></section>
+<section class="rf-ui-card"><h2>Notifications</h2><div class="notice"><span class="rf-ui-icon" aria-hidden="true">⇄</span><div><strong>Room change</strong><small class="rf-ui-muted">MAT072D · B12 → C04</small></div></div><div class="notice"><span class="rf-ui-icon" aria-hidden="true">✓</span><div><strong>Attendance submitted</strong><small class="rf-ui-muted">Period 2 · Mathematics</small></div></div><p class="rf-ui-muted">Use icons and text together; never rely on colour alone.</p></section>
+<section class="rf-ui-card"><h2>Tables &amp; empty states</h2><table class="gallery-table"><thead><tr><th>Class</th><th>Room</th><th>Status</th></tr></thead><tbody><tr><td>MAT072D</td><td>C04</td><td>Available</td></tr><tr><td>ENG081A</td><td>B08</td><td>Occupied</td></tr></tbody></table><div class="rf-ui-context"><strong>No matching records</strong><small>Try a different search or clear the filters.</small></div></section>
+<section class="rf-ui-card"><h2>Interaction standards</h2><p>Use native controls, descriptive labels, visible focus, one main action, and clear error text. Keep the weekly grid geometry and attendance status colours intact.</p><p class="rf-ui-muted">This page is a reference only. It contains no real school data, permissions or operational actions.</p><a href="index.html">Return to RollFlow</a></section>
+</div>
+</main>
+<dialog class="rf-ui-dialog" id="demo" aria-labelledby="demo-title"><form class="rf-ui-stack" id="demo-form">
+<header class="rf-ui-header"><span class="rf-ui-icon" aria-hidden="true">⇄</span><div class="rf-ui-header-copy"><h2 id="demo-title">Change room</h2><p>Temporary lesson relocation</p></div><button type="button" class="rf-ui-close" id="close" aria-label="Close">×</button></header>
+<div class="rf-ui-context"><strong>MAT072D — Mathematics</strong><small>Thursday 26 November · Period 2</small><small>10:15 – 11:25 am</small></div>
+<div class="rf-ui-compare"><div class="rf-ui-compare-panel"><small class="rf-ui-muted">Current room</small><strong class="rf-ui-value">B12</strong><small class="rf-ui-muted">Original location</small></div><span class="rf-ui-arrow" aria-hidden="true">→</span><div class="rf-ui-compare-panel rf-ui-compare-panel--target"><label for="room" class="rf-ui-field">New room</label><select id="room" class="rf-ui-control" required><option>C04</option><option>B08</option><option>D12</option></select><span class="rf-ui-status rf-ui-status--success">✓ Available</span></div></div>
+<label class="rf-ui-field">Reason for change<select required><option>Room unavailable</option><option>Maintenance</option><option>Equipment issue</option></select></label>
+<details class="rf-ui-disclosure" id="duration"><summary><span>Duration<small id="scope-label">This lesson only</small></span></summary><div class="rf-ui-disclosure-content"><label><input type="radio" name="scope" value="single" checked> This lesson only</label><label><input type="radio" name="scope" value="day"> Remaining lessons today</label><label><input type="radio" name="scope" value="range"> Until a selected date</label><label class="rf-ui-field" id="end-wrap" hidden>End date<input type="date" min="2026-11-26" value="2026-12-04" id="end" disabled></label></div></details>
+<p class="rf-ui-helper">Relevant staff and administration would receive an in-app notice.</p><p class="rf-ui-status rf-ui-status--success" id="feedback" role="status" hidden></p>
+<footer class="rf-ui-footer"><button type="button" class="rf-ui-button" id="cancel">Cancel</button><button type="submit" class="rf-ui-button rf-ui-button--primary" id="confirm">Confirm room change</button></footer>
+</form></dialog>
+<script>
+const q=id=>document.getElementById(id),form=q('demo-form'),dialog=q('demo'),swatches=[['Primary','--school-primary'],['Secondary','--school-secondary'],['Canvas','--rf-canvas'],['Surface','--rf-surface'],['Context','--rf-context'],['Border','--rf-border'],['Text','--rf-text'],['Muted','--rf-muted'],['Success','--rf-success-text'],['Warning','--rf-warning-text']];
+q('swatches').innerHTML=swatches.map(([name,token])=>'<div class="swatch"><span style="background:var('+token+')"></span><strong>'+name+'</strong><small class="rf-ui-muted">'+token+'</small></div>').join('');
+q('theme').onclick=()=>{const dark=document.body.dataset.theme==='Dark';document.body.dataset.theme=dark?'Light':'Dark';q('theme').textContent=dark?'Switch to dark mode':'Switch to light mode'};
+q('open').onclick=()=>dialog.showModal();document.querySelector('[data-preview]').onclick=()=>dialog.showModal();q('close').onclick=q('cancel').onclick=()=>dialog.close();
+function sync(){const scope=form.elements.scope.value;q('scope-label').textContent=scope==='single'?'This lesson only':scope==='day'?'Remaining lessons today':'Until '+q('end').value;q('end-wrap').hidden=scope!=='range';q('end').disabled=scope!=='range';q('confirm').textContent=scope==='single'?'Confirm room change':'Review affected lessons';q('feedback').hidden=true}
+form.onchange=sync;q('reset').onclick=()=>{form.reset();q('duration').open=false;sync()};
+form.onsubmit=e=>{e.preventDefault();q('feedback').hidden=false;q('feedback').textContent='Example only: no room allocation or notification has been created.'};
+</script></body></html>
