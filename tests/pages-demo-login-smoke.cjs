@@ -281,30 +281,29 @@ async function test() {
     }
     console.log('PASS: immediate lossless timetable switching with and without reduced motion.');
 
-    // The full five-day grid and six-session day fit ordinary laptop and desktop viewports.
-    // Turn motion off for geometry measurements so transient transforms do not affect overflow.
+    // Stable weekly grids deliberately scroll internally; do not shrink or clip lessons to fit.
+    // Exercise both layouts at all supported viewport sizes and verify first/last lesson reachability.
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    for (const size of [{ width: 1920, height: 1200 }, { width: 1440, height: 900 }, { width: 1280, height: 720 }, { width: 1180, height: 820 }, { width: 1024, height: 768 }, { width: 820, height: 1180 }, { width: 768, height: 1024 }]) {
+    for (const size of [{width:1920,height:1200},{width:1440,height:900},{width:1280,height:720},{width:1180,height:820},{width:1024,height:768},{width:820,height:1180},{width:768,height:1024}]) {
       await page.setViewportSize(size);
-      for (const mode of ['week', 'day']) {
-        await page.locator('[data-timetable-view="' + mode + '"]').click();
-        const geometry = await page.locator('.rf-timetable-workspace').evaluate(workspace => {
-          const main = workspace.closest('main');
-          const scroll = workspace.querySelector('.rf-week-scroll');
-          const bounds = main.getBoundingClientRect();
-          const cards = [...workspace.querySelectorAll('.rf-timetable-card')];
-          return {
-            cardCount: cards.length,
-            verticalOverflow: main.scrollHeight - main.clientHeight,
-            horizontalOverflow: scroll ? scroll.scrollWidth - scroll.clientWidth : 0,
-            bottomOverflow: Math.max(...cards.map(card => card.getBoundingClientRect().bottom)) - bounds.bottom
-          };
-        });
-        assert.equal(geometry.cardCount, mode === 'week' ? 30 : 6);
-        assert(geometry.verticalOverflow <= 3 && geometry.bottomOverflow <= 3,
-          mode + ' must fit vertically at ' + JSON.stringify(size) + ': ' + JSON.stringify(geometry));
-        assert(geometry.horizontalOverflow <= 3,
-          mode + ' must fit horizontally at ' + JSON.stringify(size) + ': ' + JSON.stringify(geometry));
+      for(const mode of ['week','day']){
+        await page.locator('[data-timetable-view="'+mode+'"]').click();
+        const geometry=await page.locator('.rf-timetable-workspace').evaluate(workspace=>{
+          const main=workspace.closest('main'),scroll=workspace.querySelector('.rf-week-scroll');
+          const cards=[...workspace.querySelectorAll('.rf-timetable-card')];
+          const rect=el=>el.getBoundingClientRect();
+          const mainBounds=rect(main),wsBounds=rect(workspace);
+          const inside=(card,parent)=>{const r=rect(card),p=rect(parent);return r.left>=p.left-2&&r.right<=p.right+2&&r.top>=p.top-2&&r.bottom<=p.bottom+2};
+          const cellsOk=mode==='week'?cards.every(c=>inside(c,c.closest('.rf-week-slot'))):cards.every(c=>c.offsetWidth>0&&c.offsetHeight>0);
+          main.scrollTop=0;if(scroll)scroll.scrollTo(0,0);
+          const first=cards[0],last=cards.at(-1);
+          const reachable=el=>{el.scrollIntoView({block:'nearest',inline:'nearest'});const r=rect(el),m=rect(main),v=scroll?rect(scroll):m;return r.right<=Math.min(m.right,v.right)+3&&r.bottom<=Math.min(m.bottom,v.bottom)+3&&r.left>=Math.max(m.left,v.left)-3&&r.top>=Math.max(m.top,v.top)-3};
+          const firstReachable=reachable(first),lastReachable=reachable(last);
+          return {cardCount:cards.length,cellsOk,firstReachable,lastReachable,mainWithinViewport:mainBounds.left>=-3&&mainBounds.right<=innerWidth+3&&mainBounds.bottom<=innerHeight+3,workspaceWithinMain:wsBounds.left>=mainBounds.left-3&&wsBounds.right<=mainBounds.right+3,outerHorizontalOverflow:main.scrollWidth-main.clientWidth,bodyHorizontalOverflow:document.documentElement.scrollWidth-innerWidth};
+        },mode);
+        assert.equal(geometry.cardCount,mode==='week'?30:6);
+        assert(geometry.cellsOk&&geometry.firstReachable&&geometry.lastReachable,mode+' all lessons must remain reachable and contained '+JSON.stringify({size,geometry}));
+        assert(geometry.mainWithinViewport&&geometry.workspaceWithinMain&&geometry.outerHorizontalOverflow<=3&&geometry.bodyHorizontalOverflow<=3,mode+' no outer horizontal overflow '+JSON.stringify({size,geometry}));
       }
     }
     await page.emulateMedia({ reducedMotion: 'no-preference' });
