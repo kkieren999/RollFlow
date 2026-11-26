@@ -306,6 +306,7 @@ async function test() {
         assert(geometry.mainWithinViewport&&geometry.workspaceWithinMain&&geometry.outerHorizontalOverflow<=3&&geometry.bodyHorizontalOverflow<=3,mode+' no outer horizontal overflow '+JSON.stringify({size,geometry}));
       }
     }
+    console.log('PASS: timetable geometry and lesson reachability across all seven viewport sizes.');
     await page.emulateMedia({ reducedMotion: 'no-preference' });
 
     // Term starts in January and historical dates remain navigable.
@@ -397,7 +398,7 @@ async function test() {
       'Back to Daily Schedule must sit inside the green header');
     await backButton.click();
     assert.equal((await page.locator('.page-bar h1').innerText()).trim(), 'Daily Schedule');
-    assert.match(await page.locator('#dayScheduleTitle').innerText(), /Lessons for selected date/,
+    assert.match(await page.locator('#dayScheduleTitle').innerText(), /Schedule for selected date/,
       'Historical daily schedule heading should not say Today');
     assert.equal(await page.locator('input[data-date]').first().inputValue(), '2026-03-09',
       'Back navigation must preserve the selected historical date');
