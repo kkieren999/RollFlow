@@ -1575,7 +1575,7 @@ function scheduledClassesFor(date){
    .filter(id=>!used.has(id)).map(id=>schoolClasses.find(c=>c.id===id)).filter(Boolean);
   return [...scheduled,...extra].sort((a,b)=>periodForClass(a,date)-periodForClass(b,date)||a.id.localeCompare(b.id));
  }
- const scheduled=alexScheduledClasses(date),used=new Set(scheduled.map(c=>c.id));
+ const scheduled=date<'2026-07-01'||date>'2026-12-31'?classes.filter(c=>c.day===weekday):alexScheduledClasses(date),used=new Set(scheduled.map(c=>c.id));
  const extra=[...new Set([...pinned,...plans.map(p=>p.classId)])].filter(id=>!used.has(id)).map(id=>schoolClasses.find(c=>c.id===id)).filter(Boolean);
  return [...scheduled,...extra].sort((a,b)=>periodForClass(a,date)-periodForClass(b,date)||a.id.localeCompare(b.id));
 }
@@ -1679,7 +1679,7 @@ timetable=function(){
    })):[];
  const displayRows=[...list,...preparations].sort((a,b)=>periodForClass(a,d)-periodForClass(b,d));
  const headingDate=new Date(d+'T12:00:00+10:00'),shortDate=headingDate.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short',timeZone:'Australia/Brisbane'}),longDate=headingDate.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long',timeZone:'Australia/Brisbane'});
- const dayHeading=`<div class="day-panel-heading ${week&&d===date?'rf-selected-day':''}"><h2 ${week?'':'id="dayScheduleTitle"'}>${week?`<button type="button" class="rf-week-day-link" data-rf-week-day="${esc(d)}" aria-label="Open ${esc(longDate)} day view">${esc(shortDate)}</button>`:date===brisbaneToday()?'Today’s lessons':'Lessons for selected date'}</h2><p>${list.length} ${week?'lessons':'lesson'+(list.length===1?'':'s')+' scheduled'}${demoTeacherUsername==='swilliams'?' · '+preparations.length+' spare'+(preparations.length===1?'':'s'):''}${duties.length?' · '+duties.length+' supervision'+(duties.length===1?'':'s'):''}</p>${week&&!displayRows.length&&!duties.length?`<span class="rf-week-empty-note">${esc((demoTeacherUsername==='swilliams'?sarahSchoolStatus(d):'')||'No scheduled lessons')}</span>`:''}</div>`;
+ const dayHeading=`<div class="day-panel-heading ${week&&d===date?'rf-selected-day':''}"><h2 ${week?'':'id="dayScheduleTitle"'}>${week?`<button type="button" class="rf-week-day-link" data-rf-week-day="${esc(d)}" aria-label="Open ${esc(longDate)} day view">${esc(shortDate)}</button>`:date===brisbaneToday()?'Today’s lessons':'Lessons for selected date'}</h2><p>${list.length} ${week?'lessons':'lesson'+(list.length===1?'':'s')+' scheduled'}${preparations.length?' · '+preparations.length+' spare'+(preparations.length===1?'':'s'):''}${duties.length?' · '+duties.length+' supervision'+(duties.length===1?'':'s'):''}</p>${week&&!displayRows.length&&!duties.length?`<span class="rf-week-empty-note">${esc((demoTeacherUsername==='swilliams'?sarahSchoolStatus(d):alexSchoolStatus(d))||'No scheduled lessons')}</span>`:''}</div>`;
  const renderCard=c=>{
  const p=periodForClass(c,d);
  if(c.isPlanning)return `<article class="day-lesson simple-row rf-planning-slot rf-timetable-card" data-rf-motion="${esc(d+'|spare|'+p)}"><div class="lesson-time"><strong>${esc(times[p])}</strong><span>Period ${p}</span></div><div class="lesson-details"><div class="lesson-title"><h3>Spare</h3></div><p>${week?'Staffroom':'Non-teaching period · Staffroom'}</p></div><div class="lesson-actions"><span class="lesson-status">${week?'':'No roll required'}</span></div></article>`;
@@ -3580,8 +3580,8 @@ function rfuSeed(){
 function rfuRecords(){
  const v=rfuRead(RFU_DATA_KEY,null),version=rfuRead('rollflow_unified_seed_version',0);
  if(Array.isArray(v)&&version===3)return v;
- const rows=Array.isArray(v)?[...v,...rfuSeed().filter(r=>!v.some(x=>x.id===r.id))]:rfuSeed();
- const next=rows.filter(r=>!(r.id==='s4'&&r.module==='supervision'&&r.owner==='teacher'&&r.title==='Library duty'&&r.time==='11:00'));
+ const rows=Array.isArray(v)?version===2?v:[...v,...rfuSeed().filter(r=>!v.some(x=>x.id===r.id))]:rfuSeed();
+ const next=rows.filter(r=>!(r.id==='s4'&&r.module==='supervision'&&r.owner==='teacher'&&r.title==='Library duty'&&r.time==='11:00'&&r.detail==='Library'&&r.status==='Allocated'));
  for(let date='2026-07-13';date<='2026-12-11';date=dateOffset(date,1)){
   if(alexSchoolStatus(date))continue;
   const day=weekdayFor(date),duty={Monday:['11:25','Playground supervision','Junior courtyard'],Wednesday:['12:45','Library duty','Library'],Friday:['12:45','Lunch supervision','Senior courtyard']}[day];
