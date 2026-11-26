@@ -69,6 +69,7 @@ def week(request):
     return render(request, "teacher_week.html", {
         "version": version,
         "week_days": week_days,
+        "anchor_date": anchor.isoformat(),
         "week_start": monday,
         "prev_week": shift_date(monday, -7).isoformat(),
         "next_week": shift_date(monday, 7).isoformat(),

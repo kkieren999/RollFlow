@@ -1,6 +1,7 @@
 """Build an offline Windows x64 distribution from approved runtime ZIP contents."""
 import argparse
 import hashlib
+import json
 from pathlib import Path
 import shutil
 import struct
@@ -35,7 +36,7 @@ def main():
     # Only tracked application source; no local databases, secrets or exports.
     archive = subprocess.check_output(["git", "archive", "--format=zip", "HEAD",
                                         "accounts", "rollflow", "templates", "deployment",
-                                        "manage.py", "index.html", "requirements.txt", "README.md"], cwd=ROOT)
+                                        "manage.py", "index.html", "requirements.txt", "README.md", "training", "docs"], cwd=ROOT)
     import io
     with zipfile.ZipFile(io.BytesIO(archive)) as z:
         z.extractall(app)
@@ -66,10 +67,20 @@ def main():
             launcher += " --db-port 55437 --web-port 18085"
         (out / name).write_text(launcher + ' %*\nif errorlevel 1 pause\n',
                                 encoding="ascii")
+    (out / "Open Training Demo.cmd").write_text(
+        '@echo off\n"%~dp0python\\python.exe" -m deployment.training\nif errorlevel 1 pause\n',
+        encoding="ascii")
+    (out / "BUILD-INFO.json").write_text(json.dumps({
+        "version": "3.7.0-staging",
+        "source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
+        "website_commit": (app / "training" / "SOURCE_COMMIT.txt").read_text().strip(),
+        "channel": "unsigned staging"
+    }, indent=2) + "\n", encoding="utf-8")
     (out / "READ FIRST.txt").write_text(
-        "V3.6.7 connected school data staging bundle. Fictional data only.\n"
+        "V3.7.0 website-parity staging bundle. Fictional data only.\n"
         "EXISTING V3.6.4.x, V3.6.5 or V3.6.6: stop RollFlow, extract separately, run Upgrade Existing.cmd then Start RollFlow.cmd. Do NOT run First Setup. Keep the old extracted folder (PostgreSQL path).\n"
         "Only a new empty test instance should run First Setup.cmd.\n"
+        "Open Training Demo.cmd opens the exact public website in an isolated loopback-only workspace. Never enter real records there.\n"
         "Open http://localhost:18085/. No internet is required at runtime.\n"
         "V3.6.7 shortcuts intentionally reuse %LOCALAPPDATA%\\RollFlow-V3641-Staging, not the earlier V3.5 database.\n"
         "See app/deployment/README.md for side-by-side test setup, ICT restrictions and backup steps.\n",

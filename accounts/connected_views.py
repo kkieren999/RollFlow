@@ -195,8 +195,12 @@ def teacher_schedule(request, week=False):
     if role != "teacher":
         return HttpResponseForbidden("Teacher access required.")
     publication = publication_or_404()
-    return render(request, "connected_school.html", {
-        "mode": "teacher", **schedule_context(publication, request, personal_codes(publication, request.user), week)})
+    codes = personal_codes(publication, request.user)
+    context = schedule_context(publication, request, codes, week)
+    if week or context["day"].weekday() < 5:
+        context["days"] = schedule_context(publication, request, codes, True)["days"]
+        context["native_cards"] = True
+    return render(request, "connected_school.html", {"mode": "teacher", **context})
 
 
 @never_cache

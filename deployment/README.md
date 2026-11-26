@@ -1,3 +1,9 @@
+# V3.7.0 staging — website parity
+
+The Windows release branch packages the exact public Pages snapshot in `app/training` alongside the protected Django/PostgreSQL application. Use **Open Training Demo.cmd** to launch the fictional training workspace on a separate loopback port (18086). Do not use the training workspace for real data. It does not share browser storage with the protected application. The protected application continues to use **Start RollFlow.cmd**.
+
+`BUILD-INFO.json` records both Windows source and website commit hashes; `SHA256SUMS.txt` records bundle file digests. Retain existing private state and extract a new bundle separately before running **Upgrade Existing.cmd**. Do not run First Setup over existing state. Staging is not a signed or school-approved production release.
+
 # Recording services in the student day template (offline demo)
 
 The V3.6.7 Windows staging **fictional browser fallback** now uses the same

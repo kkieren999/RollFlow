@@ -1,0 +1,30 @@
+const fs=require('node:fs');const path=require('node:path');const s=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
+const logic=s.slice(s.indexOf('function rfCalValid('),s.indexOf('let rfCalDialog='));
+const fixture=String.raw`
+const SARAH_2026_TERMS=[['2026-01-27','2026-04-02'],['2026-04-20','2026-06-26'],['2026-07-13','2026-09-18'],['2026-10-06','2026-12-11']],SARAH_2026_NO_STUDENTS={'2026-09-04':'Student-free staff development day','2026-08-12':'Brisbane Show public holiday'};
+const osDateValid=d=>typeof d==='string'&&d>='1900-01-01'&&d<='2099-12-31'&&!isNaN(Date.parse(d))&&new Date(d+'T12:00:00Z').toISOString().slice(0,10)===d;
+const dateOffset=(d,n)=>{const x=new Date(d+'T12:00:00Z');x.setUTCDate(x.getUTCDate()+n);return x.toISOString().slice(0,10)},brisbaneToday=()=> '2026-11-26',esc=v=>String(v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+`;
+const cases=String.raw`
+const checks=[];const check=(name,v)=>{if(!v)throw Error(name);checks.push(name)};
+check('Monday-first 42-day grid',rfCalDays('2026-12').length===42&&rfCalDays('2026-12')[0]==='2026-11-30');
+check('leap day',rfCalDays('2028-02').includes('2028-02-29'));
+check('month navigation crosses years',rfCalShift('2026-12',1)==='2027-01'&&rfCalShift('2026-01',-1)==='2025-12');
+check('invalid date rejected',!rfCalValid('2026-02-30'));
+check('term status',rfCalInfo('2026-11-26').term==='Term 4'&&!rfCalInfo('2026-11-26').off);
+check('weekends and school holidays',rfCalInfo('2026-11-28').off&&rfCalInfo('2026-12-14').off);
+check('student-free and public holidays',rfCalInfo('2026-09-04').off&&rfCalInfo('2026-08-12').off);
+check('unknown years not falsely school holidays',!rfCalInfo('2027-02-01').off&&rfCalInfo('2027-02-01').status.includes('not configured'));
+const events=[{date:'2026-11-25',end:'2026-11-27',title:'Closure',impact:'non-teaching'}];
+check('multi-day exception recognised',rfCalInfo('2026-11-26',events).off&&rfCalEvents('2026-11-28',events).length===0);
+check('min and max inclusive',rfCalAllowed('2026-11-26','2026-11-26','2026-12-01')&&!rfCalAllowed('2026-11-25','2026-11-26','2026-12-01')&&!rfCalAllowed('2026-12-02','2026-11-26','2026-12-01'));
+check('native step rules',rfCalAllowed('2026-11-28','','','2','2026-11-26')&&!rfCalAllowed('2026-11-27','','','2','2026-11-26'));
+check('historical non-school dates still selectable',rfCalAllowed('2026-01-03'));
+const grid=rfCalGrid('2026-11','2026-11-26','2026-11-26','2026-11-25','2026-12-04',events,'2026-11-30');
+check('range shading and two endpoints',grid.includes('rf-cal-range')&&(grid.match(/aria-pressed="true"/g)||[]).length===2);
+check('exactly one roving tab stop',(grid.match(/tabindex="0"/g)||[]).length===1);
+check('current day labelled and event dots present',grid.includes('aria-current="date"')&&grid.includes('rf-cal-dot'));
+check('full calendar event titles escaped',rfCalGrid('2026-11','2026-11-26','2026-11-26','','',[{date:'2026-11-26',title:'<test>'}],'',true).includes('&lt;test>'));
+return checks;
+`;
+for(const name of new Function(fixture+logic+cases)())console.log('PASS '+name);
