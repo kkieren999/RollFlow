@@ -2891,7 +2891,7 @@ function rfLateClassField(p,date,time){
  const rows=rfLateClassChoices(p,date,time);
  return '<option value="">'+(rows.length?'Select scheduled class':'No class scheduled at this time')+'</option>'+rows.map(row=>'<option value="'+esc(row.id)+'" '+(rows.length===1?'selected':'')+'>'+esc(row.id+' · '+row.name+' · '+row.period)+'</option>').join('');
 }
-function rfQuickIncident(a){return !!a&&!a.refer&&a.kind==='incident'}
+function rfQuickIncident(a){return !!a&&!a.refer&&a.kind==='incident'&&['late','uniform','left','truant'].includes(a.id)}
 function rfQuickNeedsClass(a){return ['late','left','truant'].includes(a.id)}
 function rfQuickClassChoices(p,date,time,a){
  const current=rfLateClassChoices(p,date,time).filter(c=>rfClassroomClassAllowed(p,c.id));
@@ -2918,7 +2918,7 @@ document.addEventListener('input',e=>{
 });
 function rfStudentIncidentBody(p,a){
  if(rfQuickIncident(a))return rfQuickIncidentBody(p,a);
- const date=brisbaneToday(),classes=rfStudentCurrentClasses(p.id,date),selected=state.page==='roll'?state.classId:'';
+ const date=brisbaneToday(),classes=rfStudentCurrentClasses(p.id,date).filter(c=>a.refer||rfClassroomClassAllowed(p,c.code)),selected=state.page==='roll'?state.classId:'';
  const options=(arr)=>arr.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');
  return `<section class="rf-student-record"><div class="rf-student-record-head"><strong>${esc(p.name)}</strong><span>${esc(p.id)}</span></div><form id="rf-student-incident-form" data-rf-action-id="${esc(a.id)}" data-rf-student-id="${esc(p.id)}" class="rf-student-incident-form"><label>Date<input type="date" name="date" value="${date}" max="${date}" required></label>${a.time?'<label>Time<input type="time" name="time" value="'+esc(new Intl.DateTimeFormat('en-AU',{timeZone:'Australia/Brisbane',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date()))+'" required></label>':''}<label>Class<select name="classCode"><option value="">Not class-specific</option>${classes.map(c=>`<option value="${esc(c.code)}" ${selected===c.code?'selected':''}>${esc(c.code+' · '+c.name)}</option>`).join('')}</select></label><label>Action type<select name="type" required><option value="">Select type</option>${options(a.types||[])}</select></label><label>Response<select name="response" required><option value="">Select response</option>${options(a.responses||[])}</select></label><label class="rf-student-wide">Notes<textarea name="notes" maxlength="1000" rows="3" placeholder="Optional factual notes"></textarea></label><label class="rf-student-check"><input type="checkbox" name="refer" ${a.refer?'checked disabled':''}> Refer to admin support</label><p class="rf-student-source">Saved locally; referrals appear in the administration queue in this browser.</p><button class="btn green rf-student-wide" type="submit">Save record</button></form></section>`;
 }
@@ -2973,7 +2973,7 @@ document.addEventListener('submit',e=>{
  e.preventDefault();e.stopImmediatePropagation();const data=new FormData(form),p=rfModuleCurrentPerson(),a=rfStudentActions().find(x=>x.id===form.dataset.rfActionId&&x.active&&x.kind==='incident');
   if(!a||demoRole==='staff'&&(!rfClassroomRoute()||a.refer)||!a.refer&&(!rfClassroomAllowed()||!rfClassroomPeople().some(x=>x.id===p?.id))){showToast('This classroom action is outside your assigned access.');return}
  const val=k=>String(data.get(k)||'').trim(),date=val('date'),time=val('time'),code=val('classCode'),quick=rfQuickIncident(a),type=quick?(a.id==='uniform'?val('type'):({'late':'Late arrival','left':'Left classroom','truant':'Missed class'})[a.id]||a.name):val('type'),response=quick?'Record only':val('response'),notes=quick?'':val('notes');
- if(!p||p.id!==form.dataset.rfStudentId||!a||!date||!studentDateValid(date)||date>brisbaneToday()||(quick||a.time)&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)||(quick?((rfQuickNeedsClass(a)||code)&&!rfQuickClassChoices(p,date,time,a).some(c=>c.id===code)||a.id==='uniform'&&!a.types.includes(type)):!a.types.includes(type)||!a.responses.includes(response)||notes.length>1000||code&&!rfStudentCurrentClasses(p.id).some(c=>c.code===code))){showToast('Check the action date, time and choices.');return}
+ if(!p||p.id!==form.dataset.rfStudentId||!a||!date||!studentDateValid(date)||date>brisbaneToday()||(quick||a.time)&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)||(quick?((rfQuickNeedsClass(a)||code)&&!rfQuickClassChoices(p,date,time,a).some(c=>c.id===code)||a.id==='uniform'&&!a.types.includes(type)):!a.types.includes(type)||!a.responses.includes(response)||notes.length>1000||code&&(!rfStudentCurrentClasses(p.id,date).some(c=>c.code===code)||!a.refer&&!rfClassroomClassAllowed(p,code)))){showToast('Check the action date, time and choices.');return}
  const record={id:'incident-'+Date.now()+'-'+Math.random().toString(36).slice(2,8),studentId:p.id,studentName:p.name,actionId:a.id,actionName:a.name,date,time,classCode:code,type,response,notes,refer:!!a.refer||data.has('refer')||response==='Refer to admin support',resolved:false,recordedAt:new Date().toISOString(),recordedBy:rfuActor||demoTeacherUsername};
  if(!rfWriteStudentLocal(RF_STUDENT_INCIDENT_KEY,[...rfStudentIncidents(),record]))return;
  document.getElementById('review-dialog')?.remove();if(rfClassroomRoute()){rfClassroomActionId='';render()}else if(rfModuleStudentId&&!state.drawer){if(state.page==='student-support'){rfSupportAction='';rfSupportType='';rfModuleStudentId=rfSupportStudent}else if(state.page!=='classroom-management')rfModuleStudentId='';else rfClassroomActionId='';render()}showToast(record.refer?'Record saved to local admin support queue':'Classroom action saved');
@@ -3825,7 +3825,7 @@ function rfCompactGroups(kind,ids,roles=[]){
   defs=[
    group('TEACHING','Daily Schedule','timetable'),
    group('TEACHING','Master Timetable','master'),
-   group('TEACHING','Class Finder','finder','seating-plans','class-lists'),
+   group('TEACHING','Class Finder','finder'),
    group('TEACHING','Classroom Management','classroom-management'),
    group('TEACHING','Student Search','search'),
    group('TEACHING','Attendance Overview','attendance-overview'),

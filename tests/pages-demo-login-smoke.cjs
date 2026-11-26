@@ -56,7 +56,7 @@ async function openRoute(page,attr,route){
  }
  if(teacher&&route==='alerts'){await page.locator('.rf-compact-header-action').click();return;}
  if(teacher&&route==='home')route='timetable';
- const parents=teacher?{'seating-plans':'finder','class-lists':'finder','follow-ups':'student-support'}:{'student-actions':'students','master':'timetable','classes':'timetable','roles':'accounts','audit':'security','data':'oneschool'};
+ const parents=teacher?{'follow-ups':'student-support'}:{'student-actions':'students','master':'timetable','classes':'timetable','roles':'accounts','audit':'security','data':'oneschool'};
  const primary=parents[route]||route;
  const nav=page.locator('.nav-primary ['+attr+'="'+primary+'"]');
  if(!await nav.isVisible())await page.locator('[data-rf-portal-menu]').click();
@@ -140,12 +140,15 @@ async function test() {
     // Quick incidents use a date/time and an authorised scheduled class, not a response selector.
     const incident=page.locator('#rf-student-incident-form');
     assert.equal(await incident.locator('[name="type"],[name="response"]').count(),0);
-    await incident.locator('[name="date"]').fill('2026-11-25');
     let selectedClass='';
-    for(const time of ['08:40','09:10','10:20','11:40','13:30']){
-      await incident.locator('[name="time"]').fill(time);
-      const options=await incident.locator('[name="classCode"] option').evaluateAll(xs=>xs.map(x=>x.value).filter(Boolean));
-      if(options.length){selectedClass=options[0];await incident.locator('[name="classCode"]').selectOption(selectedClass);break}
+    for(const date of ['2026-11-23','2026-11-24','2026-11-25','2026-11-26']){
+      await incident.locator('[name="date"]').fill(date);
+      for(const time of ['08:55','09:10','10:20','11:10','12:15','14:00']){
+        await incident.locator('[name="time"]').fill(time);
+        const options=await incident.locator('[name="classCode"] option').evaluateAll(xs=>xs.map(x=>x.value).filter(Boolean));
+        if(options.length){selectedClass=options[0];await incident.locator('[name="classCode"]').selectOption(selectedClass);break}
+      }
+      if(selectedClass)break;
     }
     assert(selectedClass,'Fictional student has an authorised lesson on the fixed date');
     await incident.locator('button[type="submit"]').click();
@@ -189,7 +192,7 @@ async function test() {
     console.log('PASS: student profiles, semester attendance action, incidents, admin referrals and configurable choices.');
 
     // Newly approved classroom modules and local teacher tools.
-    for(const route of ['attendance-overview','classroom-management','student-support','follow-ups','seating-plans','class-lists']){
+    for(const route of ['attendance-overview','classroom-management','student-support','follow-ups']){
       await openRoute(page,'data-nav',''+route+'');
       assert(await page.locator('.rf-module-root').isVisible(),'Module failed to render: '+route);
     }
@@ -200,18 +203,14 @@ async function test() {
     const task=page.locator('.rf-module-task').filter({hasText:'Fictional follow-up'});
     await task.locator('[data-rf-followup-toggle]').click();
     assert.match(await task.locator('[data-rf-followup-toggle]').innerText(),/Reopen/);
-    await openRoute(page,'data-nav','seating-plans');
-    const seats=page.locator('[data-rf-seat-id]');
-    if(await seats.count()>1){
-      const first=await seats.nth(0).getAttribute('data-rf-seat-id'),second=await seats.nth(1).getAttribute('data-rf-seat-id');
-      await seats.nth(0).click();await seats.nth(1).click();
-      assert.equal(await seats.nth(0).getAttribute('data-rf-seat-id'),second);
-      assert.equal(await seats.nth(1).getAttribute('data-rf-seat-id'),first);
-    }
+    // These obsolete menu destinations were intentionally removed; Class Finder remains standalone.
+    await openRoute(page,'data-nav','finder');
+    assert.equal(await page.locator('.rf-compact-tabs').count(),0);
+    assert.equal(await page.locator('[data-nav="seating-plans"],[data-nav="class-lists"]').count(),0);
     await signOut(page);
     await logIn(page,'admin','admin','.v31-admin');
     await openRoute(page,'data-admin-page','teacher-modules');
-    await page.locator('[data-rf-module-toggle="class-lists"]').click();
+    await page.locator('[data-rf-module-toggle="classroom-management"]').click();
     await openRoute(page,'data-admin-page','timetable');
     await page.locator('.rf-scheduling-manage summary').first().click();
     await page.locator('#rf-exception-form [name="title"]').fill('Fictional assembly');
@@ -222,14 +221,14 @@ async function test() {
     assert.match(await page.locator('.rf-scheduling-manage').innerText(),/Fictional assembly/);
     await signOut(page);
     await logIn(page,'swilliams','swilliams');
-    assert.equal(await page.locator('[data-nav="class-lists"]').count(),0);
+    assert.equal(await page.locator('[data-nav="classroom-management"]').count(),0);
     await openRoute(page,'data-nav','timetable');
     assert.match(await page.locator('.rf-scheduling-notices').innerText(),/Fictional assembly/);
-    console.log('PASS: teacher modules, follow-up completion, seating swaps, admin visibility and contextual scheduling exceptions.');
+    console.log('PASS: teacher modules, follow-up completion, intentional standalone navigation, admin visibility and contextual scheduling exceptions.');
     await signOut(page);
     await logIn(page,'admin','admin','.v31-admin');
     await openRoute(page,'data-admin-page','teacher-modules');
-    await page.locator('[data-rf-module-toggle="class-lists"]').click();
+    await page.locator('[data-rf-module-toggle="classroom-management"]').click();
     await signOut(page);
     await logIn(page,'swilliams','swilliams');
 
@@ -772,7 +771,7 @@ async function test() {
     const deviceSizes = [{width:1920,height:1200},{width:1024,height:768},{width:768,height:1024},{width:820,height:1180}];
     for (const size of deviceSizes) {
       await page.setViewportSize(size);
-      for (const route of ['home','timetable','master','finder','search','movements','alerts','profile','preferences','help','attendance-overview','classroom-management','student-support','follow-ups','seating-plans','class-lists']) {
+      for (const route of ['home','timetable','master','finder','search','movements','alerts','profile','preferences','help','attendance-overview','classroom-management','student-support','follow-ups']) {
         await openRoute(page,'data-nav',route);
         await assertWorkspaceFits('Teacher '+route+' '+JSON.stringify(size), '.content-shell>.main');
       }
