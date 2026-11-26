@@ -3657,8 +3657,10 @@ document.addEventListener('submit',e=>{
  if(!rfuCan(rfuPage,['create','manage','approve','review']))return;
  const module=rfuPage,studentId=String(d.get('student')||''),classCode=String(d.get('class')||''),owner=String(d.get('owner')||rfuActor),title=String(d.get('title')||'').trim().slice(0,100),detail=String(d.get('detail')||'').trim().slice(0,300),date=String(d.get('date')||'');
  if(!title||!detail||!osDateValid(date)||studentId&&!rfuStudents(module).some(p=>p.id===studentId)||classCode&&!rfuClasses(module).some(c=>c.code===classCode)||owner!==rfuActor&&!rfuStaff('staff').some(p=>p.username===owner))return;
- const row={module,id:'rfu-'+Date.now()+'-'+Math.random().toString(36).slice(2,8),owner,title,detail,date,studentId,classCode,status:module==='approvals'?'Awaiting review':module==='observations'?'Recorded':'Open'};
- if(!rfuRecordAllowed(module,row,rfuActor,['create','manage','approve','review']))return;if(rfuWrite(RFU_DATA_KEY,[...rfuRecords(),row])){rfuAudit('Created '+module,row.id);rfuMessage='Fictional record saved.'}render();
+ const time=String(d.get('time')||''),category=String(d.get('category')||'').slice(0,80),initialStatus=String(d.get('status')||'');
+ if(time&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)||category&&!(rfUnifiedCategories[module]||[]).includes(category)||initialStatus&&(module!=='availability'||!['Available','Unavailable'].includes(initialStatus)))return;
+ const row={module,id:'rfu-'+Date.now()+'-'+Math.random().toString(36).slice(2,8),owner,title,detail,date,time,category,studentId,classCode,status:module==='availability'?initialStatus||'Available':module==='approvals'?'Awaiting review':module==='observations'?'Recorded':'Open'};
+ if(!rfuRecordAllowed(module,row,rfuActor,['create','manage','approve','review']))return;if(rfuWrite(RFU_DATA_KEY,[...rfuRecords(),row])){rfuAudit('Created '+module,row.id);rfuMessage='Fictional record saved.';rfUnifiedState.recordMode='list'}render();
 },true);
 
 const rfuStyle=document.createElement('style');rfuStyle.textContent="\n.rfu-login{width:min(760px,100%);max-width:760px}.rfu-demo-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,185px),1fr));gap:8px;margin:10px 0}.rfu-demo-account{background:var(--rf-surface,#fff);border:1px solid #d4e0e7;border-radius:9px;padding:11px;display:grid;text-align:left;gap:4px;color:#243a48;cursor:pointer}.rfu-demo-account:hover,.rfu-demo-account:focus-visible{border-color:#0076a8;background:#eaf4fb}.rfu-demo-account strong{font-size:13px}.rfu-demo-account span,.rfu-demo-account code{font-size:11px;color:#526c7b}.rfu-create{margin:15px 0;padding:12px;border:1px solid var(--rf-border);border-radius:8px}.rfu-create summary{cursor:pointer;font-weight:700;color:var(--rf-text)}.rfu-create textarea{min-height:70px}.rf-admin-main fieldset{min-width:0;border:1px solid var(--rf-border);border-radius:8px;padding:12px;display:grid;gap:8px}.rf-admin-main fieldset legend{font-weight:700}.rf-admin-main fieldset label{overflow-wrap:anywhere}.rf-admin-main .v31-form textarea{width:100%}\n@media(max-width:640px){.rfu-demo-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.rfu-demo-account{padding:9px}.rfu-demo-account strong{font-size:12px}}";rfuStyle.textContent+=".rfu-teacher-extra{display:grid;gap:14px;background:transparent;min-width:0}.rfu-teacher-extra .v31-panel{border-radius:12px}.rfu-teacher-extra .v31-table-wrap{overflow:auto}.rfu-teacher-extra .v31-search{grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr))}";document.head.appendChild(rfuStyle);
@@ -4096,24 +4098,49 @@ const rfUnifiedRecordLabels={
  supervision:['Supervision schedule','New duty','Duty','Supervision duties','Complete']
 };
 function rfUnifiedRecordAction(module,r){
+ if(module==='availability'){return rfuCanChange(module,r)?rfUnifiedButton(r.status==='Available'?'Mark unavailable':'Mark available','data-rf-unified-availability="'+esc(r.id)+'"',true):''}
  if(!rfuCanChange(module,r)||['Complete','Reviewed','Approved','Recorded'].includes(r.status)||module==='relief'&&r.status==='Allocated')return '';
  return rfUnifiedButton(module==='approvals'?(rfuRecordAllowed(module,r,rfuActor,['approve'])?'Approve draft':'Review draft'):module==='referrals'?'Mark reviewed':module==='relief'?'Mark allocated':'Mark complete','data-rfu-change="'+esc(r.id)+'"',true);
 }
 function rfUnifiedRecordList(module,rows,actions=true){
  return rows.length?'<div class="rf-unified-record-list">'+rows.map(r=>{
- const who=[r.studentId?rfuStudentName(r.studentId):'',r.classCode||'',rfuStaffName(r.owner)].filter(Boolean).join(' · ');
+ const who=[r.studentId?rfuStudentName(r.studentId):'',r.classCode||'',rfuStaffName(r.owner),r.category||''].filter(Boolean).join(' · ');
  return '<article class="rf-module-task rf-modern-task '+(['Complete','Reviewed','Approved','Recorded'].includes(r.status)?'complete':r.date<brisbaneToday()?'due':'upcoming')+'"><span class="rf-wiz-icon '+(['Complete','Reviewed','Approved','Recorded'].includes(r.status)?'student':'left')+'">'+navSvg(RFU_MODULES.find(m=>m[0]===module)?.[2]||'clipboard-check')+'</span><div><strong>'+esc(r.title)+'</strong><small>'+esc(who)+'</small><small>'+esc(r.date+(r.time?' · '+r.time:''))+'</small><small>'+esc(r.detail||'')+'</small></div><div class="rf-module-task-buttons">'+rfUnifiedBadge(r.status)+(actions?rfUnifiedButton('View details','data-rf-unified-record="'+esc(r.id)+'"')+rfUnifiedRecordAction(module,r):'')+'</div></article>';
  }).join('')+'</div>':rfUnifiedEmpty('No records match this selection.');
 }
 function rfUnifiedRecordDetail(module,r){
- const fields=[['Status',r.status],['Date',r.date],['Time',r.time],['Assigned to',rfuStaffName(r.owner)],...(r.studentId?[['Student',rfuStudentName(r.studentId)]]:[]),...(r.classCode?[['Class',r.classCode]]:[])];
+ const fields=[['Status',r.status],['Category',r.category],['Date',r.date],['Time',r.time],['Assigned to',rfuStaffName(r.owner)],...(r.studentId?[['Student',rfuStudentName(r.studentId)]]:[]),...(r.classCode?[['Class',r.classCode]]:[])];
  const log=rfuRead(RFU_AUDIT_KEY,[]).filter(x=>x.subject===r.id);
  return rfUnifiedRoot(rfUnifiedButton('← Back to list','data-rf-unified-action="record-back"')+rfUnifiedPanel(r.title,'<dl class="teacher-profile-details">'+fields.map(([l,v])=>profileDetail(l,v)).join('')+'</dl><div class="rf-unified-notes"><strong>Details</strong><p>'+esc(r.detail||'No details recorded.')+'</p></div>'+rfUnifiedRecordAction(module,r))+rfUnifiedPanel('Activity history',log.length?rfuTable(['Date','Action','Staff member'],log.map(x=>[esc(x.date),esc(x.action),esc(rfuStaffName(x.actor))])):rfUnifiedEmpty('No additional activity recorded.'))+(module==='approvals'?rfUnifiedPanel('Attendance assistance','<p>This draft is a local assistance record, not a submitted class roll. It does not alter official attendance.</p>'):''));
 }
 const rfUnifiedOriginalRecordForm=rfuRecordForm;
+const rfUnifiedCategories={
+ observations:['Learning engagement','Literacy','Numeracy','Classroom participation','Other'],
+ tasks:['Literacy support','Numeracy support','Classroom assistance','Learning resources','Other'],
+ referrals:['Learning support','Attendance support','Wellbeing support','Transition support','Other'],
+ followups:['Learning progress','Attendance','Support plan','Other'],
+ approvals:['Attendance assistance','Relief roll assistance','Roll check request'],
+ workforce:['Classroom support','Learning intervention','Office coverage','Other'],
+ relief:['Teaching cover','Supervision cover','Other'],
+ supervision:['Playground','Bus supervision','Library','Other']
+};
 function rfUnifiedForm(module){
+ // Retain the original permission gate and scoped option lists.
  const raw=rfUnifiedOriginalRecordForm(module);if(!raw)return '';
- return raw.replace(/^<details class="rfu-create"><summary>.*?<\/summary>/,'').replace(/<\/details>$/,'').replace('class="v31-form"','class="rf-module-form rf-unified-record-form"').replace('Save demo record','Save '+esc(rfUnifiedRecordLabels[module]?.[2].toLowerCase()||'record'));
+ const studentModule=['observations','tasks','referrals','followups'].includes(module),classModule=['approvals','relief','workforce'].includes(module),staffModule=['workforce','relief','availability','supervision'].includes(module);
+ const labels={observations:['Observation title','Observation date','Describe the observed learning activity.'],tasks:['Task title','Due date','Describe the support activity to complete.'],referrals:['Referral title','Referral date','Describe the reason for referral.'],followups:['Follow-up title','Due date','Describe the action to follow up.'],approvals:['Draft title','Lesson date','Describe the attendance assistance or review request.'],workforce:['Allocation title','Allocation date','Describe the assigned work.'],availability:['Availability title','Availability date','Describe available hours or coverage needs.'],relief:['Coverage title','Coverage date','Describe the coverage requirement.'],supervision:['Duty title','Duty date','Describe the location and duty.']};
+ const [title,date,notes]=labels[module]||['Title','Date','Details'];
+ const categories=rfUnifiedCategories[module]||[];
+ const categoriesField=categories.length?'<label>'+esc(module==='referrals'?'Support category':'Category')+'<select name="category" required>'+planOpt([['','Select category'],...categories.map(x=>[x,x])],'')+'</select></label>':'';
+ const students=studentModule?rfuStudents(module):[],classes=classModule?rfuClasses(module):[],staff=staffModule?rfuStaff('staff'):[];
+ const studentField=studentModule?'<label class="rf-student-wide">Student<select name="student" required>'+planOpt([['','Select student'],...students.map(p=>[p.id,rfUnifiedPersonName(p)+' · '+p.id])],'')+'</select></label>':'';
+ const classField=classModule?'<label>Class<select name="class" required>'+planOpt([['','Select class'],...classes.map(c=>[c.code,c.code+' · '+c.name])],'')+'</select></label>':'';
+ const ownerField=staffModule?'<label>Staff member<select name="owner" required>'+planOpt([['','Select staff member'],...staff.map(p=>[p.username,rfUnifiedPersonName(p)])],'')+'</select></label>':'';
+ const statusField=module==='availability'?'<label>Availability<select name="status"><option>Available</option><option>Unavailable</option></select></label>':'';
+ const timed=['approvals','workforce','availability','relief','supervision'].includes(module);
+ const intro=studentModule?'<div class="rf-unified-form-guide"><span class="rf-wiz-icon student">'+navSvg('users')+'</span><div><strong>1. Select an authorised student</strong><small>Only students in your assigned scope appear here.</small></div></div>':'';
+ const details=studentModule?'<div class="rf-unified-form-guide rf-student-wide"><span class="rf-wiz-icon left">'+navSvg('clipboard-check')+'</span><div><strong>2. Record '+esc(rfUnifiedRecordLabels[module][2].toLowerCase())+' details</strong><small>Choose the category and enter the relevant information.</small></div></div>':'';
+ return '<form id="rfu-record-form" class="rf-module-form rf-unified-record-form">'+intro+studentField+details+classField+ownerField+categoriesField+statusField+'<label>'+esc(title)+'<input name="title" maxlength="100" required></label><label>'+esc(date)+'<input type="date" name="date" value="'+brisbaneToday()+'" required></label>'+(timed?'<label>Time (optional)<input type="time" name="time"></label>':'')+'<label class="rf-student-wide">Notes (fictional only)<textarea name="detail" maxlength="300" required placeholder="'+esc(notes)+'"></textarea></label><div class="v31-form-actions rf-student-wide"><button class="btn green">Save '+esc(rfUnifiedRecordLabels[module][2].toLowerCase())+'</button></div></form>';
 }
 rfuRecordsPage=function(module){
  const st=rfUnifiedState,labels=rfUnifiedRecordLabels[module]||['Records','New record','Record','Records','Complete'],rows=rfuRows(module);
@@ -4178,6 +4205,7 @@ rfUnifiedStyle.textContent=`
 .rf-unified-badge.good{color:var(--school-secondary);border-color:var(--school-secondary)}
 .rf-unified-day-label{font-weight:700;margin:16px 0 8px;color:var(--rf-text)}
 .rf-unified-notes{padding:14px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.rf-unified-form-guide{grid-column:1/-1;display:flex;align-items:center;gap:12px;padding:10px 0}.rf-unified-form-guide>div{display:grid;gap:4px}.rf-unified-form-guide small{color:var(--rf-muted,#647581)}
 .rf-unified-workspace .v31-table td small{display:block}
 .rf-unified-workspace .rf-calendar-grid{min-width:0;overflow:auto}
 @media(max-width:700px){.rf-unified-workspace .rf-module-controls label{min-width:0;flex:1 1 130px}.rf-unified-record-list .rf-module-task{display:flex;flex-wrap:wrap}.rf-unified-record-list .rf-module-task-buttons{width:100%;justify-content:flex-start}.rf-unified-schedule .day-lesson{display:flex;flex-wrap:wrap}.rf-unified-person-list article{flex-wrap:wrap}}
@@ -4194,9 +4222,16 @@ window.addEventListener('click',e=>{
 },true);
 document.addEventListener('click',e=>{
  if(!rfUnifiedScope()||!rfuCan(rfuPage))return;
- const b=e.target.closest('[data-rf-unified-open],[data-rf-unified-action],[data-rf-unified-view],[data-rf-unified-record]');if(!b)return;
+ const b=e.target.closest('[data-rf-unified-open],[data-rf-unified-action],[data-rf-unified-view],[data-rf-unified-record],[data-rf-unified-availability]');if(!b)return;
  e.preventDefault();e.stopImmediatePropagation();
  const st=rfUnifiedState;
+ if(b.dataset.rfUnifiedAvailability){
+  if(rfuPage!=='availability')return;
+  const rows=rfuRecords(),r=rows.find(x=>x.id===b.dataset.rfUnifiedAvailability&&x.module==='availability');
+  if(!r||!rfuCanChange('availability',r))return;
+  const status=r.status==='Available'?'Unavailable':'Available';
+  if(rfuWrite(RFU_DATA_KEY,rows.map(x=>x.id===r.id?{...x,status}:x))){rfuAudit('Updated availability',r.id);rfuMessage='Availability updated.'}render();return;
+ }
  if(b.dataset.rfUnifiedOpen){rfUnifiedOpenDirectory(b.dataset.rfUnifiedOpen,b.dataset.rfUnifiedId);return}
  if(b.dataset.rfUnifiedRecord){if(rfuRows(rfuPage).some(r=>r.id===b.dataset.rfUnifiedRecord)){st.record=b.dataset.rfUnifiedRecord;render()}return}
  if(b.dataset.rfUnifiedView){if(['day','week'].includes(b.dataset.rfUnifiedView))st.view=b.dataset.rfUnifiedView;render();return}
@@ -4218,14 +4253,24 @@ document.addEventListener('change',e=>{
  const value=e.target.value;if((key==='date'||key==='query'&&value)&&!osDateValid(value)||key==='month'&&!/^\d{4}-(0[1-9]|1[0-2])$/.test(value))return;
  rfUnifiedState[key]=value;if(key==='year')rfUnifiedState.classCode='';rfUnifiedState.limit=24;render();
 },true);
-window.addEventListener('submit',e=>{
- if(rfUnifiedScope()&&e.target.id==='rfu-record-form')rfUnifiedState.recordMode='list';
-},true);
 const rfUnifiedBeforeRender=render;
 render=function(){
  const actor=demoRole?demoRole+':'+rfuActor:'';
  if(actor!==rfUnifiedState.actor){rfUnifiedReset();rfUnifiedState.actor=actor}
  rfUnifiedBeforeRender();
+};
+
+
+/* Administrator dashboard retains specialist pages, but prioritises outstanding work. */
+rfAdminDashboard=function(){
+ const d=rfAdminAttendanceData(),v=osPublished(),active=previewStudents.filter(p=>p.status==='active'),staff=previewStaff.filter(p=>p.active),below=d.students.filter(r=>r.total&&(r.P+r.L)/r.total<.9),out=rfAdminMovementRows().filter(r=>!r.sample&&!r.returnedAt);
+ const rows=[
+ ['Attendance monitoring',below.length+' students below 90% in available fictional attendance history.','attendance','Review attendance'],
+ ['Student movements',out.length+' open movement passes.','movements','Open register'],
+ ['Timetable publication',v?'Published timetable: '+v.name:'No dated timetable import published.','oneschool','Import centre'],
+ ['Staff & accounts',staff.length+' active staff records.','accounts','Manage accounts']
+ ];
+ return rfUnifiedRoot('<section class="sheet day-schedule"><div class="day-panel-heading"><h2>School overview</h2><p>'+esc(rfUnifiedDate(d.today))+'</p></div></section>'+rfUnifiedMetrics([[active.length,'Enrolled students'],[staff.length,'Active staff'],[planning.classes.filter(c=>c.active).length,'Active classes'],[rfAdminRate(d.students),'Attendance']])+rfUnifiedPanel('School priorities',rows.map(([title,desc,id,action])=>'<article class="rf-module-task"><div><strong>'+esc(title)+'</strong><small>'+esc(desc)+'</small></div>'+rfUnifiedButton(action,'data-admin-page="'+id+'"')+'</article>').join(''))+rfUnifiedPanel('Attendance trends · '+d.sem.name,rfAttendanceCharts(d.students,d.sem.start,d.today))+osDashboard());
 };
 
 window.visualViewport?.addEventListener('resize',()=>requestAnimationFrame(fitGrid));
