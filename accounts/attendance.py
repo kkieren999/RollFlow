@@ -66,8 +66,9 @@ def active_relief(pub, day):
     ).select_related("relief_teacher","regular_teacher")}
 
 
-def own_lessons(pub, user, day):
-    if not publication_ready(pub):
+def own_lessons(pub, user, day, ignore_absence=False):
+    from .workforce_service import closed, absent, effective_room
+    if not publication_ready(pub) or closed(pub,day) or (not ignore_absence and absent(pub,day,user)):
         return []
     all_slots = [r for r in visible_slots(pub, day) if lesson_valid(r)]
     counts = Counter(lesson_key(r) for r in all_slots)
@@ -85,7 +86,7 @@ def own_lessons(pub, user, day):
         if counts[key]!=1 or any(other is not r and (other.get("staff")==r.get("staff") or other["code"]==r["code"])
                  and other["start"]<r["end"] and r["start"]<other["end"] for other in all_slots):
             continue
-        result.append(dict(r, relief=bool(assignment)))
+        result.append(dict(r, relief=bool(assignment), room=effective_room(pub,day,r)))
     return result
 
 

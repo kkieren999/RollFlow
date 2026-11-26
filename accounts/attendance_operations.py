@@ -36,7 +36,8 @@ def frozen_students(roll, lock=False):
 def daily_status(pub,day,now=None):
     now=now or timezone.localtime()
     ready=publication_ready(pub)
-    source=visible_slots(pub,day) if pub and pub.snapshot.get("source")=="dated" else []
+    from .workforce_service import closed, absent
+    source=visible_slots(pub,day) if pub and pub.snapshot.get("source")=="dated" and not closed(pub,day) else []
     slots=[r for r in source if lesson_valid(r)]
     keys=Counter(lesson_key(r) for r in slots)
     rolls={(r.class_code,r.period,r.start):r for r in AttendanceRoll.objects.filter(lesson_date=day)
@@ -80,6 +81,8 @@ def daily_status(pub,day,now=None):
                 state="Submitted data conflict — review required"
         elif not ready:
             state="Source not ready — review required"
+        elif row.get("staff") in verified and not key in relief and bindings.get(row.get("staff"),{}).get("user") in profiles and absent(pub,day,profiles[bindings[row["staff"]]["user"]].user):
+            state="Uncovered absence — review required"
         elif row.get("staff") not in verified:
             state="Unverified allocation — review required"
         elif key in relief and not personal_codes(pub,relief[key].relief_teacher):

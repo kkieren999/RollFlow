@@ -1,3 +1,7 @@
+# V4.4 workforce staging
+
+See [V4.4 notes](../docs/v4.4-workforce.md). Use protected Workforce & supervision, review publication and choose date. Existing database paths unchanged. Fictional data only.
+
 # V4.3 movement staging
 
 See [V4.3 notes](../docs/v4.3-movements.md). Configure approved destinations, grant specific reception access, issue passes from a current class. Existing database paths unchanged. Fictional data only.

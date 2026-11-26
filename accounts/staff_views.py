@@ -105,6 +105,8 @@ def section(request, section):
         return redirect("management-dashboard")
     if section == "roles":
         return redirect("school-access-manage")
+    if section == "relief" and settings.ROLLFLOW_PROTECTED_WORKSPACE:
+        return redirect("workforce-board")
     if section == "movements" and settings.ROLLFLOW_PROTECTED_WORKSPACE:
         return redirect("movement-board")
     if section not in TITLES:

@@ -17,6 +17,7 @@ CAPABILITIES = {
     "published_classes": "Published OneSchool classes",
     "published_timetable": "Published OneSchool timetable",
     "attendance_monitor": "School-wide attendance monitoring (summary only)",
+    "workforce_monitor": "School-wide workforce monitoring (read only)",
     "movement_monitor": "School-wide student movement monitoring",
     "movement_receive": "Destination reception (check in / release)",
 }

@@ -138,6 +138,8 @@ def workspace(request, module=None):
     modules = visible_modules(grants)
     if module == "attendance_monitor" and module in modules:
         return redirect("live-monitor")
+    if module == "workforce_monitor" and module in modules:
+        return redirect("workforce-board")
     if module in ("movement_monitor","movement_receive") and module in modules:
         return redirect("movement-board")
     if not modules or (module is not None and module not in modules):

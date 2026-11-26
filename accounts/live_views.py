@@ -30,7 +30,8 @@ def shell(user):
     modules = visible_modules(grants)
     modules.pop("attendance_monitor", None)
     from .movement_service import may_access
-    return {"movements":may_access(user), "teaching": can_teach(user), "monitor": can_monitor(user),
+    from .workforce_service import self_allowed, authority
+    return {"workforce_self":self_allowed(user),"workforce_monitor":authority(user),"movements":may_access(user), "teaching": can_teach(user), "monitor": can_monitor(user),
             "admin_access": user.is_staff and user.is_superuser,
             "modules": modules, "grants": grants}
 
@@ -73,7 +74,8 @@ def my_day(request):
     rows = own_lessons(pub, request.user, day)
     lessons = [dict(row, url=lesson_url(row), status=status_label(roll_for(day,row), pub))
                for row in rows]
-    return page(request, "live_day.html", lessons=lessons, day=day, ready=publication_ready(pub))
+    from .workforce_service import closed, absent
+    return page(request, "live_day.html", lessons=lessons, day=day, ready=publication_ready(pub), day_closed=closed(pub,day), unavailable=absent(pub,day,request.user))
 
 
 @never_cache

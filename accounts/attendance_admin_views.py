@@ -1,5 +1,6 @@
 """Audited correction and exact relief allocation management."""
-from datetime import datetime, time, date
+from datetime import datetime, time, date, timedelta
+from django.urls import reverse
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.models import User
@@ -90,7 +91,13 @@ class ReliefForm(forms.Form):
 @require_http_methods(["GET","POST"])
 def relief(request):
     pub=current()
-    day=timezone.localdate()
+    from .workforce_service import closed, absent, duty_conflict, notify, lesson_has_records
+    try:
+        day=date.fromisoformat(request.GET.get("date") or timezone.localdate().isoformat())
+    except ValueError:
+        return HttpResponseBadRequest("Invalid relief date.")
+    if day<timezone.localdate() or day>timezone.localdate()+timedelta(days=180):
+        return HttpResponseBadRequest("Choose today or a future planning date.")
     form=ReliefForm(request.POST if request.method=="POST" and request.POST.get("action")=="assign" else None,pub=pub,day=day)
     error=""
     if request.method=="POST":
@@ -103,7 +110,7 @@ def relief(request):
                     teacher=User.objects.select_for_update().get(pk=form.cleaned_data["teacher"].pk)
                     lock_sources()
                     active=current()
-                    if not pub or not active or active.pk!=pub.pk or request.POST.get("publication")!=str(pub.pk) or not publication_ready(active):
+                    if not pub or not active or active.pk!=pub.pk or request.POST.get("publication")!=str(pub.pk) or not publication_ready(active) or closed(active,day):
                         raise ValueError("Publication changed; review again.")
                     row=form.rows[form.cleaned_data["lesson"]]
                     key=lesson_key(row)
@@ -111,11 +118,13 @@ def relief(request):
                     regular=User.objects.filter(pk=binding.get("user")).first()
                     if not regular or teacher.pk==regular.pk or not personal_codes(active,teacher):
                         raise ValueError("Choose a different, verified teaching account.")
-                    if not any(lesson_key(r)==key for r in own_lessons(active,regular,day)):
+                    if not any(lesson_key(r)==key for r in own_lessons(active,regular,day,ignore_absence=True)):
                         raise ValueError("Original lesson is not an unambiguous verified allocation.")
+                    if absent(active,day,teacher) or duty_conflict(active,day,teacher,row["start"],row["end"]):
+                        raise ValueError("Relief teacher is unavailable or assigned to supervision.")
                     roster_for(active,row["code"],day,lock=True)
-                    if AttendanceRoll.objects.filter(lesson_date=day,class_code=row["code"],start__lt=row["end"],end__gt=row["start"]).exists():
-                        raise ValueError("A roll already exists. No automatic ownership transfer is allowed.")
+                    if lesson_has_records(day,row):
+                        raise ValueError("A roll or movement already exists. No automatic ownership transfer is allowed.")
                     if ReliefAttendanceAssignment.objects.filter(publication=active,lesson_date=day,class_code=key[0],period=key[1],start=key[2],cancelled_at__isnull=True).exists():
                         raise ValueError("An assignment already exists; review or cancel it first.")
                     if any(r["start"]<row["end"] and row["start"]<r["end"] for r in own_lessons(active,teacher,day)):
@@ -127,18 +136,21 @@ def relief(request):
                     a=ReliefAttendanceAssignment.objects.create(publication=active,lesson_date=day,class_code=key[0],period=key[1],start=key[2],end=row["end"],
                         regular_teacher=regular,relief_teacher=teacher,created_by=request.user,expires_at=expiry)
                     audit(request.user,"relief_lesson_assigned",teacher,after={"assignment":a.pk,"publication":active.pk,"regular_teacher":regular.pk})
-                    return redirect("attendance-relief")
+                    notify(active,day,[regular.pk,teacher.pk],f"Relief assignment {key[0]} {key[1]} on {day.isoformat()}. Review your schedule.")
+                    return redirect(reverse("attendance-relief")+"?date="+day.isoformat())
                 if request.POST.get("action")=="cancel":
                     lock_sources()
                     a=get_object_or_404(ReliefAttendanceAssignment.objects.select_for_update(),pk=request.POST.get("assignment"))
-                    if a.cancelled_at or a.lesson_date!=day or not pub or a.publication_id!=pub.pk:
+                    active=current()
+                    if a.cancelled_at or a.lesson_date!=day or not active or a.publication_id!=active.pk:
                         raise ValueError("Assignment is not current.")
-                    if AttendanceRoll.objects.filter(lesson_date=a.lesson_date,class_code=a.class_code,start__lt=a.end,end__gt=a.start).exists():
-                        raise ValueError("A roll exists; assignment cannot be cancelled automatically.")
+                    if lesson_has_records(day,{"code":a.class_code,"start":a.start,"end":a.end}):
+                        raise ValueError("A roll exists or a movement was recorded; assignment cannot be cancelled automatically.")
                     a.cancelled_at=timezone.now()
                     a.save(update_fields=["cancelled_at"])
                     audit(request.user,"relief_lesson_cancelled",a.relief_teacher,after={"assignment":a.pk})
-                    return redirect("attendance-relief")
+                    notify(active,day,[a.regular_teacher_id,a.relief_teacher_id],f"Relief assignment cancelled for {a.class_code} on {day.isoformat()}.")
+                    return redirect(reverse("attendance-relief")+"?date="+day.isoformat())
                 if request.POST.get("action")!="assign":
                     return HttpResponseBadRequest("Unknown action.")
         except (ValueError,IntegrityError) as exc:

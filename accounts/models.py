@@ -439,3 +439,43 @@ class MovementEvent(models.Model):
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["movement","revision"],name="unique_movement_revision")]
+
+
+class WorkforceEntry(models.Model):
+    """Approved dated operational overlay; no clinical absence detail."""
+    class Kind(models.TextChoices):
+        ABSENCE = "absence", "Full-day unavailability"
+        DUTY = "duty", "Supervision duty"
+        ROOM = "room", "Lesson room change"
+        CLOSURE = "closure", "School day exception (closed)"
+
+    publication = models.ForeignKey(ConnectedSchoolPublication, on_delete=models.PROTECT)
+    day = models.DateField()
+    kind = models.CharField(max_length=12, choices=Kind.choices)
+    staff = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="+")
+    class_code = models.CharField(max_length=30, blank=True)
+    period = models.CharField(max_length=50, blank=True)
+    start = models.CharField(max_length=5, blank=True)
+    end = models.CharField(max_length=5, blank=True)
+    location = models.CharField(max_length=100, blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["publication","day","staff"], condition=models.Q(kind="absence",cancelled_at__isnull=True), name="unique_workforce_absence"),
+            models.UniqueConstraint(fields=["publication","day","class_code","period","start"], condition=models.Q(kind="room",cancelled_at__isnull=True), name="unique_workforce_room"),
+            models.UniqueConstraint(fields=["publication","day"], condition=models.Q(kind="closure",cancelled_at__isnull=True), name="unique_workforce_closure"),
+        ]
+        indexes = [models.Index(fields=["publication","day","kind"],name="workforce_pub_day_kind")]
+
+
+class WorkforceNotice(models.Model):
+    """Private operational inbox, acknowledgement is not delivery confirmation."""
+    recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    publication = models.ForeignKey(ConnectedSchoolPublication, on_delete=models.PROTECT)
+    day = models.DateField()
+    message = models.CharField(max_length=240)
+    created_at = models.DateTimeField(auto_now_add=True)
+    acknowledged_at = models.DateTimeField(null=True, blank=True)
