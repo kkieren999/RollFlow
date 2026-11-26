@@ -4,7 +4,8 @@ from django.db.models import Q
 from .models import StaffProfile
 
 def can_teach(user):
-    if not user.is_authenticated or not user.is_active:
+    from .security_service import eligible_account
+    if not eligible_account(user):
         return False
     enabled = StaffProfile.objects.filter(user_id=user.pk).values_list("teaching_enabled", flat=True).first()
     if enabled is not None:
