@@ -112,13 +112,23 @@ if(!url||!password)throw Error('Disposable protected browser fixture missing');
     await t.goto(url+'/live/teacher/students/');
     await t.getByRole('link',{name:'View student'}).click();
     assert.match(await t.locator('main').innerText(),/Fictional CI water break/);
-    await t.getByRole('link',{name:'Open filtered movement register'}).click();
+    const register=t.getByRole('link',{name:'Open filtered movement register'});
+    const registerHref=await register.getAttribute('href');
+    assert.match(registerHref,/^\/live\/movements\/\?student=\d+&date=/);
+    await Promise.all([t.waitForURL(url+registerHref),register.click()]);
+    assert.match(await t.locator('main').innerText(),/Filtered to a single student/);
+    assert.doesNotMatch(await t.locator('main').innerText(),/BrowserDenied/);
     // Navigation can commit before the deferred enhancement has initialized.
     // Require the actual filter to become visible; do not skip a missing script.
-    await t.locator('#rf-movement-search').waitFor({state:'visible',timeout:10000});
+    await t.locator('#rf-movement-search[data-ready=true]').waitFor({state:'visible',timeout:10000});
+    assert.equal(await t.locator('#rf-movement-query').isEnabled(),true);
+    await t.locator('#rf-movement-query').fill('Fictional CI water break');
+    assert.match(await t.locator('#rf-movement-search-status').innerText(),/1 matching displayed passes/);
+    assert.equal(await t.locator('[data-rf-pass-row]:visible').count(),1);
     assert(await t.locator('#rf-movement-search').isVisible());
     await t.locator('#rf-movement-query').fill('zz-no-match');
     assert.match(await t.locator('#rf-movement-search-status').innerText(),/0 matching displayed passes/);
+    assert.equal(await t.locator('[data-rf-pass-row]:visible').count(),0);
     console.log('Protected installed app: independent sessions, roster isolation, submitted roll and monitor verified.');
   }finally{await browser.close();}
 })().catch(e=>{console.error(e.message);process.exitCode=1;});
