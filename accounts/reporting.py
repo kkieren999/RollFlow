@@ -49,7 +49,8 @@ class Scope:
                     self.staff_ids.add(p.user_id)
         if self.kind=="year":
             # All roster members and the reviewed class year metadata must agree.
-            students={s.pk:s for s in Student.objects.all().only("pk","student_id","year_level","status")}
+            today=timezone.localdate()
+            students={s.pk:s for s in Student.objects.all().only("pk","student_id","year_level","status","enrolled_on","left_on")}
             from .connected_school import canonical
             seen=Counter(c.get("code") for c in pub.snapshot.get("classes",[]))
             for c in pub.snapshot.get("classes",[]):
@@ -57,7 +58,9 @@ class Scope:
                 years=c.get("years",[])
                 if (seen[c.get("code")]==1 and years and all(type(y) is int and y==int(self.value) for y in years)
                     and ids and all(pk in students and students[pk].year_level==int(self.value)
-                        and students[pk].status=="active" and canonical(students[pk].student_id)==pub.snapshot.get("student_identity",{}).get(str(pk)) for pk in ids)):
+                        and students[pk].status=="active" and (not students[pk].enrolled_on or students[pk].enrolled_on<=today)
+                        and (not students[pk].left_on or students[pk].left_on>=today)
+                        and bool(canonical(students[pk].student_id)) and canonical(students[pk].student_id)==pub.snapshot.get("student_identity",{}).get(str(pk)) for pk in ids)):
                     self.classes.add(c["code"])
 
     def keys(self,day):

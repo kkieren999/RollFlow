@@ -55,7 +55,10 @@ def home(request):
     if not (ctx["teaching"] or ctx["monitor"] or ctx["admin_access"] or ctx["modules"] or ctx["report_access"]):
         return HttpResponseForbidden("No assigned workspace.")
     pub = current()
-    return page(request, "live_home.html", ready=publication_ready(pub))
+    from django.conf import settings
+    from .leadership_experience import dashboard
+    leadership=dashboard(request.user) if settings.ROLLFLOW_PROTECTED_WORKSPACE and ctx["report_access"] else None
+    return page(request, "live_home.html", ready=publication_ready(pub),leadership=leadership)
 
 
 def roster_token(students):

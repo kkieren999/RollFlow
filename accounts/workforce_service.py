@@ -71,8 +71,8 @@ def lesson_people(pub,day,row):
 
 
 def coverage(pub,day):
-    from .attendance import lesson_valid,lesson_key
-    if not pub or closed(pub,day):
+    from .attendance import lesson_valid,lesson_key,publication_ready,own_lessons
+    if not publication_ready(pub) or closed(pub,day):
         return []
     absences=set(entries(pub,day,"absence").values_list("staff_id",flat=True))
     relief={(a.class_code,a.period,a.start):a for a in ReliefAttendanceAssignment.objects.filter(publication=pub,
@@ -87,7 +87,40 @@ def coverage(pub,day):
             continue
         a=relief.get(lesson_key(r))
         covered=bool(a and a.expires_at>timezone.now() and a.regular_teacher_id==regular and a.end==r["end"]
-            and a.relief_teacher_id not in absences and personal_codes(pub,a.relief_teacher))
+            and a.relief_teacher_id not in absences and any(lesson_key(x)==lesson_key(r) and x.get("relief")
+                for x in own_lessons(pub,a.relief_teacher,day)))
         rows.append(dict(code=r["code"],period=r["period"],start=r["start"],end=r["end"],
             room=effective_room(pub,day,r),covered=covered,relief=a.relief_teacher.username if covered else ""))
     return rows
+
+
+def relief_candidates(pub,day,row):
+    """Read-only conservative eligibility preview for one exact reviewed lesson.
+
+    The existing locked assignment endpoint remains authoritative. No private
+    absence reasons or guesses about staff availability are returned.
+    """
+    from .attendance import publication_ready,own_lessons,lesson_key,roster_for,AttendanceUnavailable
+    from .connected_school import date_is_school_day
+    from .security_service import eligible_account
+    if not publication_ready(pub) or not date_is_school_day(pub,day) or closed(pub,day):
+        return [],"Review a current published school day."
+    key=lesson_key(row)
+    binding=pub.snapshot.get("bindings",{}).get(row.get("staff"),{})
+    regular=User.objects.filter(pk=binding.get("user")).first()
+    if not regular or not any(lesson_key(r)==key for r in own_lessons(pub,regular,day,ignore_absence=True)):
+        return [],"Original allocation is not uniquely verified or already covered."
+    if lesson_has_records(day,row) or ReliefAttendanceAssignment.objects.filter(publication=pub,
+        lesson_date=day,class_code=key[0],period=key[1],start=key[2],cancelled_at__isnull=True).exists():
+        return [],"Existing roll, movement or assignment requires review."
+    try:roster_for(pub,row["code"],day)
+    except AttendanceUnavailable:return [],"Roster is not ready."
+    result=[]
+    for p in StaffProfile.objects.filter(timetable_link_verified=True,user__is_active=True).select_related("user").order_by("user__username"):
+        u=p.user
+        if u.pk==regular.pk or not eligible_account(u) or not personal_codes(pub,u):
+            continue
+        if absent(pub,day,u) or raw_busy(pub,day,u,row["start"],row["end"]):
+            continue
+        result.append({"pk":u.pk,"name":u.get_full_name() or u.username})
+    return result,"No recorded conflicts in this reviewed timetable; verify suitability before assigning."

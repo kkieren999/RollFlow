@@ -65,7 +65,7 @@ def workspace_context(request):
               *([link("Workforce overview","workforce-board")] if ctx["workforce_monitor"] else []),
               *([link("My workforce & notices","workforce-mine")] if ctx["workforce_self"] else []))
     if ctx["report_access"]:
-        group("REPORTING","Reports","chart",link("Leadership reports","leadership-reports"))
+        group("REPORTING","Reports","chart",link("Leadership overview","leadership-overview"),link("Leadership reports","leadership-reports"))
     if admin:
         group("SYSTEM","Account Management","shield",link("Roles & permissions","school-access-manage"),link("Role templates","security-templates"),
               link("Access review","security-history",aliases=("/manage/security/effective/",)))

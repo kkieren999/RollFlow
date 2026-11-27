@@ -155,8 +155,17 @@ def relief(request):
                     return HttpResponseBadRequest("Unknown action.")
         except (ValueError,IntegrityError) as exc:
             error=str(exc) if isinstance(exc,ValueError) else "Concurrent assignment changed; review again."
+    from .workforce_service import relief_candidates
+    selected=request.GET.get("lesson","")
+    candidates=[]
+    candidate_note=""
+    if selected:
+        row=form.rows.get(selected)
+        if row is None:return HttpResponseBadRequest("Choose an exact reviewed lesson.")
+        candidates,candidate_note=relief_candidates(pub,day,row)
     assignments=ReliefAttendanceAssignment.objects.filter(lesson_date=day).select_related("regular_teacher","relief_teacher").order_by("start","pk")
-    return render(request,"attendance_relief.html",{"form":form,"publication":pub,"day":day,"assignments":assignments,"error":error})
+    return render(request,"attendance_relief.html",{"form":form,"publication":pub,"day":day,"assignments":assignments,"error":error,
+        "selected":selected,"candidates":candidates,"candidate_note":candidate_note,"lesson_choices":form.fields["lesson"].choices})
 
 
 @administrator

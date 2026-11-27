@@ -37,7 +37,7 @@ class StudentMovementDayTests(TestCase):
     def test_changed_identity_is_not_disclosed_and_outside_interval(self):
         m=test_movements.MovementTests.make_pass(self)
         url=f"/live/movements/{m.pk}/day/"
-        StudentMovement.objects.filter(pk=m.pk).update(departed_at=self.now+timedelta(hours=2))
+        StudentMovement.objects.filter(pk=m.pk).update(departed_at=self.now+timedelta(hours=2),due_at=self.now+timedelta(hours=2,minutes=15))
         self.assertContains(self.client.get(url),"Outside recorded lesson interval")
         self.student.student_id="CHANGED"
         self.student.save(update_fields=["student_id"])
