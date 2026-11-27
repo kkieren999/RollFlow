@@ -41,6 +41,7 @@ TEMPLATES = [{
         "django.template.context_processors.request",
         "django.contrib.auth.context_processors.auth",
         "django.contrib.messages.context_processors.messages",
+        "accounts.workspace_ui.workspace_context",
     ]},
 }]
 if os.environ.get("ROLLFLOW_DB_NAME"):

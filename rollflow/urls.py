@@ -8,7 +8,10 @@ from accounts.school_access_views import workspace, manage_access
 
 from accounts import live_views, security_views, movement_views, workforce_views, classroom_views, report_views
 
+from accounts import ui_views
+
 urlpatterns = [
+    path('account/theme/', ui_views.theme, name='ui-theme'),
     path('live/reports/', report_views.reports, name='leadership-reports'),
     path('live/classroom/', classroom_views.classroom, name='classroom-tools'),
     path('live/support/', classroom_views.board, name='support-board'),
