@@ -220,6 +220,13 @@ jobs:
         shell: pwsh
         run: |
           $bundle = "$env:RUNNER_TEMP/rf-installed-LocalLab"
+          # Each Actions step gets a fresh shell. The installed test lives
+          # outside the checkout, so explicitly expose the CI-only dependency.
+          $env:NODE_PATH = Join-Path $env:GITHUB_WORKSPACE 'node_modules'
+          if (!(Test-Path (Join-Path $env:NODE_PATH 'playwright-core/package.json'))) { throw 'Playwright CI dependency missing' }
+          $testScript = Join-Path $bundle 'app/deployment/protected_browser_smoke.cjs'
+          node -e "console.log(require('node:module').createRequire(process.argv[1]).resolve('playwright-core'))" $testScript
+          if ($LASTEXITCODE -ne 0) { throw 'Installed protected browser test cannot resolve Playwright' }
           & "$bundle/python/python.exe" -m deployment.protected_browser_server --state "$env:RUNNER_TEMP/rf-restored"
           if ($LASTEXITCODE -ne 0) { throw 'Protected multi-session browser smoke failed' }
       - name: Generate release candidate readiness evidence
