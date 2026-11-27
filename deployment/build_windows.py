@@ -18,6 +18,7 @@ def main():
     p.add_argument("--postgres-runtime", required=True, type=Path,
                    help="Extracted Windows x64 PostgreSQL binary distribution (bin/lib/share)")
     p.add_argument("--output", required=True, type=Path)
+    p.add_argument("--client-output", type=Path, help="Separate lightweight staff workstation bundle")
     args = p.parse_args()
     if sys.platform != "win32" or sys.version_info[:2] != (3, 14) or struct.calcsize("P") != 8:
         p.error("Build using Windows x64 CPython 3.14.")
@@ -28,6 +29,8 @@ def main():
         p.error("Expected official CPython 3.14 embeddable runtime.")
     if not all((args.postgres_runtime / name).is_dir() for name in ("bin", "lib", "share")):
         p.error("Expected PostgreSQL binary distribution.")
+    if args.client_output and (args.client_output.resolve().exists() or args.client_output.resolve().is_relative_to(out)):
+        p.error("Client output must be a new separate directory.")
     out.mkdir(parents=True)
     shutil.copytree(args.python_runtime, out / "python")
     shutil.copytree(args.postgres_runtime, out / "postgres")
@@ -58,7 +61,7 @@ def main():
         from windows_launchers import write_launchers
     write_launchers(out)
     (out / "BUILD-INFO.json").write_text(json.dumps({
-        "version": "4.6.0-staging",
+        "version": "4.7.0-staging",
         "source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
         "website_commit": (app / "training" / "SOURCE_COMMIT.txt").read_text().strip(),
         "website_mode": "exact offline public workspace; fictional data only",
@@ -66,7 +69,7 @@ def main():
         "channel": "unsigned staging"
     }, indent=2) + "\n", encoding="utf-8")
     (out / "READ FIRST.txt").write_text(
-        "ROLLFLOW 4.6 - SCHOOL MANAGEMENT SYSTEM (STAGING)\n"
+        "ROLLFLOW 4.7 - SCHOOL MANAGEMENT SYSTEM (STAGING)\n"
         "Extract the entire package to a new local folder before running it.\n"
         "Start RollFlow.cmd opens the protected database workspace menu.\n"
         "Open Training Demo.cmd opens the separate fictional offline website without database setup.\n"
@@ -77,15 +80,26 @@ def main():
         "then Start Existing Protected.cmd. Never initialise or delete an existing instance.\n"
         "Existing school staging data and the fresh database are not shared.\n"
         "Protected mode is not yet feature-equivalent to the public training workspace.\n"
-        "See app/deployment/README.md and app/docs/v4.6-reporting.md. No real school data in staging.\n",
+        "See app/deployment/README.md and app/docs/v4.7-installer.md. No real school data in staging.\n",
         encoding="utf-8")
-    manifest = []
-    for path in sorted(out.rglob("*")):
-        if path.is_file():
-            with path.open("rb") as f:
-                digest = hashlib.file_digest(f, "sha256").hexdigest()
-            manifest.append(digest + "  " + path.relative_to(out).as_posix())
-    (out / "SHA256SUMS.txt").write_text("\n".join(manifest) + "\n", encoding="utf-8")
+    (out / "Verify Package.cmd").write_text('@echo off\n"%~dp0python\\python.exe" -B -m deployment.bundle_integrity "%~dp0."\npause\n',encoding="ascii")
+    if __package__:
+        from .bundle_integrity import manifest
+    else:
+        from bundle_integrity import manifest
+    manifest(out)
+    if args.client_output:
+        client=args.client_output.resolve()
+        client.mkdir()
+        shutil.copytree(args.python_runtime,client/"python")
+        for name in ("workstation.py","bundle_integrity.py"):
+            shutil.copyfile(ROOT/"deployment"/name,client/name)
+        for name,cmd in (("Configure School Server.cmd","configure"),("Open School Server.cmd","open"),("School Connection Diagnostics.cmd","diagnose")):
+            (client/name).write_text('@echo off\n"%~dp0python\\python.exe" -B "%~dp0workstation.py" '+cmd+'\nif errorlevel 1 pause\n'+('pause\n' if cmd!="open" else ''),encoding="ascii")
+        (client/"BUILD-INFO.json").write_text(json.dumps({"version":"4.7.0-staging","channel":"unsigned staging","source_commit":subprocess.check_output(["git","rev-parse","HEAD"],cwd=ROOT,text=True).strip(),"mode":"HTTPS browser launcher only"},indent=2),encoding="utf-8")
+        (client/"READ FIRST.txt").write_text("Configure the exact school ICT-approved HTTPS server. No database, credentials or student records are stored by the launcher. Use your browser to sign in. Unsigned staging; no real records.\n",encoding="utf-8")
+        manifest(client)
+
 
 if __name__ == "__main__":
     main()

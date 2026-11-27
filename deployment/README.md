@@ -1,3 +1,7 @@
+# V4.7 Windows installer staging
+
+See [V4.7 installation and recovery](../docs/v4.7-installer.md). Versioned per-user installers; no automatic database upgrade, no school data. Use the workstation-only package for the approved HTTPS server, not a separate database on every PC.
+
 # V4.6 leadership reporting staging
 
 See [V4.6 notes](../docs/v4.6-reporting.md). Explicit report and export grants required. Existing state paths unchanged; fictional data only.
