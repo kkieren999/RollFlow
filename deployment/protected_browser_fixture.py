@@ -61,6 +61,10 @@ def seed():
             faculty="English" if key=="hod" else "")
         StaffAccessGrant.objects.create(user=u,role=role,scope=scope,scope_value=value,capabilities=caps,granted_by=admin)
 
+    from accounts.models import MovementDestination
+    MovementDestination.objects.create(name="Fictional CI water break",expected_minutes=10,
+        requires_reception=False,created_by=admin)
+
 def reset_test_login_windows():
     # All synthetic browser accounts share the CI runner's loopback IP.
     # Reset only within the explicitly named disposable CI restore; never

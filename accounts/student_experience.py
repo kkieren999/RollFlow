@@ -3,7 +3,6 @@ from collections import defaultdict
 from datetime import date,timedelta
 from django.utils import timezone
 from .movement_service import visible,identity_matches
-from .movement_views import projection
 
 
 def movement_day(user,anchor,day,now=None):
@@ -12,6 +11,7 @@ def movement_day(user,anchor,day,now=None):
     Group by the recorded lesson interval, not a guessed period grid. An open
     pass can span periods or midnight; do not infer a student's location.
     """
+    from .movement_views import projection
     now=now or timezone.now()
     grouped=defaultdict(list)
     # Match original published student identity on each pass; do not join

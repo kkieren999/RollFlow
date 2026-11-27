@@ -95,6 +95,8 @@ def issue(request):
         return redirect("teacher-login")
     if not eligible_account(request.user) or not can_teach(request.user):
         return HttpResponseForbidden("Verified teaching access required.")
+    if request.GET.get("date") and request.GET["date"]!=timezone.localdate().isoformat():
+        return HttpResponseBadRequest("Movement passes require the current verified lesson.")
     key=tuple(request.GET.get(k,"") for k in ("code","period","start"))
     if not all(key):
         return HttpResponseBadRequest("Select a current lesson from My day.")

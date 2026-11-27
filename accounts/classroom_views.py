@@ -47,6 +47,8 @@ def classroom(request):
         return redirect("teacher-login")
     if not eligible_account(request.user) or not can_teach(request.user):
         return HttpResponseForbidden("Teaching access required.")
+    if request.GET.get('date') and request.GET['date']!=timezone.localdate().isoformat():
+        return HttpResponseBadRequest('Classroom actions require today’s verified lesson.')
     key=key_from(request)
     if not all(key):return HttpResponseBadRequest("Select a verified lesson.")
     try:

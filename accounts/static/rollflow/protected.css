@@ -166,3 +166,5 @@ body:has(.rf-protected-shell) main .rf-seat{display:flex;flex-direction:column;a
 .rf-movement-row p{margin:4px 0;font-size:12px;color:var(--rf-muted)}
 #rf-seat-editor[hidden],#rf-class-action-picker[hidden],.rf-class-action-forms form[hidden]{display:none!important}
 @media(max-width:600px){.rf-seat-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
+.rf-wiz-steps{display:flex;gap:8px;list-style:none;padding:0;flex-wrap:wrap}.rf-wiz-steps li{padding:8px 12px;border:1px solid var(--rf-border);border-radius:8px;background:var(--rf-context)}.rf-wiz-steps li[aria-current=step]{background:var(--rf-action);color:white}.rf-wiz-steps li[data-complete=true]{background:var(--rf-success-bg);color:var(--rf-success-text)}[data-rf-pass-row][hidden],#rf-movement-search[hidden]{display:none!important}

@@ -74,7 +74,7 @@ async function run(){
       assert.equal(await p.locator('[data-rf-shell=protected]').getAttribute('data-theme'),'dark');
       await p.reload();assert.equal(await p.locator('[data-rf-shell=protected]').getAttribute('data-theme'),'dark');
       await p.screenshot({path:path.join(target,'teacher-protected-dark.png'),animations:'disabled'});
-      for(const [label,route] of [['week','/teacher/week/'],['master','/live/teacher/master/'],['classes','/live/teacher/classes/'],['class-detail','/live/teacher/classes/BROWSER7/'],['students','/live/teacher/students/'],['roll','/live/roll/?code=BROWSER7&period=P1&start=00%3A00']]){
+      for(const [label,route] of [['week','/teacher/week/'],['master','/live/teacher/master/'],['classes','/live/teacher/classes/'],['class-detail','/live/teacher/classes/BROWSER7/'],['students','/live/teacher/students/'],['roll','/live/roll/?code=BROWSER7&period=P1&start=00%3A00'],['classroom','/live/classroom/?code=BROWSER7&period=P1&start=00%3A00'],['support','/live/support/'],['movements','/live/movements/']]){
         const res=await p.goto(url+route);assert.equal(res.status(),200,'RC2.2 '+label);
         assert.doesNotMatch(await p.locator('main').innerText(),/BrowserDenied|BROWSER8/);
         await p.screenshot({path:path.join(target,'teacher-'+label+'-protected-dark.png'),animations:'disabled'});
@@ -90,7 +90,7 @@ async function run(){
   const combined=[...prior,...evidence];
   assert.equal(new Set(combined.map(x=>x.account)).size,combined.length,'Duplicate evidence account');
   if(batch===2)assert.deepEqual(combined.map(x=>x.account).sort(),Object.keys(mapping).sort(),'All 13 reference accounts captured');
-  fs.writeFileSync(outfile,JSON.stringify({websiteCommit:fs.readFileSync(path.join(root,'SOURCE_COMMIT.txt'),'utf8').trim(),scope:'RC2.2 shell and protected teacher workflows; differences are open, not approval',accounts:combined},null,2));
+  fs.writeFileSync(outfile,JSON.stringify({websiteCommit:fs.readFileSync(path.join(root,'SOURCE_COMMIT.txt'),'utf8').trim(),scope:'RC2.3 shell, teacher and student workflows; differences are open, not approval',accounts:combined},null,2));
  }finally{if(browser)await browser.close();ref.close()}
 }
 run().catch(e=>{console.error(e.stack);process.exitCode=1});
