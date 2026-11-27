@@ -86,7 +86,11 @@ def restore(snapshot_path,state,pg_bin,db_port,web_port):
         raise ValueError("Snapshot dump missing.")
     with (snap/"rollflow.dump").open("rb") as stream:
         if stream.read(5)!=b"PGDMP":raise ValueError("Invalid PostgreSQL dump.")
-    init(SimpleNamespace(mode="staging",host=None,pg_bin=pg_bin,db_port=db_port,web_port=web_port,no_admin=True),state)
+    # Reject structurally unreadable dumps before creating destination state.
+    from .native import BUNDLE,EXE
+    runtime=(pg_bin or BUNDLE/"postgres"/"bin").resolve()
+    run([runtime/("pg_restore"+EXE),"--list",snap/"rollflow.dump"],stdout=subprocess.DEVNULL)
+    init(SimpleNamespace(mode="staging",host=None,pg_bin=runtime,db_port=db_port,web_port=web_port,no_admin=True),state)
     from .native import load
     cfg=load(state)
     marker=state/"recovery-required.lock"
