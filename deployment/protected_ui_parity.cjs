@@ -20,9 +20,12 @@ async function run(){
  await new Promise((resolve,reject)=>{ref.once('error',reject);ref.listen(0,'127.0.0.1',resolve)});
  const refurl='http://127.0.0.1:'+ref.address().port;
  let browser;const evidence=[];
+ const selected=(process.env.RF_UI_ACCOUNT_IDS||'').split(',').filter(Boolean);
+ const batch=Number(process.env.RF_UI_BATCH);
+ if(!selected.length||selected.some(id=>!Object.hasOwn(mapping,id))||!Number.isInteger(batch)||batch<0||batch>2)throw Error('Invalid isolated browser test batch');
  try{
   browser=await chromium.launch({channel:'chrome',headless:true});
-  for(const [id,login] of Object.entries(mapping)){
+  for(const [id,login] of Object.entries(mapping).filter(([id])=>selected.includes(id))){
    const rctx=await browser.newContext({viewport:{width:1440,height:900}}),ctx=await browser.newContext({viewport:{width:1440,height:900}});
    try{
     const rp=await rctx.newPage(),p=await ctx.newPage(),errors=[],external=[];
@@ -77,7 +80,12 @@ async function run(){
     console.log('Protected/reference UI captured:',id);
    }finally{await rctx.close();await ctx.close()}
   }
-  fs.writeFileSync(path.join(target,'navigation-differences.json'),JSON.stringify({websiteCommit:fs.readFileSync(path.join(root,'SOURCE_COMMIT.txt'),'utf8').trim(),scope:'RC2.1 shell only; differences are open, not approval',accounts:evidence},null,2));
+  const outfile=path.join(target,'navigation-differences.json');
+  const prior=batch===0?[]:JSON.parse(fs.readFileSync(outfile,'utf8')).accounts;
+  const combined=[...prior,...evidence];
+  assert.equal(new Set(combined.map(x=>x.account)).size,combined.length,'Duplicate evidence account');
+  if(batch===2)assert.deepEqual(combined.map(x=>x.account).sort(),Object.keys(mapping).sort(),'All 13 reference accounts captured');
+  fs.writeFileSync(outfile,JSON.stringify({websiteCommit:fs.readFileSync(path.join(root,'SOURCE_COMMIT.txt'),'utf8').trim(),scope:'RC2.1 shell only; differences are open, not approval',accounts:combined},null,2));
  }finally{if(browser)await browser.close();ref.close()}
 }
 run().catch(e=>{console.error(e.stack);process.exitCode=1});

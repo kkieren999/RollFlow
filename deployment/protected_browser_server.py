@@ -29,8 +29,14 @@ def main():
             else:raise RuntimeError("Protected server did not become ready.")
             subprocess.run(["node",str(ROOT/"deployment"/"protected_browser_smoke.cjs")],cwd=ROOT,
                 env={**os.environ,"RF_PROTECTED_BROWSER_URL":url},check=True,timeout=120)
-            subprocess.run(["node",str(ROOT/"deployment"/"protected_ui_parity.cjs")],cwd=ROOT,
-                env={**os.environ,"RF_PROTECTED_BROWSER_URL":url},check=True,timeout=300)
+            # Keep each batch below the shared-IP login limit. The guarded
+            # reset is available only in this synthetic restore fixture.
+            batches=("admin,principal,deputy,hod,ylc","business,office,teacher,swilliams","learning,aide,relief,guidance")
+            for index,batch in enumerate(batches):
+                manage(cfg,"shell","-c","from deployment.protected_browser_fixture import reset_test_login_windows; reset_test_login_windows()")
+                subprocess.run(["node",str(ROOT/"deployment"/"protected_ui_parity.cjs")],cwd=ROOT,
+                    env={**os.environ,"RF_PROTECTED_BROWSER_URL":url,"RF_UI_ACCOUNT_IDS":batch,
+                         "RF_UI_BATCH":str(index)},check=True,timeout=180)
         finally:
             child.terminate()
             child.wait(timeout=15)

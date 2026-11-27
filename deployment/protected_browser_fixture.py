@@ -60,3 +60,14 @@ def seed():
         StaffProfile.objects.create(user=u,staff_id="BROWSER_"+key.upper(),teaching_enabled=teaches,
             faculty="English" if key=="hod" else "")
         StaffAccessGrant.objects.create(user=u,role=role,scope=scope,scope_value=value,capabilities=caps,granted_by=admin)
+
+def reset_test_login_windows():
+    # All synthetic browser accounts share the CI runner's loopback IP.
+    # Reset only within the explicitly named disposable CI restore; never
+    # alter the normal application's throttling or a school database.
+    state=Path(settings.ROLLFLOW_ARCHIVE_STATE_DIR)
+    if (settings.ROLLFLOW_SCHOOL_MODE or state.name!="rf-restored"
+        or os.environ.get("RF_PROTECTED_BROWSER_FIXTURE")!="yes"):
+        raise RuntimeError("Refusing to reset login windows outside the disposable fixture.")
+    from accounts.models import LoginWindow
+    LoginWindow.objects.all().delete()
