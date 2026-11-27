@@ -13,7 +13,10 @@ def workspace_context(request):
     result={"rf_ui_enabled":True}
     if not eligible_account(request.user):
         return result
-    ctx=shell(request.user)
+    # Only live_views.page sets this request-local value during rendering.
+    # Other templates independently compute their presentation context.
+    ctx=getattr(request,"_rf_render_shell",None)
+    if ctx is None:ctx=shell(request.user)
     if not (ctx["teaching"] or ctx["admin_access"] or ctx["grants"]):
         return result
     path=request.path
