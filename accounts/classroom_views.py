@@ -60,7 +60,7 @@ def classroom(request):
                 raw=request.POST.get("recipient","")
                 if raw.isascii() and raw.isdecimal() and len(raw)<=18:
                     ids.append(int(raw))
-                locked={u.pk:u for u in User.objects.select_for_update().filter(pk__in=ids).order_by("pk")}
+                locked={u.pk:u for u in User.objects.select_for_update(no_key=True).filter(pk__in=ids).order_by("pk")}
                 actor=locked[actor.pk]
                 list(StaffAccessGrant.objects.select_for_update().filter(user_id__in=ids).order_by('pk'))
                 lock_sources()
@@ -184,7 +184,7 @@ def change(request,kind,pk):
             ids=[request.user.pk]
             raw=request.POST.get("recipient","")
             if raw.isascii() and raw.isdecimal() and len(raw)<=18:ids.append(int(raw))
-            users={u.pk:u for u in User.objects.select_for_update().filter(pk__in=ids).order_by("pk")}
+            users={u.pk:u for u in User.objects.select_for_update(no_key=True).filter(pk__in=ids).order_by("pk")}
             actor=users[request.user.pk]
             list(StaffAccessGrant.objects.select_for_update().filter(user_id__in=ids).order_by("pk"))
             if not board_allowed(actor):return HttpResponseForbidden("Support access revoked.")
