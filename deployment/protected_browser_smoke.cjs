@@ -113,6 +113,9 @@ if(!url||!password)throw Error('Disposable protected browser fixture missing');
     await t.getByRole('link',{name:'View student'}).click();
     assert.match(await t.locator('main').innerText(),/Fictional CI water break/);
     await t.getByRole('link',{name:'Open filtered movement register'}).click();
+    // Navigation can commit before the deferred enhancement has initialized.
+    // Require the actual filter to become visible; do not skip a missing script.
+    await t.locator('#rf-movement-search').waitFor({state:'visible',timeout:10000});
     assert(await t.locator('#rf-movement-search').isVisible());
     await t.locator('#rf-movement-query').fill('zz-no-match');
     assert.match(await t.locator('#rf-movement-search-status').innerText(),/0 matching displayed passes/);
