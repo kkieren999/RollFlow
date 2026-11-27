@@ -115,3 +115,51 @@ class ConcurrentReliabilityTests(TransactionTestCase):
         self.assertIn(result[0],(302,403,409))
         self.assertIn(result[1],(200,302,409))
         self.assertNotEqual(AttendanceRoll.objects.exists(),WorkforceEntry.objects.filter(kind="closure").exists())
+        if result[1]==302:
+            self.assertTrue(WorkforceNotice.objects.filter(recipient=self.teacher).exists())
+            self.assertFalse(AttendanceRevision.objects.exists())
+        else:
+            self.assertEqual(AttendanceRevision.objects.count(),1)
+            self.assertFalse(WorkforceNotice.objects.exists())
+
+
+    def test_account_lock_allows_foreign_key_reference_without_releasing_writer_lock(self):
+        """Deterministic reproduction of closure's notice FK while attendance owns user lock."""
+        from django.contrib.auth.models import User
+        from django.db import transaction, DatabaseError
+        from threading import Event
+        held=Event()
+        referenced=Event()
+        def hold_account():
+            close_old_connections()
+            try:
+                with transaction.atomic():
+                    User.objects.select_for_update(no_key=True).get(pk=self.teacher.pk)
+                    held.set()
+                    if not referenced.wait(10):
+                        raise AssertionError("Notice insertion blocked on account writer lock")
+            finally:
+                connections.close_all()
+        def reference_account():
+            close_old_connections()
+            try:
+                if not held.wait(10):
+                    raise AssertionError("Account writer lock was not acquired")
+                with connections["default"].cursor() as cursor:
+                    cursor.execute("SET lock_timeout = '3s'")
+                with transaction.atomic():
+                    WorkforceNotice.objects.create(recipient_id=self.teacher.pk,publication_id=self.pub.pk,
+                        day=self.day,message="Synthetic FK concurrency check")
+                # The same lock still excludes competing account mutation.
+                with self.assertRaises(DatabaseError):
+                    with transaction.atomic():
+                        User.objects.select_for_update(nowait=True,no_key=True).get(pk=self.teacher.pk)
+            finally:
+                referenced.set()
+                connections.close_all()
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            first=executor.submit(hold_account)
+            second=executor.submit(reference_account)
+            second.result(timeout=20)
+            first.result(timeout=20)
+        self.assertEqual(WorkforceNotice.objects.filter(message="Synthetic FK concurrency check").count(),1)
