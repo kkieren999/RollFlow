@@ -199,3 +199,4 @@ header.rf-appbar{
 [hidden]{display:none!important}
 
 </style>
+{% if rf_ui_enabled %}{% load static %}<link rel="stylesheet" href="{% static 'rollflow/protected.css' %}"><script src="{% static 'rollflow/protected.js' %}" defer></script>{% endif %}

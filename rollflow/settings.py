@@ -29,6 +29,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "rollflow.protected_session.ProtectedSessionMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -40,6 +41,7 @@ TEMPLATES = [{
         "django.template.context_processors.request",
         "django.contrib.auth.context_processors.auth",
         "django.contrib.messages.context_processors.messages",
+        "accounts.workspace_ui.workspace_context",
     ]},
 }]
 if os.environ.get("ROLLFLOW_DB_NAME"):
@@ -118,3 +120,6 @@ if ROLLFLOW_SCHOOL_MODE:
     FILE_UPLOAD_TEMP_DIR = str(Path(os.environ["ROLLFLOW_DATA_DIR"]) / "uploads")
     Path(FILE_UPLOAD_TEMP_DIR).mkdir(parents=True, exist_ok=True)
     # Apply HSTS to this host only; ICT owns policy for its parent domain.
+
+# Protected native and school installs never serve the fictional legacy teacher shell.
+ROLLFLOW_PROTECTED_WORKSPACE = ROLLFLOW_SCHOOL_MODE or os.environ.get("ROLLFLOW_PROTECTED_WORKSPACE") == "1"
