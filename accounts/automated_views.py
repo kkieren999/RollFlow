@@ -76,7 +76,7 @@ def setup(request):
                     for code in sorted(selected):
                         item=by_code[code]
                         pending=PendingTeacherSetup.objects.select_for_update().get(staff_code=code)
-                        user=User.objects.select_for_update().get(pk=pending.user_id)
+                        user=User.objects.select_for_update(no_key=True).get(pk=pending.user_id)
                         profile=StaffProfile.objects.select_for_update().get(user=user)
                         staff_id=canonical(request.POST.get("id_"+code))
                         if (not re.fullmatch(r"[A-Z0-9_-]{1,40}",staff_id)

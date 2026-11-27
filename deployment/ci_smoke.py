@@ -31,7 +31,7 @@ def main():
                                  autocommit=True) as conn:
                 conn.execute("ALTER ROLE rollflow_app CREATEDB")
                 try:
-                    call("manage.py", "test", "accounts", env=config_env(cfg))
+                    call("manage.py", "test", "accounts", env={**config_env(cfg), "ROLLFLOW_PROTECTED_WORKSPACE": "0"})
                 finally:
                     conn.execute("ALTER ROLE rollflow_app NOCREATEDB")
                 assert conn.execute("SELECT rolsuper, rolcreatedb, rolcreaterole FROM pg_roles WHERE rolname = 'rollflow_app'").fetchone() == (False, False, False)
@@ -40,7 +40,7 @@ def main():
             env.update(DJANGO_SUPERUSER_USERNAME="ci_local_admin", DJANGO_SUPERUSER_EMAIL="ci@example.invalid",
                        DJANGO_SUPERUSER_PASSWORD=secrets.token_urlsafe(32))
             call("manage.py", "createsuperuser", "--noinput", env=env)
-            call("manage.py", "shell", "-c", "import os; from django.test import Client; from django.contrib.auth import get_user_model; from django.contrib.auth.hashers import identify_hasher; u=get_user_model().objects.get(username='ci_local_admin'); assert identify_hasher(u.password).algorithm == 'argon2'; assert Client().login(username=u.username,password=os.environ['DJANGO_SUPERUSER_PASSWORD']); print('Local hashed accounts verified')", env=env)
+            call("manage.py", "shell", "-c", "import os; from django.test import Client; from django.contrib.auth import get_user_model; from django.contrib.auth.hashers import identify_hasher; u=get_user_model().objects.get(username='ci_local_admin'); assert identify_hasher(u.password).algorithm == 'argon2'; assert Client().login(username=u.username,password=os.environ['DJANGO_SUPERUSER_PASSWORD']); c=Client(HTTP_HOST='localhost'); assert c.login(username=u.username,password=os.environ['DJANGO_SUPERUSER_PASSWORD']); response=c.get('/'); assert response.status_code == 302, response.status_code; assert response['Location'] == '/live/'; assert c.get('/live/').status_code == 200; print('Local hashed accounts and protected workspace verified')", env=env)
             child = subprocess.Popen([sys.executable, "-m", "deployment.serve_instance", str(state)],
                                      cwd=ROOT, env=config_env(cfg))
             try:
@@ -65,6 +65,10 @@ def main():
             call("manage.py", "shell", "-c",
                  "from django.test import Client; r=Client().get('/login/', secure=True, HTTP_HOST='rollflow.school.example'); assert r.status_code==200; assert 'connect-src' in r['Content-Security-Policy']; assert Client().get('/login/', HTTP_HOST='rollflow.school.example').status_code == 301; print('School security smoke passed')",
                  env=env)
+            # The production server must refuse to launch despite valid-looking school settings.
+            denied=subprocess.run([sys.executable,"-c","import rollflow.wsgi"],cwd=ROOT,env=env,
+                                  capture_output=True,text=True)
+            assert denied.returncode!=0 and "school mode blocked" in denied.stderr
             env["ROLLFLOW_DEBUG"] = "1"
             bad = subprocess.run([sys.executable, "manage.py", "check"], cwd=ROOT, env=env,
                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -76,7 +80,17 @@ def main():
         call("-m", "deployment.native", "--state", state, "manage", "migrate", "--check")
         call("-m", "deployment.native", "--state", state, "manage", "shell", "-c",
              "from django.contrib.auth import get_user_model; assert get_user_model().objects.filter(username='ci_local_admin',is_superuser=True).exists()")
-        print("Native PostgreSQL initialization, restart, backup and HTTP smoke passed")
+        call("-m","deployment.native","--state",state,"manage","shell","-c","from deployment.rc28_recovery_fixture import seed; seed()")
+        snapshot=Path(tmp)/"snapshot"
+        call("-m","deployment.native","--state",state,"snapshot",snapshot)
+        restored=Path(tmp)/"restored"
+        call("-m","deployment.native","--state",restored,"restore-staging",snapshot,
+             "--pg-bin",pg_bin,"--db-port","55433","--web-port","18081")
+        call("-m","deployment.native","--state",restored,"manage","shell","-c",
+             "from django.contrib.auth import get_user_model; assert get_user_model().objects.filter(username='ci_local_admin',is_superuser=True).exists()")
+        call("-m","deployment.native","--state",restored,"manage","shell","-c","from deployment.rc28_recovery_fixture import verify; verify(restored=True)")
+        call("-m","deployment.native","--state",state,"manage","shell","-c","from deployment.rc28_recovery_fixture import verify; verify(restored=False)")
+        print("Native PostgreSQL initialization, restart, backup, isolated restore and HTTP smoke passed")
 
 if __name__ == "__main__":
     main()
