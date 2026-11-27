@@ -1,0 +1,7 @@
+<nav class="rf-student-tabs" aria-label="Current lesson workflows">
+<a href="{{ lesson_links.schedule }}">Daily Schedule</a>
+<a href="{{ lesson_links.class }}">Class details</a>
+<a href="{{ lesson_links.roll }}" {% if lesson_active == "roll" %}aria-current="page"{% endif %}>Attendance</a>
+<a href="{{ lesson_links.classroom }}" {% if lesson_active == "classroom" %}aria-current="page"{% endif %}>Classroom tools</a>
+{% if lesson_links.movement %}<a href="{{ lesson_links.movement }}" {% if lesson_active == "movement" %}aria-current="page"{% endif %}>Issue movement pass</a>{% endif %}
+</nav><p class="muted">Lesson access is rechecked on every action. Save changes before switching modules.</p>
