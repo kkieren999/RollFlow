@@ -7,5 +7,5 @@
 <main id="main-content" class="rf-page" style="max-width:760px">
 <section class="panel"><h1>No timetable published</h1>
 <p class="rf-page-intro">Your administrator has not published a timetable for your account. Contact your school timetable administrator.</p>
-<p class="note">Timetable views are read-only. Live attendance is not enabled.</p>
+<p class="note">{% if rf_shell %}Attendance requires complete reviewed dated school data. Return to your <a href="{% url 'live-day' %}">daily schedule</a> to check readiness.{% else %}Timetable views are read-only. Live attendance is not enabled.{% endif %}</p>
 </section></main></body></html>

@@ -1,3 +1,47 @@
+# V5.0 RC1 — production launch preparation
+
+See [V5.0 release candidate](../docs/v5.0-release-candidate.md). School startup is deliberately blocked. Use fictional local staging only; no real data or public deployment.
+
+# V4.7 Windows installer staging
+
+See [V4.7 installation and recovery](../docs/v4.7-installer.md). Versioned per-user installers; no automatic database upgrade, no school data. Use the workstation-only package for the approved HTTPS server, not a separate database on every PC.
+
+# V4.6 leadership reporting staging
+
+See [V4.6 notes](../docs/v4.6-reporting.md). Explicit report and export grants required. Existing state paths unchanged; fictional data only.
+
+# V4.5 classroom and student support staging
+
+See [V4.5 notes](../docs/v4.5-classroom-support.md). Existing state paths unchanged. Fictional data only.
+
+# V4.4 workforce staging
+
+See [V4.4 notes](../docs/v4.4-workforce.md). Use protected Workforce & supervision, review publication and choose date. Existing database paths unchanged. Fictional data only.
+
+# V4.3 movement staging
+
+See [V4.3 notes](../docs/v4.3-movements.md). Configure approved destinations, grant specific reception access, issue passes from a current class. Existing database paths unchanged. Fictional data only.
+
+# V4.2 live attendance staging
+
+See [V4.2 notes](../docs/v4.2-attendance.md). Existing database state paths unchanged. Fictional staging only.
+
+# V4.1 school data staging
+
+See [V4.1 notes](../docs/v4.1-school-data.md). Use the protected School data centre to review source imports and publication history. Existing database paths remain unchanged. No real school data in staging.
+
+# V4.0 security foundation staging
+
+See [V4.0 notes](../docs/v4.0-security.md). Account changes and role templates are managed through the protected workspace. All prior instructions are historical; existing instance state paths remain unchanged.
+
+# V3.9 protected foundation staging
+
+Start RollFlow.cmd now opens the protected database menu. Open Training Demo.cmd opens only fictional public website data. See [V3.9 notes](../docs/v3.9-live-foundation.md). Prior version instructions below are historical.
+
+# V3.8 Windows package — start here
+
+**Start RollFlow.cmd** opens the complete bundled website offline using fictional data. **Protected Workspace.cmd** opens a menu for fresh database-backed staging or backup-first upgrade of the existing database. See [V3.8 rebuild notes](../docs/v3.8-windows-rebuild.md). Old instructions below refer to earlier packages and their original shortcuts. Never use real records in staging.
+
 ## Authoritative school data (V3.7.0 staging)
 
 1. In the private server, use the OneSchool timetable CSV import and publish the complete dated export.
