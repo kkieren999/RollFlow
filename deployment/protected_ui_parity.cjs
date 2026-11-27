@@ -15,7 +15,7 @@ const ref=http.createServer((req,res)=>{
  res.writeHead(200,{'Content-Type':file.endsWith('.css')?'text/css':'text/html; charset=utf-8'});res.end(fs.readFileSync(path.join(root,file)));
 });
 const mapping={admin:'admin',principal:'principal',deputy:'deputy',hod:'hod',ylc:'ylc',business:'business',office:'office',teacher:'teacher',swilliams:'other',learning:'learning',aide:'aide',relief:'relief',guidance:'guidance'};
-const expected={admin:['Staff Management','Student Management','Account Management','OneSchool Import Centre'],principal:['Student Search','Attendance Overview','Reports'],deputy:['Attendance Overview','Student Movements'],hod:['Class Finder','Master Timetable','Reports'],ylc:['Student Search','Class Finder','Reports'],business:['Staff Directory','Workforce Allocations','Reports'],office:['Student Search','Student Movements'],teacher:['Daily Schedule','Master Timetable','Class Finder','Student Search','Student Support'],swilliams:['Daily Schedule','Master Timetable','Class Finder','Student Search','Student Support'],learning:['Daily Schedule','Student Support'],aide:['Student Support'],relief:['Daily Schedule','Student Support'],guidance:['Student Support']};
+const expected={admin:['Staff Management','Student Management','Account Management','OneSchool Import Centre','System Management'],principal:['Student Search','Attendance Overview','Reports'],deputy:['Attendance Overview','Student Movements'],hod:['Class Finder','Master Timetable','Reports'],ylc:['Student Search','Class Finder','Reports'],business:['Staff Directory','Workforce Allocations','Reports'],office:['Student Search','Student Movements'],teacher:['Daily Schedule','Master Timetable','Class Finder','Student Search','Student Support'],swilliams:['Daily Schedule','Master Timetable','Class Finder','Student Search','Student Support'],learning:['Daily Schedule','Student Support'],aide:['Student Support'],relief:['Daily Schedule','Student Support'],guidance:['Student Support']};
 async function run(){
  await new Promise((resolve,reject)=>{ref.once('error',reject);ref.listen(0,'127.0.0.1',resolve)});
  const refurl='http://127.0.0.1:'+ref.address().port;
@@ -46,6 +46,7 @@ async function run(){
     if(id!=='admin'){
      assert(!protectedLabels.includes('Account Management'),id+' admin link leaked');
      assert.equal((await ctx.request.get(url+'/manage/access/')).status(),403,id+' direct admin boundary');
+     for(const route of ['/manage/system/','/manage/system/accounts/','/manage/system/audit/','/manage/system/settings/'])assert.equal((await ctx.request.get(url+route)).status(),403,id+' administration review boundary');
     }
     assert.equal(await p.locator('main#main-content').count(),1,id+' single main landmark');
     await rp.screenshot({path:path.join(target,id+'-reference-1440.png'),animations:'disabled'});
@@ -56,6 +57,14 @@ async function run(){
     await rp.screenshot({path:path.join(target,id+'-reference-390.png'),animations:'disabled'});
     await p.screenshot({path:path.join(target,id+'-protected-390.png'),animations:'disabled'});
     if(id==='admin'){
+      await p.setViewportSize({width:1440,height:900});
+      for(const [label,route] of [['overview','/manage/system/'],['accounts','/manage/system/accounts/'],['audit','/manage/system/audit/'],['settings','/manage/system/settings/']]){
+        assert.equal((await p.goto(url+route)).status(),200,'RC2.5 admin '+label);
+        assert.equal(await p.locator('main#main-content').count(),1);
+        await p.screenshot({path:path.join(target,'admin-'+label+'-1440.png'),animations:'disabled'});
+      }
+      assert.match(await p.locator('main').innerText(),/Production blocked/);
+      await p.setViewportSize({width:390,height:844});await p.screenshot({path:path.join(target,'admin-settings-390.png'),animations:'disabled'});
       await p.setViewportSize({width:1440,height:900});await p.goto(url+'/manage/access/');
       await p.locator('#id_scope').selectOption('school');
       assert(await p.locator('input[name=capabilities][value=movement_receive]').isDisabled());
@@ -108,7 +117,7 @@ async function run(){
   const combined=[...prior,...evidence];
   assert.equal(new Set(combined.map(x=>x.account)).size,combined.length,'Duplicate evidence account');
   if(batch===2)assert.deepEqual(combined.map(x=>x.account).sort(),Object.keys(mapping).sort(),'All 13 reference accounts captured');
-  fs.writeFileSync(outfile,JSON.stringify({websiteCommit:fs.readFileSync(path.join(root,'SOURCE_COMMIT.txt'),'utf8').trim(),scope:'RC2.4 protected leadership, workforce, teacher and student workflows; differences are open, not approval',accounts:combined},null,2));
+  fs.writeFileSync(outfile,JSON.stringify({websiteCommit:fs.readFileSync(path.join(root,'SOURCE_COMMIT.txt'),'utf8').trim(),scope:'RC2.5 protected administration, leadership, workforce, teacher and student workflows; differences are open, not approval',accounts:combined},null,2));
  }finally{if(browser)await browser.close();ref.close()}
 }
 run().catch(e=>{console.error(e.stack);process.exitCode=1});
