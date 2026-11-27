@@ -5,7 +5,7 @@ from django.contrib import messages
 from django.contrib.auth.models import User
 from django.core.paginator import Paginator
 from django.db import transaction,IntegrityError
-from django.http import HttpResponseForbidden,HttpResponseBadRequest
+from django.http import HttpResponseForbidden,HttpResponseBadRequest,Http404
 from django.shortcuts import render,redirect,get_object_or_404
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
@@ -40,6 +40,7 @@ def student_label(m):
 def projection(m,user,now):
     return {"pk":m.pk,"student_pk":m.student_id,"student":student_label(m),"class_code":m.class_code,"destination":m.destination_name,
         "origin":m.origin_room,"state":m.get_state_display(),"departure":m.departed_at,"due":m.due_at,
+        "period":m.period,"lesson_date":m.lesson_date,"identity_ok":identity_matches(m),
         "overdue":not m.closed_at and m.due_at<=now,"revision":m.revision,
         "actions":actions_for(user,m),"closed":m.closed_at}
 
@@ -69,7 +70,18 @@ def board(request):
     history=qs.filter(lesson_date=day,closed_at__isnull=False).order_by("-closed_at","-pk")
     active_page=Paginator(active,50).get_page(request.GET.get("open_page"))
     history_page=Paginator(history,50).get_page(request.GET.get("page"))
-    return page(request,"movement_board.html",day=day,student_filter=student_filter,open_count=active.count(),
+    issue_links=[]
+    if can_teach(request.user):
+        from django.urls import reverse
+        from urllib.parse import urlencode
+        clock=movement_clock()
+        pub=current()
+        for row in own_lessons(pub,request.user,clock.date()):
+            if row["start"]<=clock.strftime("%H:%M")<row["end"]:
+                try:roster_for(pub,row["code"],clock.date())
+                except AttendanceUnavailable:continue
+                issue_links.append({"code":row["code"],"period":row["period"],"url":reverse("movement-issue")+"?"+urlencode(dict(zip(("code","period","start"),lesson_key(row))))})
+    return page(request,"movement_board.html",day=day,student_filter=student_filter,issue_links=issue_links,open_count=active.count(),
         overdue_count=active.filter(due_at__lte=now).count(),active_page=active_page,history_page=history_page,
         open_rows=[projection(m,request.user,now) for m in active_page],
         closed_rows=[projection(m,request.user,now) for m in history_page],
@@ -203,3 +215,22 @@ def destinations(request):
             messages.error(request,"Destination configuration changed; review again.")
             return redirect("movement-destinations")
     return render(request,"movement_destinations.html",{"form":form,"destinations":MovementDestination.objects.order_by("name")})
+
+
+@never_cache
+@require_GET
+def student_day(request,pk):
+    if not request.user.is_authenticated:return redirect("teacher-login")
+    if not may_access(request.user):return HttpResponseForbidden("Movement access required.")
+    anchor=get_object_or_404(visible(request.user),pk=pk)
+    if not identity_matches(anchor):raise Http404("Student identity needs review.")
+    from .student_experience import movement_day
+    try:
+        day=date.fromisoformat(request.GET.get("date") or anchor.lesson_date.isoformat())
+        if day>timezone.localdate() or day<date(1900,1,1):raise ValueError()
+    except (ValueError,TypeError):return HttpResponseBadRequest("Choose a valid current or historical date.")
+    groups=movement_day(request.user,anchor,day)
+    # No per-student name for a date without any permitted movement records.
+    return page(request,"movement_student_day.html",day=day,anchor=anchor.pk,
+                student=student_label(anchor) if groups else "",groups=groups,
+                total=sum(len(g["rows"]) for g in groups))

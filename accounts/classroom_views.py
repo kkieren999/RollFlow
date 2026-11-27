@@ -1,5 +1,6 @@
 """Classroom tools and explicitly assigned student support; protected endpoints."""
 from datetime import timedelta
+from .student_experience import follow_up_date
 from django.contrib.auth.models import User
 from django.db import transaction,IntegrityError
 from django.http import HttpResponseBadRequest,HttpResponseForbidden,Http404
@@ -112,12 +113,12 @@ def classroom(request):
                         if not recipient or not has_cap(recipient,"support_task"):
                             return HttpResponseForbidden("Recipient lacks explicit learning task permission.")
                         item=SupportTask.objects.create(publication=pub,student=student,class_code=key[0],requested_by=actor,
-                            assigned_to=recipient,category=category,due_on=day+timedelta(days=7))
+                            assigned_to=recipient,category=category,due_on=follow_up_date(request.POST.get("due"),day))
                     else:
                         if category not in dict(REFERRALS):return HttpResponseBadRequest("Invalid educational referral.")
                         item=SupportReferral.objects.create(publication=pub,student=student,class_code=key[0],requested_by=actor,
-                            category=category,follow_up_on=day+timedelta(days=7))
-                    audit(actor,"classroom_"+action,after={"record":item.pk})
+                            category=category,follow_up_on=follow_up_date(request.POST.get("due"),day))
+                    audit(actor,"classroom_"+action,after={"record":item.pk,**({"due":(item.due_on if action=="task" else item.follow_up_on).isoformat()} if action in ("task","referral") else {})})
                 elif action=="withdraw_observation":
                     item=get_object_or_404(ClassroomObservation.objects.select_for_update(),pk=request.POST.get("observation"),
                         publication=pub,teacher=actor,class_code=key[0],student_id__in=[s.pk for s in students],withdrawn_at__isnull=True)
@@ -134,6 +135,7 @@ def classroom(request):
             return page(request,"classroom_tools.html",row=row,regular=regular,roster=roster,plan=plan,occupied=occupied,
                 publication=pub,roster_token=roster_token(students),observations=observations,
                 observation_choices=OBSERVATIONS,task_choices=TASKS,referral_choices=REFERRALS,
+                today=day,default_due=day+timedelta(days=7),max_due=day+timedelta(days=90),
                 recipients=recipients("support_task") if regular else [])
     except (ValueError,AttendanceUnavailable,IntegrityError) as exc:
         return conflict(request,str(exc) if isinstance(exc,ValueError) else "Concurrent change. Reload.")
@@ -154,11 +156,18 @@ def board(request):
     if not board_allowed(request.user):return HttpResponseForbidden("Assigned educational support access required.")
     pub=current()
     rows=[]
+    view=request.GET.get("view","all")
+    if view not in ("all","tasks","referrals","followups","closed"):
+        return HttpResponseBadRequest("Unknown support view.")
     for model,kind in ((SupportTask,"task"),(SupportReferral,"referral")):
         for record in accessible(request.user,model,pub).order_by("-created_at","-pk"):
             if permitted(record,request.user,pub):
                 rows.append(project(record,request.user,pub,kind))
-    return page(request,"support_board.html",rows=Paginator(rows,50).get_page(request.GET.get("page")),
+    counts={"tasks":sum(r["kind"]=="task" for r in rows),"referrals":sum(r["kind"]=="referral" for r in rows),"followups":sum(r["overdue"] for r in rows),"closed":sum(r["state"] in ("closed","withdrawn","completed","cancelled") for r in rows)}
+    rows=[r for r in rows if view=="all" or (view=="tasks" and r["kind"]=="task") or (view=="referrals" and r["kind"]=="referral") or (view=="followups" and r["overdue"]) or (view=="closed" and r["state"] in ("closed","withdrawn","completed","cancelled"))]
+    rows.sort(key=lambda r:(not r["overdue"],r["due"],r["kind"],r["pk"]))
+    today=timezone.localdate()
+    return page(request,"support_board.html",rows=Paginator(rows,50).get_page(request.GET.get("page")),view=view,counts=counts,today=today,max_due=today+timedelta(days=90),
         support_coordinator=coordinator(request.user),reviewers=recipients("support_referral") if coordinator(request.user) else [])
 
 
@@ -187,6 +196,17 @@ def change(request,kind,pk):
             action=request.POST.get("action")
             if action not in dict(actions(record,actor,pub)):return HttpResponseForbidden("Support action not authorised.")
             old=record.state
+            if action=="reschedule":
+                if not request.POST.get("due"):return HttpResponseBadRequest("Choose a follow-up date.")
+                field="due_on" if kind=="task" else "follow_up_on"
+                prior=getattr(record,field)
+                due=follow_up_date(request.POST["due"])
+                if due==prior:raise ValueError("Choose a different follow-up date.")
+                setattr(record,field,due)
+                record.revision+=1
+                record.save(update_fields=[field,"revision"])
+                audit(actor,"support_reschedule",after={"kind":kind,"record":record.pk,"revision":record.revision,"prior_due":prior.isoformat(),"due":due.isoformat()})
+                return redirect("support-board")
             if action=="assign":
                 recipient=users.get(int(raw)) if raw.isascii() and raw.isdecimal() and len(raw)<=18 else None
                 if not recipient or not has_cap(recipient,"support_referral"):

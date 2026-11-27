@@ -22,6 +22,7 @@ urlpatterns = [
     path('live/movements/', movement_views.board, name='movement-board'),
     path('live/movements/issue/', movement_views.issue, name='movement-issue'),
     path('live/movements/<int:pk>/', movement_views.detail, name='movement-detail'),
+    path('live/movements/<int:pk>/day/', movement_views.student_day, name='movement-student-day'),
     path('live/movements/<int:pk>/change/', movement_views.change, name='movement-change'),
     path('manage/movement-destinations/', movement_views.destinations, name='movement-destinations'),
     path("manage/security/templates/", security_views.templates, name="security-templates"),

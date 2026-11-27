@@ -88,7 +88,7 @@ def actions(record,user,pub):
             if record.state=="pending":result.append(("accept","Accept task"))
             if record.state=="accepted":result.append(("complete","Complete task"))
         if coordinator(user) or requester_current(record,user,pub):
-            result.append(("cancel","Cancel task"))
+            result.extend([("reschedule","Change follow-up date"),("cancel","Cancel task")])
         return result
     result=[]
     if coordinator(user) and record.state in ("pending","assigned","reviewed"):
@@ -97,6 +97,8 @@ def actions(record,user,pub):
         result.append(("review","Record educational review"))
     if record.state=="reviewed" and (coordinator(user) or (record.assigned_to_id==user.pk and has_cap(user,"support_referral"))):
         result.append(("close","Close reviewed referral"))
+    if coordinator(user) or requester_current(record,user,pub):
+        result.append(("reschedule","Change follow-up date"))
     if coordinator(user) or (record.state=="pending" and requester_current(record,user,pub)):
         result.append(("withdraw","Withdraw referral"))
     return result
