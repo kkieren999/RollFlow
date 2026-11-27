@@ -2,9 +2,9 @@ name: V3 foundation tests
 on:
   workflow_dispatch:
   push:
-    branches: [windows-release, v3.0-foundation, feature/v3.6.5-connected-school-data, feature/v3.6.6-automated-school-setup, feature/v3.6.7-unified-ui, feature/v3.6.7-student-movements-dashboard, feature/v3.6.7-varied-fictional-movements, feature/admin-movement-destinations-windows, feature/v3.6.7-movement-student-day-template, feature/v3.6.7-log-services-into-day-template]
+    branches: [feature/v5.0-rc2.5-administration-system-management, feature/v5.0-rc2.4-leadership-operations, feature/v5.0-rc2.3-student-experience, feature/v5.0-rc2.2-teacher-experience, feature/v5.0-rc2.1-interface-foundation, feature/v5.0-production-launch-candidate, feature/v4.7-windows-installer, feature/v4.6-leadership-reporting, feature/v4.5-classroom-student-support, feature/v4.4-workforce-relief-supervision, feature/v4.3-student-movements, feature/v4.2-live-attendance, feature/v4.1-school-data-oneschool, feature/v4.0-accounts-roles-security, feature/v3.9-live-foundation, feature/v3.8-windows-rebuild, feature/v3.7-staff-access, windows-release, v3.0-foundation, feature/v3.6.5-connected-school-data, feature/v3.6.6-automated-school-setup, feature/v3.6.7-unified-ui, feature/v3.6.7-student-movements-dashboard, feature/v3.6.7-varied-fictional-movements, feature/admin-movement-destinations-windows, feature/v3.6.7-movement-student-day-template, feature/v3.6.7-log-services-into-day-template]
   pull_request:
-    branches: [main, v3.0-foundation, integration/v3.6.1-windows-teacher-portal, feature/v3.6.2-oneschool-import-centre, feature/v3.6.4-real-oneschool-format-support, fix/v3.6.4-oneschool-unknown-worksheet-size, fix/v3.6.4.2-empty-staff-pdf-legends, fix/v3.6.4.3-cross-line-alignment, feature/v3.6.5-connected-school-data, feature/v3.6.6-automated-school-setup, feature/v3.6.7-unified-ui]
+    branches: [windows-release, main, v3.0-foundation, integration/v3.6.1-windows-teacher-portal, feature/v3.6.2-oneschool-import-centre, feature/v3.6.4-real-oneschool-format-support, fix/v3.6.4-oneschool-unknown-worksheet-size, fix/v3.6.4.2-empty-staff-pdf-legends, fix/v3.6.4.3-cross-line-alignment, feature/v3.6.5-connected-school-data, feature/v3.6.6-automated-school-setup, feature/v3.6.7-unified-ui]
 permissions:
   contents: read
 jobs:
@@ -28,11 +28,19 @@ jobs:
       - name: Validate bundled website source and permissions
         run: |
           python deployment/sync_training.py --check
-          python -m unittest deployment.test_training -v
+          python -m unittest deployment.test_training deployment.test_windows_launchers deployment.test_installer deployment.test_release_readiness -v
           node training/tests/teaching-permissions-logic.cjs
           node training/tests/calendar-logic.cjs
           node training/tests/classroom-management-logic.cjs
           node training/tests/room-changes-logic.cjs
+      - name: Enforce release candidate launch hold
+        run: |
+          python -m deployment.release_readiness --json
+          set +e
+          python -m deployment.release_readiness --require-production
+          status=$?
+          set -e
+          test "$status" -eq 2
       - run: python manage.py check
       - run: python manage.py makemigrations --check --dry-run
       - run: python manage.py test accounts
@@ -52,7 +60,8 @@ jobs:
       - run: python deployment/ci_smoke.py
 
   windows-offline-bundle:
-    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/windows-release' || github.ref == 'refs/heads/v3.0-foundation' || github.ref == 'refs/heads/feature/v3.6.5-connected-school-data' || github.ref == 'refs/heads/feature/v3.6.6-automated-school-setup' || github.ref == 'refs/heads/feature/v3.6.7-unified-ui' || github.ref == 'refs/heads/feature/v3.6.7-student-movements-dashboard' || github.ref == 'refs/heads/feature/v3.6.7-varied-fictional-movements' || github.ref == 'refs/heads/feature/admin-movement-destinations-windows' || github.ref == 'refs/heads/feature/v3.6.7-movement-student-day-template' || github.ref == 'refs/heads/feature/v3.6.7-log-services-into-day-template'
+    needs: [tests, postgres-and-native]
+    if: github.ref == 'refs/heads/feature/v5.0-rc2.5-administration-system-management' || github.ref == 'refs/heads/feature/v5.0-rc2.4-leadership-operations' || github.ref == 'refs/heads/feature/v5.0-rc2.3-student-experience' || github.ref == 'refs/heads/feature/v5.0-rc2.2-teacher-experience' || github.ref == 'refs/heads/feature/v5.0-rc2.1-interface-foundation' || github.ref == 'refs/heads/feature/v5.0-production-launch-candidate' || github.ref == 'refs/heads/feature/v4.7-windows-installer' || github.ref == 'refs/heads/feature/v4.6-leadership-reporting' || github.ref == 'refs/heads/feature/v4.5-classroom-student-support' || github.ref == 'refs/heads/feature/v4.4-workforce-relief-supervision' || github.ref == 'refs/heads/feature/v4.3-student-movements' || github.ref == 'refs/heads/feature/v4.2-live-attendance' || github.ref == 'refs/heads/feature/v4.1-school-data-oneschool' || github.ref == 'refs/heads/feature/v4.0-accounts-roles-security' || github.ref == 'refs/heads/feature/v3.9-live-foundation' || github.ref == 'refs/heads/feature/v3.8-windows-rebuild' || github.ref == 'refs/heads/feature/v3.7-staff-access' || github.event_name == 'pull_request' || github.ref == 'refs/heads/windows-release' || github.ref == 'refs/heads/v3.0-foundation' || github.ref == 'refs/heads/feature/v3.6.5-connected-school-data' || github.ref == 'refs/heads/feature/v3.6.6-automated-school-setup' || github.ref == 'refs/heads/feature/v3.6.7-unified-ui' || github.ref == 'refs/heads/feature/v3.6.7-student-movements-dashboard' || github.ref == 'refs/heads/feature/v3.6.7-varied-fictional-movements' || github.ref == 'refs/heads/feature/admin-movement-destinations-windows' || github.ref == 'refs/heads/feature/v3.6.7-movement-student-day-template' || github.ref == 'refs/heads/feature/v3.6.7-log-services-into-day-template'
     runs-on: windows-2025
     timeout-minutes: 25
     steps:
@@ -82,26 +91,61 @@ jobs:
           $pgRoot = Get-ChildItem "$root/postgres" -Directory -Recurse | Where-Object { (Test-Path (Join-Path $_.FullName 'bin/postgres.exe')) -and (Test-Path (Join-Path $_.FullName 'share')) } | Select-Object -First 1
           if (!$pgRoot -and (Test-Path "$root/postgres/bin/postgres.exe")) { $pgRoot = Get-Item "$root/postgres" }
           if (!$pgRoot) { throw 'PostgreSQL bin/lib/share layout not found' }
-          python deployment/build_windows.py --python-runtime "$root/python" --postgres-runtime $pgRoot.FullName --output "$env:RUNNER_TEMP/RollFlow"
+          python deployment/build_windows.py --python-runtime "$root/python" --postgres-runtime $pgRoot.FullName --output "$env:RUNNER_TEMP/RollFlow" --client-output "$env:RUNNER_TEMP/RollFlow-Workstation"
           if ($LASTEXITCODE -ne 0) { throw 'Bundle build failed' }
+      - name: Compile and exercise the two unsigned versioned Windows installers
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $bundle = "$env:RUNNER_TEMP/RollFlow"
+          $client = "$env:RUNNER_TEMP/RollFlow-Workstation"
+          $out = "$env:RUNNER_TEMP/rf-installers"
+          New-Item -ItemType Directory $out | Out-Null
+          python deployment/bundle_integrity.py $bundle --strict
+          if ($LASTEXITCODE -ne 0) { throw 'Full package integrity failure' }
+          python deployment/bundle_integrity.py $client --strict
+          if ($LASTEXITCODE -ne 0) { throw 'Workstation package integrity failure' }
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (!(Test-Path $iscc)) { throw 'Inno Setup 6 compiler missing from Windows runner' }
+          & $iscc "/DBundleDir=$bundle" "/O$out" deployment/installer.iss
+          if ($LASTEXITCODE -ne 0) { throw 'Local lab setup compilation failed' }
+          & $iscc "/DWorkstation=1" "/DBundleDir=$client" "/O$out" deployment/installer.iss
+          if ($LASTEXITCODE -ne 0) { throw 'Workstation setup compilation failed' }
+          foreach ($kind in @('LocalLab','Workstation')) {
+            $exe = "$out/RollFlow-V5.0.0-rc.2.5-$kind-x64-STAGING-Setup.exe"
+            $dest = "$env:RUNNER_TEMP/rf-installed-$kind"
+            $p = Start-Process -FilePath $exe -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-',"/DIR=$dest") -Wait -PassThru
+            if ($p.ExitCode -ne 0) { throw "Installer failed: $kind" }
+            python deployment/bundle_integrity.py $dest
+            if ($LASTEXITCODE -ne 0) { throw "Installed manifest failed: $kind" }
+            if (!(Test-Path "$dest/BUILD-INFO.json")) { throw "Install missing version metadata" }
+            if ($kind -eq 'Workstation' -and ((Test-Path "$dest/postgres") -or (Test-Path "$dest/app"))) { throw 'Workstation contains local server' }
+            $hash = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
+            "$hash  $(Split-Path $exe -Leaf)" | Set-Content "$exe.sha256" -Encoding ascii
+          }
       - name: Unit-test Windows password-file ACL handling
         run: python -m unittest deployment.test_native_permissions -v
       - name: Smoke-test bundled runtime, database and backup
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $bundle = "$env:RUNNER_TEMP/RollFlow"
+          $bundle = "${env:RUNNER_TEMP}/rf-installed-LocalLab"
           $state = "$env:RUNNER_TEMP/rf-test-state"
           # Regression: the actual Windows shortcuts must not silently reuse
           # a previous version's default RollFlow-Staging instance.
-          $setupLauncher = Get-Content (Join-Path $bundle 'First Setup.cmd') -Raw
-          $startLauncher = Get-Content (Join-Path $bundle 'Start RollFlow.cmd') -Raw
+          $setupLauncher = Get-Content (Join-Path $bundle 'First Setup Fresh.cmd') -Raw
+          $startLauncher = Get-Content (Join-Path $bundle 'Start Fresh Protected.cmd') -Raw
+          $existingLauncher = Get-Content (Join-Path $bundle 'Start Existing Protected.cmd') -Raw
+          $protectedLauncher = Get-Content (Join-Path $bundle 'Start RollFlow.cmd') -Raw
+          if ($protectedLauncher -notmatch 'Protected Workspace.cmd') { throw 'Protected workspace must be the default launcher' }
+          $websiteLauncher = Get-Content (Join-Path $bundle 'Open Training Demo.cmd') -Raw
           foreach ($launcher in @($setupLauncher, $startLauncher)) {
-            if ($launcher -notmatch 'RollFlow-V3641-Staging') { throw 'V3.6.1 shortcuts must have a dedicated instance state' }
+            if ($launcher -notmatch 'RollFlow-V38-Fresh-Staging') { throw 'Fresh shortcuts must use isolated instance state' }
             if ($launcher -notmatch '--state') { throw 'Shortcut state override missing' }
           }
-          if ($setupLauncher -notmatch '--db-port 55437 --web-port 18085') { throw 'V3.6.1 setup must use independent database and web ports' }
-          if ($startLauncher -notmatch 'start') { throw 'Start shortcut must use configured V3.6.1 state' }
+          if ($setupLauncher -notmatch '--db-port 55438 --web-port 18087') { throw 'Fresh setup must use independent ports' }
+          if ($existingLauncher -notmatch 'RollFlow-V3641-Staging') { throw 'Existing state path changed' }
+          if ($websiteLauncher -notmatch 'deployment.training' -or $websiteLauncher -match 'deployment.native') { throw 'Training launch must open the complete website' }
           & "$bundle/python/python.exe" -m deployment.native --state $state init --no-admin
           if ($LASTEXITCODE -ne 0) { throw 'Native setup failed' }
           if (Test-Path (Join-Path $state 'initial-password.txt')) { throw 'Temporary initdb password was not deleted' }
@@ -140,9 +184,80 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'V3.6.6 setup schema or route unavailable' }
           & "$bundle/python/python.exe" -m deployment.native --state $state manage shell -c "from django.template.loader import get_template; from django.conf import settings; from pathlib import Path; expected=['ui_system.html','ui_header.html','staff_portal.html','connected_school.html','automated_setup.html','teacher_week.html','teacher_timetable.html','oneschool_documents.html']; assert all(get_template(x) for x in expected); text=(Path(settings.BASE_DIR)/'index.html').read_text(encoding='utf-8'); assert text.count('<!-- ROLLFLOW_SERVER_BOOTSTRAP -->')==1 and '--green:#147f38' in text"
           if ($LASTEXITCODE -ne 0) { throw 'V3.6.7 unified design system, portal template or legacy teacher bootstrap missing' }
+      - name: Validate central attendance schema and protected routes on Windows
+        shell: pwsh
+        run: |
+          $bundle = "${env:RUNNER_TEMP}/rf-installed-LocalLab"
+          $state = "$env:RUNNER_TEMP/rf-test-state"
+          & "$bundle/python/python.exe" -m deployment.native --state $state manage shell -c "from django.urls import reverse; from django.db import connection; from django.conf import settings; from accounts.models import AttendanceRoll, AttendanceRevision, RoleTemplate, AccessAudit, StaffAccessGrant, AttendanceTransferReview, ReliefAttendanceAssignment, StudentMovement, MovementDestination, MovementEvent, WorkforceEntry, WorkforceNotice, ClassroomPlan, ClassroomObservation, SupportTask, SupportReferral; assert settings.ROLLFLOW_PROTECTED_WORKSPACE; from accounts.report_views import pdf_bytes; assert pdf_bytes(dict(domain='attendance',scope_label='Fictional',start='2026-01-01',end='2026-01-01',publication=1,rows=[('Test',1)],notes=['Fictional'])).startswith(b'%PDF'); assert reverse('leadership-reports') == '/live/reports/'; assert reverse('support-board') == '/live/support/'; assert all(m._meta.db_table in connection.introspection.table_names() for m in (ClassroomPlan, ClassroomObservation, SupportTask, SupportReferral)); assert reverse('workforce-board') == '/live/workforce/'; assert all(m._meta.db_table in connection.introspection.table_names() for m in (WorkforceEntry, WorkforceNotice)); assert reverse('movement-board') == '/live/movements/'; assert all(m._meta.db_table in connection.introspection.table_names() for m in (StudentMovement, MovementDestination, MovementEvent)); assert ReliefAttendanceAssignment._meta.db_table in connection.introspection.table_names(); assert reverse('attendance-relief') == '/manage/attendance/relief/'; assert reverse('school-data-overview') == '/manage/school-data/'; assert AttendanceTransferReview._meta.db_table in connection.introspection.table_names(); assert reverse('security-templates') == '/manage/security/templates/'; assert all(m._meta.db_table in connection.introspection.table_names() for m in (RoleTemplate, AccessAudit, StaffAccessGrant)); assert reverse('live-home') == '/live/'; assert AttendanceRoll._meta.db_table in connection.introspection.table_names(); assert AttendanceRevision._meta.db_table in connection.introspection.table_names()"
+          if ($LASTEXITCODE -ne 0) { throw 'Central attendance migration or protected workspace missing' }
+      - name: Restore isolated synthetic snapshot and verify archive recovery
+        shell: pwsh
+        run: |
+          $bundle = "${env:RUNNER_TEMP}/rf-installed-LocalLab"
+          $state = "$env:RUNNER_TEMP/rf-test-state"
+          $snapshot = "$env:RUNNER_TEMP/rf-full-snapshot"
+          $restore = "$env:RUNNER_TEMP/rf-restored"
+          & "$bundle/python/python.exe" -m deployment.native --state $state snapshot $snapshot
+          if ($LASTEXITCODE -ne 0) { throw 'Full snapshot failed' }
+          & "$bundle/python/python.exe" -m deployment.native --state $restore restore-staging $snapshot --db-port 55439 --web-port 18089
+          if ($LASTEXITCODE -ne 0) { throw 'Isolated restore failed' }
+          & "$bundle/python/python.exe" -m deployment.native --state $restore manage shell -c "from accounts.models import Student, OneSchoolArchivedFile; from accounts.oneschool_storage import read_encrypted; assert Student.objects.filter(student_id='UPGRADEFAKE').exists(); f=OneSchoolArchivedFile.objects.get(original_name='fictional.xlsx'); assert read_encrypted(f.storage_token)==b'fictional-existing-archive'"
+          if ($LASTEXITCODE -ne 0) { throw 'Recovered student/archive did not match' }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check the actual packaged website in Chrome
+        shell: pwsh
+        run: |
+          npm install --no-save --no-audit --no-fund playwright-core@1.56.1
+          if ($LASTEXITCODE -ne 0) { throw 'Browser test dependency installation failed' }
+          $env:RF_PYTHON = "${env:RUNNER_TEMP}/rf-installed-LocalLab/python/python.exe"
+          $env:NODE_PATH = "$(Get-Location)/node_modules"
+          node "${env:RUNNER_TEMP}/rf-installed-LocalLab/app/deployment/windows_workspace_smoke.cjs"
+          if ($LASTEXITCODE -ne 0) { throw 'Packaged website role/navigation smoke failed' }
+      - name: Protected multi-session browser attendance on installed application
+        shell: pwsh
+        run: |
+          $bundle = "$env:RUNNER_TEMP/rf-installed-LocalLab"
+          # Each Actions step gets a fresh shell. The installed test lives
+          # outside the checkout, so explicitly expose the CI-only dependency.
+          $env:NODE_PATH = Join-Path $env:GITHUB_WORKSPACE 'node_modules'
+          if (!(Test-Path (Join-Path $env:NODE_PATH 'playwright-core/package.json'))) { throw 'Playwright CI dependency missing' }
+          $env:RF_UI_SCREENSHOTS = Join-Path $env:RUNNER_TEMP "rf-ui-evidence"
+          $testScript = Join-Path $bundle 'app/deployment/protected_browser_smoke.cjs'
+          node -e "console.log(require('node:module').createRequire(process.argv[1]).resolve('playwright-core'))" $testScript
+          if ($LASTEXITCODE -ne 0) { throw 'Installed protected browser test cannot resolve Playwright' }
+          & "$bundle/python/python.exe" -m deployment.protected_browser_server --state "$env:RUNNER_TEMP/rf-restored"
+          if ($LASTEXITCODE -ne 0) { throw 'Protected multi-session browser smoke failed' }
       - uses: actions/upload-artifact@v4
         with:
-          name: RollFlow-V3.7.0-Windows-x64-STAGING
+          name: RollFlow-RC2.5-Protected-UI-Comparison
+          path: ${{ runner.temp }}/rf-ui-evidence/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Generate release candidate readiness evidence
+        shell: pwsh
+        run: |
+          $bundle = "$env:RUNNER_TEMP/RollFlow"
+          $out = "$env:RUNNER_TEMP/rf-installers"
+          & "$bundle/python/python.exe" -B -m deployment.release_readiness --bundle $bundle --json | Set-Content "$out/PRODUCTION-READINESS.json" -Encoding utf8
+          if ($LASTEXITCODE -ne 0) { throw 'Release inspection failed' }
+          # The readiness CLI intentionally exits 2 while production is blocked.
+          # Validate that exact result in a subprocess; return 0 to the Actions shell
+          # only when the safeguard worked. Never swallow unexpected exit codes.
+          & "$bundle/python/python.exe" -B -c "import subprocess,sys; result=subprocess.run([sys.executable,'-B','-m','deployment.release_readiness','--require-production']); print('Production hold exit code:',result.returncode); sys.exit(0 if result.returncode == 2 else 1)"
+          if ($LASTEXITCODE -ne 0) { throw 'Production launch hold did not work' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RollFlow-V5.0.0-rc.2.5-Portable-Windows-x64-STAGING
           path: ${{ runner.temp }}/RollFlow/
+          if-no-files-found: error
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RollFlow-V5.0.0-rc.2.5-Windows-Installers-x64-STAGING
+          path: ${{ runner.temp }}/rf-installers/
           if-no-files-found: error
           retention-days: 14
