@@ -72,7 +72,7 @@ def workspace_context(request):
     if admin:
         group("SYSTEM","Account Management","shield",link("Account review","admin-account-review",aliases=("/manage/security/effective/",)),link("Roles & permissions","school-access-manage"),link("Role templates","security-templates"))
         group("SYSTEM","Audit & Activity","list",link("Activity log","admin-audit-review"),link("Structured access history","security-history"))
-        group("SYSTEM","System Management","database",link("System settings & readiness","admin-system-settings"))
+        group("SYSTEM","System Management","database",link("System settings & readiness","admin-system-settings"),link("Pilot readiness","admin-pilot-readiness"))
         group("SYSTEM","OneSchool Import Centre","database",link("Document imports","oneschool-documents",aliases=("/manage/oneschool/documents/",)),
               link("Timetable imports","oneschool-centre",aliases=("/manage/oneschool/",) if path.startswith("/manage/oneschool/") and not path.startswith(("/manage/oneschool/documents/","/manage/oneschool/class-memberships/","/manage/oneschool/timetable-evidence/")) else ()),
               link("Class memberships","oneschool-class-rosters"),link("Timetable evidence","oneschool-timetable-evidence"),
