@@ -5,7 +5,7 @@ from django.utils import timezone
 from .attendance import (own_lessons, roster_for, roll_for, roll_matches,
                          AttendanceUnavailable, lesson_key)
 from .movement_service import visible, identity_matches
-from .models import AttendanceRevision
+from .models import AttendanceRevision, AttendanceRoll
 
 
 def lesson_links(row, now=None):
@@ -41,7 +41,12 @@ def student_workflow(pub, user, record, today=None):
         status = "Not recorded"
         mark = ""
         links = lesson_links(row)
-        if roll:
+        overlap = AttendanceRoll.objects.filter(lesson_date=today, class_code=row["code"],
+                    start__lt=row["end"], end__gt=row["start"]).exclude(pk=roll.pk if roll else None).exists()
+        if overlap:
+            status = "Review required"
+            links = {}
+        elif roll:
             if not roll_matches(roll, pub, row, user, roster):
                 status = "Review required"
                 links = {}
