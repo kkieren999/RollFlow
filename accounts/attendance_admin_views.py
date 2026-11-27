@@ -107,7 +107,7 @@ def relief(request):
                     return HttpResponseForbidden("Administrator access revoked.")
                 # Lock user before sources to match roll writes.
                 if request.POST.get("action")=="assign" and form.is_valid():
-                    teacher=User.objects.select_for_update().get(pk=form.cleaned_data["teacher"].pk)
+                    teacher=User.objects.select_for_update(no_key=True).get(pk=form.cleaned_data["teacher"].pk)
                     lock_sources()
                     active=current()
                     if not pub or not active or active.pk!=pub.pk or request.POST.get("publication")!=str(pub.pk) or not publication_ready(active) or closed(active,day):
