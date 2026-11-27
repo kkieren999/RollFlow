@@ -121,7 +121,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $bundle = "$env:RUNNER_TEMP/RollFlow"
+          $bundle = "${env:RUNNER_TEMP}/rf-installed-LocalLab"
           $state = "$env:RUNNER_TEMP/rf-test-state"
           # Regression: the actual Windows shortcuts must not silently reuse
           # a previous version's default RollFlow-Staging instance.
@@ -179,14 +179,14 @@ jobs:
       - name: Validate central attendance schema and protected routes on Windows
         shell: pwsh
         run: |
-          $bundle = "$env:RUNNER_TEMP/RollFlow"
+          $bundle = "${env:RUNNER_TEMP}/rf-installed-LocalLab"
           $state = "$env:RUNNER_TEMP/rf-test-state"
           & "$bundle/python/python.exe" -m deployment.native --state $state manage shell -c "from django.urls import reverse; from django.db import connection; from django.conf import settings; from accounts.models import AttendanceRoll, AttendanceRevision, RoleTemplate, AccessAudit, StaffAccessGrant, AttendanceTransferReview, ReliefAttendanceAssignment, StudentMovement, MovementDestination, MovementEvent, WorkforceEntry, WorkforceNotice, ClassroomPlan, ClassroomObservation, SupportTask, SupportReferral; assert settings.ROLLFLOW_PROTECTED_WORKSPACE; from accounts.report_views import pdf_bytes; assert pdf_bytes(dict(domain='attendance',scope_label='Fictional',start='2026-01-01',end='2026-01-01',publication=1,rows=[('Test',1)],notes=['Fictional'])).startswith(b'%PDF'); assert reverse('leadership-reports') == '/live/reports/'; assert reverse('support-board') == '/live/support/'; assert all(m._meta.db_table in connection.introspection.table_names() for m in (ClassroomPlan, ClassroomObservation, SupportTask, SupportReferral)); assert reverse('workforce-board') == '/live/workforce/'; assert all(m._meta.db_table in connection.introspection.table_names() for m in (WorkforceEntry, WorkforceNotice)); assert reverse('movement-board') == '/live/movements/'; assert all(m._meta.db_table in connection.introspection.table_names() for m in (StudentMovement, MovementDestination, MovementEvent)); assert ReliefAttendanceAssignment._meta.db_table in connection.introspection.table_names(); assert reverse('attendance-relief') == '/manage/attendance/relief/'; assert reverse('school-data-overview') == '/manage/school-data/'; assert AttendanceTransferReview._meta.db_table in connection.introspection.table_names(); assert reverse('security-templates') == '/manage/security/templates/'; assert all(m._meta.db_table in connection.introspection.table_names() for m in (RoleTemplate, AccessAudit, StaffAccessGrant)); assert reverse('live-home') == '/live/'; assert AttendanceRoll._meta.db_table in connection.introspection.table_names(); assert AttendanceRevision._meta.db_table in connection.introspection.table_names()"
           if ($LASTEXITCODE -ne 0) { throw 'Central attendance migration or protected workspace missing' }
       - name: Restore isolated synthetic snapshot and verify archive recovery
         shell: pwsh
         run: |
-          $bundle = "$env:RUNNER_TEMP/RollFlow"
+          $bundle = "${env:RUNNER_TEMP}/rf-installed-LocalLab"
           $state = "$env:RUNNER_TEMP/rf-test-state"
           $snapshot = "$env:RUNNER_TEMP/rf-full-snapshot"
           $restore = "$env:RUNNER_TEMP/rf-restored"
@@ -204,10 +204,16 @@ jobs:
         run: |
           npm install --no-save --no-audit --no-fund playwright-core@1.56.1
           if ($LASTEXITCODE -ne 0) { throw 'Browser test dependency installation failed' }
-          $env:RF_PYTHON = "$env:RUNNER_TEMP/RollFlow/python/python.exe"
+          $env:RF_PYTHON = "${env:RUNNER_TEMP}/rf-installed-LocalLab/python/python.exe"
           $env:NODE_PATH = "$(Get-Location)/node_modules"
-          node "$env:RUNNER_TEMP/RollFlow/app/deployment/windows_workspace_smoke.cjs"
+          node "${env:RUNNER_TEMP}/rf-installed-LocalLab/app/deployment/windows_workspace_smoke.cjs"
           if ($LASTEXITCODE -ne 0) { throw 'Packaged website role/navigation smoke failed' }
+      - name: Protected multi-session browser attendance on installed application
+        shell: pwsh
+        run: |
+          $bundle = "$env:RUNNER_TEMP/rf-installed-LocalLab"
+          & "$bundle/python/python.exe" -m deployment.protected_browser_server --state "$env:RUNNER_TEMP/rf-restored"
+          if ($LASTEXITCODE -ne 0) { throw 'Protected multi-session browser smoke failed' }
       - uses: actions/upload-artifact@v4
         with:
           name: RollFlow-V4.7.0-Portable-Windows-x64-STAGING

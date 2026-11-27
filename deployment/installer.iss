@@ -60,6 +60,8 @@ Name: "{userdesktop}\RollFlow Local Lab (Staging)"; Filename: "{app}\Start RollF
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
   Result := '';
-  if FileExists(ExpandConstant('{app}\BUILD-INFO.json')) then
+  if FileExists(ExpandConstant('{app}\instance.json')) or DirExists(ExpandConstant('{app}\oneschool-imports')) then
+    Result := 'This is a private data directory. Choose a new application directory.'
+  else if FileExists(ExpandConstant('{app}\BUILD-INFO.json')) then
     Result := 'This version already exists. Keep it intact; install a new version or have ICT review retirement.';
 end;

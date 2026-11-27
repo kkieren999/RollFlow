@@ -76,7 +76,14 @@ def main():
         call("-m", "deployment.native", "--state", state, "manage", "migrate", "--check")
         call("-m", "deployment.native", "--state", state, "manage", "shell", "-c",
              "from django.contrib.auth import get_user_model; assert get_user_model().objects.filter(username='ci_local_admin',is_superuser=True).exists()")
-        print("Native PostgreSQL initialization, restart, backup and HTTP smoke passed")
+        snapshot=Path(tmp)/"snapshot"
+        call("-m","deployment.native","--state",state,"snapshot",snapshot)
+        restored=Path(tmp)/"restored"
+        call("-m","deployment.native","--state",restored,"restore-staging",snapshot,
+             "--pg-bin",pg_bin,"--db-port","55433","--web-port","18081")
+        call("-m","deployment.native","--state",restored,"manage","shell","-c",
+             "from django.contrib.auth import get_user_model; assert get_user_model().objects.filter(username='ci_local_admin',is_superuser=True).exists()")
+        print("Native PostgreSQL initialization, restart, backup, isolated restore and HTTP smoke passed")
 
 if __name__ == "__main__":
     main()

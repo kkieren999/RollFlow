@@ -260,6 +260,12 @@ def upgrade(cfg):
             manage(cfg, "check")
             manage(cfg, "collectstatic", "--noinput")
         print("Upgrade complete. Keep the original installation and backup; start the new code.")
+    except BaseException:
+        if migration_started:
+            marker=state/"recovery-required.lock"
+            if not marker.exists():
+                write_private(marker,"Upgrade failed after migration began. ICT recovery required.\n")
+        raise
     finally:
         lock.unlink(missing_ok=True)
 
