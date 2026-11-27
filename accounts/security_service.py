@@ -10,8 +10,11 @@ def eligible_account(user):
 
 def lock_administrator(actor):
     """Call within atomic before changing account/permission state.
-    Deterministic lock order prevents two admins concurrently disabling each other."""
-    admins = list(User.objects.select_for_update().filter(is_staff=True, is_superuser=True).order_by("pk"))
+    Deterministic lock order prevents two admins concurrently disabling each other.
+    NO KEY UPDATE still serializes account changes, but permits foreign-key
+    references (notices/audit) by a transaction holding school source locks.
+    Never change account primary keys through these workflows."""
+    admins = list(User.objects.select_for_update(no_key=True).filter(is_staff=True, is_superuser=True).order_by("pk"))
     return any(u.pk == actor.pk and eligible_account(u) for u in admins)
 
 
