@@ -1,0 +1,7 @@
+<section class="live-card rf-leadership-panel" data-rf-leadership-domain="{{ leadership.choice.domain }}" data-rf-leadership-scope="{{ leadership.choice.scope }}">
+<div class="rf-leadership-heading"><div><h2>{{ leadership.choice.label }} · {{ leadership.choice.scope_label }}</h2><p>{{ leadership.start|date:"j M Y" }} – {{ leadership.end|date:"j M Y" }} · Publication #{{ leadership.publication|default:"—" }}</p></div><a class="live-button" href="{{ leadership.report_url }}">Detailed report</a></div>
+{% if leadership.metrics %}<div class="rf-leadership-grid">{% for metric in leadership.metrics %}<article class="rf-kpi"><span>{{ metric.label }}</span><strong>{{ metric.value }}</strong></article>{% endfor %}</div>
+{% if leadership.completion != None %}<div class="rf-completion"><label for="rf-roll-completion">Verified roll completion · {{ leadership.completion }}%</label><progress id="rf-roll-completion" max="100" value="{{ leadership.completion|floatformat:'1u' }}">{{ leadership.completion }}%</progress><p>Submitted rolls divided by scheduled lesson keys. Not student attendance percentage.</p></div>{% endif %}
+{% else %}<p class="live-warn">No verified summary is available for these sources and dates. Unavailable is not zero.</p>{% endif %}
+{% if leadership.notes %}<details><summary>Interpretation and limits</summary>{% for note in leadership.notes %}<p>{{ note }}</p>{% endfor %}</details>{% endif %}
+</section>

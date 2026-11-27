@@ -97,7 +97,7 @@ input[type=checkbox]{margin-right:6px}table{width:100%;text-align:left;border-co
 </tbody></table></div></section>{% endfor %}
 {% endif %}
 {% elif mode == 'roster' %}
-<h1>{{ record.code }} · {{ record.name }}</h1><p>Read-only roster of currently active students in the published class. Central attendance marking is not enabled.</p>
+<h1>{{ record.code }} · {{ record.name }}</h1><p>Read-only roster of currently active students in the published class. Attendance for current verified lessons is available through <a href="{% url 'live-day' %}">My day</a>.</p>
 {% if publication.snapshot.source == "dated" and not publication.snapshot.stats.rosters_ready %}<p class="note">Student rosters are not yet published. Ask your administrator to apply both roster reports and republish.</p>{% endif %}<section class="panel"><h2>Students ({{ students.paginator.count }})</h2><table><thead><tr><th>Student</th><th>Year</th>{% if admin_roster %}<th>EQID</th>{% endif %}</tr></thead><tbody>
 {% for stu in students %}<tr><td>{{ stu.last_name }}, {{ stu.preferred_name|default:stu.first_name }}</td><td>{{ stu.year_level }}</td>{% if admin_roster %}<td>{{ stu.student_id }}</td>{% endif %}</tr>{% empty %}<tr><td colspan="3">No current students in this roster.</td></tr>{% endfor %}
 </tbody></table><nav>{% if students.has_previous %}<a href="?page={{ students.previous_page_number }}&amp;date={{ roster_date|urlencode }}">Previous</a>{% endif %}Page {{ students.number }} of {{ students.paginator.num_pages }}{% if students.has_next %}<a href="?page={{ students.next_page_number }}&amp;date={{ roster_date|urlencode }}">Next</a>{% endif %}</nav></section>
