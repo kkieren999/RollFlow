@@ -3,9 +3,32 @@
 **Last reviewed:** 27 November 2026 (Australia/Brisbane)  
 **Project:** kkieren999/RollFlow  
 **Goal:** Deliver a secure, school-wide Windows/browser application suitable for an approved Queensland secondary school pilot and eventually live deployment. The current website is the UX reference, not the production data layer.  
-**Status:** V4.6 leadership reporting committed; validation and production gates remain. No production launch or real school data authorised.
+**Status:** V4.7 Windows installers and recovery committed; validation and production approval gates remain. No production launch or real school data authorised.
 
-## CURRENT CHECKPOINT — V4.6 leadership dashboards and reporting (27 Nov 2026)
+## CURRENT CHECKPOINT — V4.7 Windows installation and recovery (27 Nov 2026)
+
+**Latest cumulative branch:** `feature/v4.7-windows-installer`, head `a511ec7dea58bdf6108cb62bbc07ae7a433698d4`, draft PR #44 https://github.com/kkieren999/RollFlow/pull/44 (base windows-release). Verify actual head before changes. This supersedes all earlier checkpoints.
+
+### Build status
+- V4.5 exact commit 4b034863 #328 passed all jobs; artifact 15154945055 https://github.com/kkieren999/RollFlow/actions/runs/45896510104/artifacts/15154945055 (expires 10 Dec 2026 UTC; recheck).
+- V4.6 #331/#332 failed six reporting tests with TypeError StaffAccessGrant object is not callable: LiveFoundationTests.setUp assigns self.grant, shadowing ReportingTests.grant. Renamed test helper to report_grant in 7ef5dddf9639b90473d1c0ce9bfc4d2c9cac6ca4 on feature/v4.6-leadership-reporting; all 164 application tests and PostgreSQL/native jobs passed in repaired #333 https://github.com/kkieren999/RollFlow/actions/runs/45930453060 and #334 https://github.com/kkieren999/RollFlow/actions/runs/45930458695; Windows pending at inspection. V4.7 inherits repair.
+- V4.7 initial commit 70830e49 #335 https://github.com/kkieren999/RollFlow/actions/runs/45930631258 standard tests passed; PostgreSQL/native running. Latest exact commit a511ec7d push #336 https://github.com/kkieren999/RollFlow/actions/runs/45930736471 running; draft PR #44 triggered, check exact head PR run. No V4.7 setup file or Windows artifact verified yet.
+- Expected artifact names RollFlow-V4.7.0-Windows-Installers-x64-STAGING (two setup EXEs and .sha256 files), RollFlow-V4.7.0-Portable-Windows-x64-STAGING. No signing credentials, no production deployment, no real records or merge authorised.
+
+### Implemented
+- deployment/installer.iss: Inno Setup 6 per-user x64 versioned installation wizard for full LocalLab and separate lightweight Workstation. Start menu, optional desktop shortcut; no automatic setup, start, service registration or migration; no same-version overwrite or installing over a private instance. LocalLab deliberately has no unattended uninstaller: old PostgreSQL runtime paths may be referenced by existing instances; manual ICT retirement. Workstation uninstaller preserves URL-only preference. Full staging runtime includes fictional training and protected local DB as separate modes.
+- deployment/workstation.py: approved DNS HTTPS origin only, no URL credentials, paths, queries or custom ports; explicit confirmation, local URL-only configuration, default browser sign-in and certificate-checked diagnostic (no redirect following or TLS bypass). No DB or app server in client package. User-configurable URL, not ICT-enforced policy; approved central server DNS/TLS, proxy/firewall, service account, endpoint deployment and service supervision remain ICT tasks.
+- deployment/bundle_integrity.py: SHA256 manifest generation and strict verification, path traversal and duplicate guards. Detects corruption, not publisher authenticity. Setup binaries have checksum files; unsigned staging. Actual Authenticode signing/timestamping requires approved credentials and process. No automatic update channel; versioned side-by-side controlled manual updates, retain old runtime.
+- deployment/recovery.py, native.py: stopped private snapshot of DB dump, encrypted OneSchool archive and archive key, restrictive ACL, manifest and pg_restore listing; upgrade seals snapshot before migration, failed migration guard blocks subsequent new-code start/manage, no automatic downgrade. restore-staging creates new independent state and ports, restores verified synthetic snapshot, migrates and clears sessions; original untouched. Diagnostics omit secrets and logs. Production recovery, encrypted offsite retention, independent approval still outstanding.
+- CI builds both setup EXEs, installs silently only on disposable runner, verifies installed manifests and lightweight client separation, runs previous native checks using installed full app, restores fictional data and encrypted archive, generates protected browser fixture in restored state only, tests three independent browser contexts and real sign-in, roster isolation, locked attendance and monitor summary. Existing training Chrome checks retained. Linux native CI adds isolated restore. Unit tests deployment/test_installer.py. These gates are committed, not yet validated on latest head.
+- docs/v4.7-installer.md, deployment/README.md. Windows version 4.7.0 staging, no application schema changes.
+
+### Next actions (strict order)
+1. Verify exact #336 and PR runs and repaired V4.6 #333/#334. Repair actual failures in installer/compiler, manifest, restore, fixture/browser or preceding tests, without weakening security. Confirm setup artifacts, actual filenames, hashes, expiry, commit, and tested installation. Record final evidence here. Use no older failing head.
+2. Complete V4.7 acceptance: real controlled Windows deployment pilot on approved test infrastructure; approved Authenticode signing/timestamping, managed/pinned server configuration and approved TLS proxy/DNS/firewall, service lifecycle/account and monitoring, controlled release/update and verified rollback plan (do not run old app against migrated DB), approved production backup/restore and retention/RPO/RTO, full protected workflow browser/concurrency/performance and recovery tests. Existing CI only narrow synthetic tests; no school records.
+3. V5.0 Production Launch preparation: inventory and finish unresolved prior phase gaps; school ICT/privacy approval, independent security review, approved identity provider SSO/MFA, authorised OneSchool report/transfer method, safe enrolment/rollback and historical attendance/reconciliation, operational policy for movement and confidential support, authorised delegated actions, reporting privacy review, data retention, load/recovery drills, school staff training, pilot and support plan. Do not deploy or claim production approval without explicit evidence. Work may produce readiness checklist and release candidate but actual launch requires approvals and signing. Continue cumulative branch, keep public fictional website unchanged, update this file each session.
+
+## PREVIOUS CHECKPOINT — V4.6 leadership dashboards and reporting (27 Nov 2026)
 
 **Latest cumulative branch:** `feature/v4.6-leadership-reporting`, head `1926ef6704134ac734408b67b9d3567525f0c197`, draft PR #43 https://github.com/kkieren999/RollFlow/pull/43 (base windows-release). Verify actual branch head before edits. This supersedes prior checkpoints.
 
@@ -177,7 +200,7 @@ This file is the durable project handover, not a transcript. Read it in full bef
 
 1. Connect to the GitHub repository and re-check the live branch heads, open pull requests, workflow runs, job logs and artifacts. Facts in this file are a snapshot; current repository evidence takes precedence.
 2. Resume the first incomplete task in the CURRENT CHECKPOINT above, then consult the earlier roadmap sections. Do not start an unrelated implementation or restart from an older release just because it is the default branch.
-3. Work from the latest cumulative Windows development branch, presently `feature/v4.6-leadership-reporting`. For a new phase, create a feature branch from the verified cumulative head. Inspect other overlapping branches before merging. Use an expected-head lease when updating a branch.
+3. Work from the latest cumulative Windows development branch, presently `feature/v4.7-windows-installer`. For a new phase, create a feature branch from the verified cumulative head. Inspect other overlapping branches before merging. Use an expected-head lease when updating a branch.
 4. Preserve working OneSchool imports, database schema/history, access boundaries and public website. Prefer incremental migrations and shared UI components; do not discard working code unnecessarily. Do not merge, deploy, delete existing databases, publish real data, or change school infrastructure without explicit approval.
 5. Add tests with fictional data. Run/trigger Django checks, migration consistency, all relevant regression tests, PostgreSQL/native smoke, browser checks and Windows packaging. Investigate failed jobs rather than weakening security or suppressing tests. A queued/running build is not a successful build.
 6. Create or update a draft PR. Report actual changes, limitations, branch, commit, PR, test outcomes and a verified artifact URL. Never claim an installer is ready unless the exact commit's required jobs passed and the artifact exists.
@@ -208,7 +231,9 @@ Stable handover URL: https://github.com/kkieren999/RollFlow/blob/development-han
 
 | Prior cumulative V4.5 development source | `feature/v4.5-classroom-student-support` — `4b0348637e54617723ff77f3be965e6340f5bb8e`, draft PR #42 |
 
-| **Current cumulative development source** | `feature/v4.6-leadership-reporting` — `1926ef6704134ac734408b67b9d3567525f0c197`, draft PR #43 |
+| Prior cumulative V4.6 development source | `feature/v4.6-leadership-reporting` — `1926ef6704134ac734408b67b9d3567525f0c197`, draft PR #43 |
+
+| **Current cumulative development source** | `feature/v4.7-windows-installer` — `a511ec7dea58bdf6108cb62bbc07ae7a433698d4`, draft PR #44 |
 
 Links:
 - Website: https://kkieren999.github.io/RollFlow/
