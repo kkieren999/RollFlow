@@ -22,7 +22,7 @@ class GrantForm(forms.Form):
     template = forms.ModelChoiceField(queryset=RoleTemplate.objects.none(), required=False, help_text="Optional reviewed bundle. Its scope and capabilities are copied at assignment; choose matching scope. Role label is copied.")
     starts_at = forms.DateTimeField(required=False, widget=forms.DateTimeInput(attrs={"type":"datetime-local"}), help_text="School local time; blank means immediately.")
     expires_at = forms.DateTimeField(required=False, widget=forms.DateTimeInput(attrs={"type":"datetime-local"}), help_text="School local time; blank means no scheduled expiry.")
-    scope = forms.ChoiceField(choices=[("faculty", "Staff faculty"), ("year", "Year level"), ("school", "Whole school"), ("class", "Published class (read only)"), ("destination", "Movement destination ID")])
+    scope = forms.ChoiceField(choices=[("", "Choose scope"), ("faculty", "Staff faculty"), ("year", "Year level"), ("school", "Whole school"), ("class", "Published class (read only)"), ("destination", "Movement destination ID")])
     scope_value = forms.CharField(max_length=100, required=False, help_text="Exact existing faculty name, year 7–12 or published class code, or movement destination ID (see destination settings). Leave blank for whole school.")
     capabilities = forms.MultipleChoiceField(choices=list(CAPABILITIES.items()), widget=forms.CheckboxSelectMultiple, required=False)
 
@@ -63,11 +63,11 @@ class GrantForm(forms.Form):
             if not MovementDestination.objects.filter(pk=int(value),active=True,requires_reception=True).exists():
                 self.add_error("scope_value", "Select an active staffed movement destination ID.")
         if not valid_scope(scope, value):
-            self.add_error("scope_value", "Enter a valid scope.")
+            self.add_error("scope_value", "Enter a valid scope. Choose a scope and supply its required value. Whole school requires an empty scope value.")
         elif scope == "faculty" and not StaffProfile.objects.filter(faculty__iexact=value).exists():
             self.add_error("scope_value", "Choose an existing faculty exactly.")
         if scope in SCOPES and not set(caps).issubset(SCOPES[scope]):
-            self.add_error("capabilities", "These modules cannot be safely scoped to the selected area.")
+            self.add_error("capabilities", "These modules cannot be safely scoped to the selected area: " + ", ".join(CAPABILITIES.get(cap, cap) for cap in caps if cap not in SCOPES[scope]))
         if not template and role == "Head of Department" and scope != "faculty":
             self.add_error("scope", "HOD grants must be faculty scoped.")
         if not template and role == "Head of Year" and scope != "year":
@@ -126,7 +126,7 @@ def manage_access(request):
         if action != "grant":
             return HttpResponseForbidden("Unknown access action.")
     grants = StaffAccessGrant.objects.select_related("user", "granted_by", "template").order_by("user__username", "pk")
-    return render(request, "school_access_manage.html", {"form": form, "grants": Paginator(grants, 50).get_page(request.GET.get("page"))})
+    return render(request, "school_access_manage.html", {"form": form, "grants": Paginator(grants, 50).get_page(request.GET.get("page")), "scope_capabilities": {k: sorted(v) for k,v in SCOPES.items()}})
 
 
 @never_cache
