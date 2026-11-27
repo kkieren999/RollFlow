@@ -39,3 +39,25 @@ class InstallerTests(unittest.TestCase):
             root=Path(tmp)
             (root/"SHA256SUMS.txt").write_text("a"*64+"  ../outside\n")
             with self.assertRaises(ValueError):verify(root)
+
+    def test_strict_manifest_rejects_unlisted_symlink(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            (root/"file.txt").write_text("fictional")
+            manifest(root)
+            try:
+                (root/"unlisted").symlink_to(root/"missing")
+            except (OSError,NotImplementedError):
+                self.skipTest("Symlink creation unavailable")
+            with self.assertRaisesRegex(ValueError,"symbolic link"):
+                verify(root,strict=True)
+
+    def test_manifest_rejects_case_collision(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            (root/"file.txt").write_text("first")
+            if (root/"FILE.txt").exists():
+                self.skipTest("Case-insensitive filesystem")
+            (root/"FILE.txt").write_text("second")
+            with self.assertRaisesRegex(ValueError,"Case-colliding"):
+                manifest(root)
