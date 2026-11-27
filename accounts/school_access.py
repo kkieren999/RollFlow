@@ -16,6 +16,14 @@ CAPABILITIES = {
     "timetable": "Manual timetable",
     "published_classes": "Published OneSchool classes",
     "published_timetable": "Published OneSchool timetable",
+    "report_attendance": "Leadership attendance summary",
+    "export_attendance": "Export leadership attendance summary",
+    "report_movements": "Leadership movement summary",
+    "export_movements": "Export leadership movement summary",
+    "report_workforce": "Leadership workforce summary",
+    "export_workforce": "Export leadership workforce summary",
+    "report_support": "Leadership educational support aggregates",
+    "export_support": "Export educational support aggregates",
     "attendance_monitor": "School-wide attendance monitoring (summary only)",
     "support_task": "Assigned learning support tasks (named student only)",
     "support_referral": "Assigned educational referrals (named student only)",
@@ -26,8 +34,8 @@ CAPABILITIES = {
 }
 SCOPES = {
     "school": set(CAPABILITIES) - {"movement_receive"},
-    "faculty": {"staff", "classes", "timetable", "published_classes", "published_timetable"},
-    "year": {"students", "classes", "timetable", "published_classes", "published_timetable"},
+    "faculty": {"staff", "classes", "timetable", "published_classes", "published_timetable", "report_attendance", "export_attendance", "report_movements", "export_movements", "report_workforce", "export_workforce"},
+    "year": {"students", "classes", "timetable", "published_classes", "published_timetable", "report_attendance", "export_attendance", "report_movements", "export_movements", "report_workforce", "export_workforce"},
     "class": {"published_classes", "published_timetable"},
     "destination": {"movement_receive"},
 }

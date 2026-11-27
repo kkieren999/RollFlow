@@ -136,6 +136,8 @@ def workspace(request, module=None):
         return redirect("teacher-login")
     grants = grants_for(request.user)
     modules = visible_modules(grants)
+    if module and module.startswith(("report_","export_")) and module in modules:
+        return redirect("leadership-reports")
     if module == "attendance_monitor" and module in modules:
         return redirect("live-monitor")
     if module in ("support_task","support_referral","support_coordinator") and module in modules:

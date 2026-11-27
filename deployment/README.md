@@ -1,3 +1,7 @@
+# V4.6 leadership reporting staging
+
+See [V4.6 notes](../docs/v4.6-reporting.md). Explicit report and export grants required. Existing state paths unchanged; fictional data only.
+
 # V4.5 classroom and student support staging
 
 See [V4.5 notes](../docs/v4.5-classroom-support.md). Existing state paths unchanged. Fictional data only.

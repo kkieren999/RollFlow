@@ -6,9 +6,10 @@ from accounts.teacher_week_views import week as teacher_week
 from accounts.connected_views import roster as connected_roster
 from accounts.school_access_views import workspace, manage_access
 
-from accounts import live_views, security_views, movement_views, workforce_views, classroom_views
+from accounts import live_views, security_views, movement_views, workforce_views, classroom_views, report_views
 
 urlpatterns = [
+    path('live/reports/', report_views.reports, name='leadership-reports'),
     path('live/classroom/', classroom_views.classroom, name='classroom-tools'),
     path('live/support/', classroom_views.board, name='support-board'),
     path('live/support/<str:kind>/<int:pk>/change/', classroom_views.change, name='support-change'),

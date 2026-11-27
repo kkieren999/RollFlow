@@ -31,8 +31,11 @@ def shell(user):
     modules.pop("attendance_monitor", None)
     from .movement_service import may_access
     from .classroom_support import board_allowed
+    from .reporting import available
+    reports=available(user,grants)
+    modules={k:v for k,v in modules.items() if not k.startswith(("report_","export_"))}
     from .workforce_service import self_allowed, authority
-    return {"support_access":board_allowed(user),"workforce_self":self_allowed(user),"workforce_monitor":authority(user),"movements":may_access(user), "teaching": can_teach(user), "monitor": can_monitor(user),
+    return {"report_access":bool(reports),"support_access":board_allowed(user),"workforce_self":self_allowed(user),"workforce_monitor":authority(user),"movements":may_access(user), "teaching": can_teach(user), "monitor": can_monitor(user),
             "admin_access": user.is_staff and user.is_superuser,
             "modules": modules, "grants": grants}
 

@@ -58,7 +58,7 @@ def main():
         from windows_launchers import write_launchers
     write_launchers(out)
     (out / "BUILD-INFO.json").write_text(json.dumps({
-        "version": "4.5.0-staging",
+        "version": "4.6.0-staging",
         "source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
         "website_commit": (app / "training" / "SOURCE_COMMIT.txt").read_text().strip(),
         "website_mode": "exact offline public workspace; fictional data only",
@@ -66,7 +66,7 @@ def main():
         "channel": "unsigned staging"
     }, indent=2) + "\n", encoding="utf-8")
     (out / "READ FIRST.txt").write_text(
-        "ROLLFLOW 4.5 - SCHOOL MANAGEMENT SYSTEM (STAGING)\n"
+        "ROLLFLOW 4.6 - SCHOOL MANAGEMENT SYSTEM (STAGING)\n"
         "Extract the entire package to a new local folder before running it.\n"
         "Start RollFlow.cmd opens the protected database workspace menu.\n"
         "Open Training Demo.cmd opens the separate fictional offline website without database setup.\n"
@@ -77,7 +77,7 @@ def main():
         "then Start Existing Protected.cmd. Never initialise or delete an existing instance.\n"
         "Existing school staging data and the fresh database are not shared.\n"
         "Protected mode is not yet feature-equivalent to the public training workspace.\n"
-        "See app/deployment/README.md and app/docs/v4.5-classroom-support.md. No real school data in staging.\n",
+        "See app/deployment/README.md and app/docs/v4.6-reporting.md. No real school data in staging.\n",
         encoding="utf-8")
     manifest = []
     for path in sorted(out.rglob("*")):
