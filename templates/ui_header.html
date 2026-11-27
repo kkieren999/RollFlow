@@ -1,3 +1,4 @@
+{% if rf_shell %}{% include "protected_navigation.html" %}{% else %}
 {# Unified staff-facing navigation, visible links only; server permissions remain authoritative. #}
 <header class="rf-appbar">
   <a class="rf-brand" href="{% if portal == 'teacher' %}{% url 'teacher-timetable' %}{% else %}{% url 'management-dashboard' %}{% endif %}">
@@ -30,3 +31,4 @@
     <button class="rf-signout" type="submit">Sign out</button>
   </form>
 </header>
+{% endif %}
