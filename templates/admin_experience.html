@@ -9,6 +9,7 @@
 <a href="{% url 'admin-account-review' %}" {% if section == "accounts" %}aria-current="page"{% endif %}>Account review</a>
 <a href="{% url 'admin-audit-review' %}" {% if section == "audit" %}aria-current="page"{% endif %}>Audit &amp; activity</a>
 <a href="{% url 'admin-system-settings' %}" {% if section == "settings" %}aria-current="page"{% endif %}>System settings</a>
+<a href="{% url 'admin-pilot-readiness' %}">Pilot readiness</a>
 </nav>
 {% if section == "overview" %}
 <div class="live-grid">{% for label,value in stats %}<section class="live-card"><h2>{{ value }}</h2><p>{{ label }}</p></section>{% endfor %}</div>
