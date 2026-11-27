@@ -1,3 +1,7 @@
+# RC3 operational guidance
+
+**Fictional staging only.** Start with [RC3 ICT deployment runbook](../docs/v5.0-rc3-ict-deployment.md), [pilot readiness index](../docs/v5.0-rc3-pilot-readiness.md) and the Pilot Readiness launcher. The legacy school-mode examples below describe a future architecture only and are blocked by code in this release. Current RC3 launcher paths and snapshot/isolated restore procedures are in the RC3 runbook and recovery handbook; historical version instructions below are not the current installation procedure.
+
 # V5.0 RC1 — production launch preparation
 
 See [V5.0 release candidate](../docs/v5.0-release-candidate.md). School startup is deliberately blocked. Use fictional local staging only; no real data or public deployment.
