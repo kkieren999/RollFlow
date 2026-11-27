@@ -83,6 +83,7 @@ def config_env(cfg):
     school = cfg["mode"] == "school"
     env.update({
         "ROLLFLOW_DEBUG": "0" if school else "1",
+        "ROLLFLOW_PROTECTED_WORKSPACE": "1",
         "ROLLFLOW_SCHOOL_MODE": "1" if school else "0",
         "ROLLFLOW_LIVE_TIMETABLE": "1" if school else "0",
         "ROLLFLOW_TRUST_HTTPS_PROXY": "1" if school else "0",
@@ -209,6 +210,7 @@ def upgrade(cfg):
         raise RuntimeError("Stop the existing RollFlow instance and PostgreSQL before upgrading.")
     lock = state / "upgrade-in-progress.lock"
     write_private(lock, "Existing-instance upgrade in progress.\n")
+    migration_started = False
     try:
         root = state / "upgrade-backups"
         if root.is_symlink():
@@ -249,12 +251,21 @@ def upgrade(cfg):
             backup(cfg, dest / "rollflow.dump")
             run([pg(cfg, "pg_restore"), "--list", dest / "rollflow.dump"],
                 stdout=subprocess.DEVNULL)
+            from deployment.recovery import seal
+            seal(dest,cfg["mode"])
             print("Verified pre-upgrade backup:", dest)
+            migration_started = True
             manage(cfg, "migrate", "--noinput")
             manage(cfg, "migrate", "--check")
             manage(cfg, "check")
             manage(cfg, "collectstatic", "--noinput")
         print("Upgrade complete. Keep the original installation and backup; start the new code.")
+    except BaseException:
+        if migration_started:
+            marker=state/"recovery-required.lock"
+            if not marker.exists():
+                write_private(marker,"Upgrade failed after migration began. ICT recovery required.\n")
+        raise
     finally:
         lock.unlink(missing_ok=True)
 
@@ -278,19 +289,40 @@ def main():
     m.add_argument("args", nargs=argparse.REMAINDER)
     b = sub.add_parser("backup")
     b.add_argument("output", type=Path)
+    snap=sub.add_parser("snapshot",help="Stopped private database and archive snapshot")
+    snap.add_argument("output",type=Path)
+    restore=sub.add_parser("restore-staging",help="Restore verified staging snapshot into NEW state")
+    restore.add_argument("snapshot",type=Path)
+    restore.add_argument("--pg-bin",type=Path)
+    restore.add_argument("--db-port",type=int,required=True)
+    restore.add_argument("--web-port",type=int,required=True)
+    sub.add_parser("diagnostics")
     args = parser.parse_args()
     state = args.state.expanduser().resolve()
-    if args.command == "init":
+    if args.command in ("init","restore-staging"):
         if not all(1024 <= p <= 65535 for p in (args.db_port, args.web_port)) or args.db_port == args.web_port:
             parser.error("Choose different, unprivileged TCP ports.")
-        init(args, state)
+        if args.command=="restore-staging":
+            from deployment.recovery import restore
+            restore(args.snapshot,state,args.pg_bin,args.db_port,args.web_port)
+        else:init(args,state)
         return
     cfg = load(state)
+    if args.command=="diagnostics":
+        from deployment.recovery import diagnostics
+        diagnostics(cfg)
+        return
+    if (state/"recovery-required.lock").exists():
+        raise RuntimeError("Recovery required. Preserve this instance; restore into a separate staging state.")
     if args.command == "upgrade":
         upgrade(cfg)
         return
     if (state / "upgrade-in-progress.lock").exists():
         raise RuntimeError("Upgrade in progress. Do not start or manage the instance.")
+    if args.command=="snapshot":
+        from deployment.recovery import snapshot
+        snapshot(cfg,args.output)
+        return
     with database(cfg):
         if args.command == "start":
             manage(cfg, "migrate", "--check")

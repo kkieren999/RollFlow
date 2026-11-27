@@ -4,8 +4,31 @@ from accounts.master_views import master
 from accounts.views import portal_login, teacher, sign_out, teacher_timetable
 from accounts.teacher_week_views import week as teacher_week
 from accounts.connected_views import roster as connected_roster
+from accounts.school_access_views import workspace, manage_access
+
+from accounts import live_views, security_views, movement_views, workforce_views, classroom_views, report_views
 
 urlpatterns = [
+    path('live/reports/', report_views.reports, name='leadership-reports'),
+    path('live/classroom/', classroom_views.classroom, name='classroom-tools'),
+    path('live/support/', classroom_views.board, name='support-board'),
+    path('live/support/<str:kind>/<int:pk>/change/', classroom_views.change, name='support-change'),
+    path('live/workforce/', workforce_views.board, name='workforce-board'),
+    path('live/workforce/mine/', workforce_views.mine, name='workforce-mine'),
+    path('live/workforce/notices/<int:pk>/ack/', workforce_views.acknowledge, name='workforce-ack'),
+    path('live/movements/', movement_views.board, name='movement-board'),
+    path('live/movements/issue/', movement_views.issue, name='movement-issue'),
+    path('live/movements/<int:pk>/', movement_views.detail, name='movement-detail'),
+    path('live/movements/<int:pk>/change/', movement_views.change, name='movement-change'),
+    path('manage/movement-destinations/', movement_views.destinations, name='movement-destinations'),
+    path("manage/security/templates/", security_views.templates, name="security-templates"),
+    path("manage/security/effective/<int:pk>/", security_views.effective, name="security-effective"),
+    path("manage/security/history/", security_views.history, name="security-history"),
+    path("account/password/", security_views.password, name="security-password"),
+    path("live/", live_views.home, name="live-home"),
+    path("live/day/", live_views.my_day, name="live-day"),
+    path("live/roll/", live_views.mark_roll, name="live-roll"),
+    path("live/attendance/", live_views.monitor, name="live-monitor"),
     path("", portal_login, name="teacher-login"),
     path("login/", portal_login),
     path("admin-login/", portal_login, {"mode": "admin"}, name="admin-login"),
@@ -15,6 +38,9 @@ urlpatterns = [
     path("teacher/", teacher, name="teacher"),
     path("teacher/roster/<str:code>/", connected_roster, name="connected-teacher-roster"),
     path("logout/", sign_out, name="logout"),
+    path("workspace/", workspace, name="school-workspace"),
+    path("workspace/<str:module>/", workspace, name="school-workspace-module"),
+    path("manage/access/", manage_access, name="school-access-manage"),
     path("manage/", include("rollflow.management_urls")),
     path("admin/", admin_site.urls),
 ]
