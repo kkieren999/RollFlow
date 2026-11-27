@@ -98,3 +98,49 @@ body:has(.rf-protected-shell[data-theme="dark"]) main tbody tr:hover{background:
 @media(prefers-reduced-motion:reduce){.rf-protected-shell *{scroll-behavior:auto!important;transition:none!important}}
 
 .rf-p-quicklink small{display:block;color:var(--rf-muted);font-size:12px}.rf-p-quicklink>span:last-child{margin-left:auto}.rf-protected-shell{position:relative;min-width:0}.rf-p-account summary:focus-visible,.rf-p-menu:focus-visible,.rf-p-navlink:focus-visible{outline:3px solid #e8b63e;outline-offset:-3px}
+
+
+/* RC2.2 teacher workflows: actual published data, not demo-generated cards. */
+.rf-sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.rf-teacher-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+body:has(.rf-protected-shell) main .rf-schedule-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--rf-surface);padding:12px;margin:16px 0;border-radius:12px}
+.rf-schedule-nav,.rf-schedule-nav form,.rf-view-toggle{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.rf-tool-btn,.rf-view-toggle a{display:inline-flex;align-items:center;min-height:38px;padding:7px 12px;border:1px solid var(--rf-border);border-radius:8px;background:var(--rf-surface);text-decoration:none}
+.rf-view-toggle a[aria-current="page"]{background:var(--rf-action);color:#fff!important;border-color:var(--rf-action)}
+.rf-schedule-source{font-size:12px;color:var(--rf-muted);overflow-wrap:anywhere}
+.rf-teacher-week{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;align-items:start}
+.rf-schedule-day{min-width:0;border:1px solid var(--rf-border);background:var(--rf-surface);border-radius:12px;overflow:hidden}
+.rf-schedule-dayhead{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;background:var(--rf-context);padding:12px;color:var(--rf-text);border-bottom:1px solid var(--rf-border)}
+.rf-schedule-dayhead strong,.rf-schedule-dayhead span{display:block}.rf-schedule-dayhead span{font-size:12px}
+.rf-schedule-empty{padding:10px 12px;color:var(--rf-muted);font-size:13px;margin:0}
+.rf-lesson-card{display:grid;grid-template-columns:110px minmax(0,1fr) minmax(120px,auto);gap:14px;margin:10px;padding:12px;border:1px solid var(--rf-border);border-left:4px solid #16852b;border-radius:8px;background:var(--rf-surface);min-width:0}
+.rf-lesson-card h2{font-size:16px;margin:0 0 5px;overflow-wrap:anywhere}
+.rf-lesson-time strong,.rf-lesson-time span{display:block}.rf-lesson-time span{font-size:12px;color:var(--rf-muted)}
+.rf-lesson-meta{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--rf-muted);margin-bottom:8px}
+.rf-status{display:inline-block;background:var(--rf-context);color:var(--rf-text);border:1px solid var(--rf-border);font-weight:600;font-size:11px;padding:3px 7px;border-radius:6px;max-width:100%}
+.rf-status[data-status="Submitted"]{background:var(--rf-success-bg);color:var(--rf-success-text)}
+.rf-status[data-status="Draft"],.rf-status[data-status="Review required"],.rf-status[data-status="Roster review required"]{background:var(--rf-warning-bg);color:var(--rf-warning-text)}
+.rf-lesson-duty{border-left-color:#0076a8}.rf-lesson-gap{border-left-color:#9ca7ac;grid-template-columns:110px minmax(0,1fr)}
+.rf-lesson-actions{display:flex;align-items:flex-start;flex-direction:column;gap:5px;font-size:12px}
+.rf-teacher-week .rf-lesson-card{grid-template-columns:1fr;gap:8px;margin:6px;padding:9px}
+.rf-teacher-week .rf-lesson-actions{align-items:stretch}
+.rf-directory-filters{display:flex;align-items:end;gap:10px;flex-wrap:wrap}
+.rf-directory-filters label{display:block;font-weight:600;margin-bottom:4px}
+.rf-directory-filters input{width:min(280px,100%)}
+.rf-class-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,215px),1fr));gap:12px}
+.rf-directory-card{background:var(--rf-context);border:1px solid var(--rf-border);border-radius:10px;padding:14px;min-width:0}
+.rf-directory-card h2{margin:8px 0 0}.rf-directory-card p{margin:4px 0 10px}
+.rf-directory-pages{display:flex;justify-content:center;align-items:center;gap:16px;padding:12px;flex-wrap:wrap}
+.rf-class-hero{padding:18px;background:var(--rf-surface);border:1px solid var(--rf-border);border-left:4px solid #16852b;border-radius:12px}
+.rf-class-action{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid var(--rf-border)}
+.rf-roll-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(95px,1fr));gap:8px}
+.rf-roll-stat{background:var(--rf-context);border:1px solid var(--rf-border);border-radius:8px;padding:10px;text-align:center}
+.rf-roll-stat strong,.rf-roll-stat span{display:block}.rf-roll-stat strong{font-size:24px}.rf-roll-stat span{font-size:12px}
+.rf-mark-buttons{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}
+body:has(.rf-protected-shell) main .rf-mark-buttons button{background:var(--rf-context);color:var(--rf-text);border:1px solid var(--rf-border);min-width:42px;font-weight:700}
+body:has(.rf-protected-shell) main .rf-mark-buttons button[aria-pressed=true][data-mark="P"]{background:var(--rf-success-bg);color:var(--rf-success-text);border-color:var(--rf-success-text)}
+body:has(.rf-protected-shell) main .rf-mark-buttons button[aria-pressed=true][data-mark="A"]{background:var(--rf-danger-bg);color:var(--rf-danger-text);border-color:var(--rf-danger-text)}
+body:has(.rf-protected-shell) main .rf-mark-buttons button[aria-pressed=true][data-mark="L"]{background:var(--rf-warning-bg);color:var(--rf-warning-text);border-color:var(--rf-warning-text)}
+body:has(.rf-protected-shell) main .rf-mark-buttons button[aria-pressed=true][data-mark=""]{outline:2px solid var(--rf-muted)}
+@media(max-width:1100px){.rf-teacher-week{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.rf-teacher-week{grid-template-columns:1fr}.rf-lesson-card,.rf-lesson-gap{grid-template-columns:1fr;gap:7px}.rf-lesson-actions{flex-direction:row;flex-wrap:wrap;align-items:center}.rf-schedule-nav input{max-width:165px}}
