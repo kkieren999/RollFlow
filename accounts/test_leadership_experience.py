@@ -112,3 +112,20 @@ class OperationsExperienceTests(TestCase):
         self.assertIn("teacher-attendance.js",html)
         self.assertNotIn("teacher-attendance.js",html.split("</title>",1)[0])
         self.assertIn("rf-mark-select",html)
+
+
+    def test_operational_summary_only_explicit_monitors(self):
+        from .leadership_experience import operational_summary
+        self.assertEqual(operational_summary(self.other,self.pub),[])
+        self.client.force_login(self.monitor)
+        self.assertEqual([s["label"] for s in operational_summary(self.monitor,self.pub)],["Attendance Overview"])
+        r=self.client.get("/live/")
+        self.assertContains(r,"Today's whole-school operational monitoring")
+        self.assertNotContains(r,"FictionalPupil")
+        self.assertNotContains(r,'data-rf-operations="Workforce Allocations"')
+        self.assertEqual(self.client.get("/live/leadership/").status_code,403)
+        g=StaffAccessGrant.objects.create(user=self.monitor,role="Business Manager",scope="school",
+            capabilities=["workforce_monitor"],granted_by=self.admin)
+        self.assertContains(self.client.get("/live/"),'data-rf-operations="Workforce Allocations"')
+        g.delete()
+        self.assertNotContains(self.client.get("/live/"),'data-rf-operations="Workforce Allocations"')

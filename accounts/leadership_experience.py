@@ -43,3 +43,46 @@ def dashboard(user,query=None):
     return {"choice":choice,"choices":links,"start":start,"end":end,"publication":pub.pk if pub else None,
             "metrics":metrics,"notes":notes,"completion":completion,
             "report_url":report_link(choice,start,end)}
+
+
+def operational_summary(user,pub=None):
+    """Whole-school operational monitors only, distinct from scoped reports.
+
+    No named records, report authority, export access or new writes.
+    """
+    from .security_service import eligible_account
+    from .attendance import can_monitor,publication_ready
+    from .attendance_operations import daily_status
+    from .connected_school import date_is_school_day
+    from .movement_service import authority as movement_authority,visible
+    from .workforce_service import authority as workforce_authority,entries,coverage,closed
+    if not eligible_account(user):return []
+    today=timezone.localdate()
+    pub=current() if pub is None else pub
+    ready=bool(publication_ready(pub) and date_is_school_day(pub,today))
+    sections=[]
+    def add(label,route,metrics,note):
+        sections.append({"label":label,"url":reverse(route),"metrics":[{"label":k,"value":v} for k,v in metrics],"note":note})
+    if can_monitor(user):
+        values=[]
+        if ready:
+            _,summary=daily_status(pub,today)
+            values=[("Scheduled lesson keys",summary["expected"]),("Verified submitted rolls",summary["submitted"]),
+                    ("Outstanding rolls",summary["outstanding"]),("Data exceptions",summary["exceptions"])]
+        add("Attendance Overview","live-monitor",values,"Current reviewed day; not official pupil attendance percentages." if ready else "No source-ready published school day.")
+    if movement_authority(user)[1]:
+        qs=visible(user).filter(closed_at__isnull=True)
+        add("Student Movements","movement-board",[("Open passes",qs.count()),("Overdue passes",qs.filter(due_at__lte=timezone.now()).count())],
+            "All dates, including carryover. Recorded events only, not physical location.")
+    if workforce_authority(user):
+        values=[]
+        if ready:
+            rows=coverage(pub,today)
+            q=entries(pub,today)
+            values=[("Recorded full-day unavailability",q.filter(kind="absence").count()),
+                    ("Uncovered lessons",sum(not r["covered"] for r in rows)),
+                    ("Supervision duties",q.filter(kind="duty").count()),("Room changes",q.filter(kind="room").count())]
+        add("Workforce Allocations","workforce-board",values,
+            "Approved closure for today." if ready and closed(pub,today) else
+            "Current recorded changes, not actual staff availability." if ready else "No source-ready published school day.")
+    return sections
