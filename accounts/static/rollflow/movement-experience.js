@@ -13,7 +13,9 @@
  const search=document.getElementById('rf-movement-search');
  if(search){
    const input=document.getElementById('rf-movement-query'),status=document.getElementById('rf-movement-search-status'),rows=[...document.querySelectorAll('[data-rf-pass-row]')];
-   search.hidden=false;
+   input.disabled=false;
+   search.dataset.ready="true";
+   status.textContent=rows.length+" displayed passes. Search is limited to the current page of authorised records.";
    input.addEventListener('input',()=>{const q=input.value.trim().toLocaleLowerCase();let count=0;
      rows.forEach(r=>{r.hidden=!!q&&!r.textContent.toLocaleLowerCase().includes(q);if(!r.hidden)count++;});
      status.textContent=count+' matching displayed passes. Search is limited to the current page of authorised records.';
