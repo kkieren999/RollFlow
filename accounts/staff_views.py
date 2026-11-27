@@ -75,10 +75,10 @@ def dashboard(request):
     version=current_version()
     imported_stats=[]
     if version:
-        a=version.summary
+        a=version.summary if isinstance(version.summary,dict) else {}
         current=version.days.filter(date=timezone.localdate()).first()
         rows=current.allocations if current else []
-        imported_stats=[("Imported allocations",a.get("lessons",0)),("Imported classes",a.get("classes",0)),("Imported staff IDs",a.get("staff",0)),("Imported rooms",a.get("rooms",0)),("Imported school days",a.get("days",0)),("Today’s allocations",len(rows)),("Today’s classes",len({r["code"] for r in rows}))]
+        imported_stats=[("Imported allocations",a.get("lessons","Unavailable")),("Imported classes",a.get("classes","Unavailable")),("Imported staff IDs",a.get("staff","Unavailable")),("Imported rooms",a.get("rooms","Unavailable")),("Imported school days",a.get("days","Unavailable")),("Today’s allocations",len(rows)),("Today’s classes",len({r["code"] for r in rows}))]
     if connected:
         today_rows = visible_slots(connected, timezone.localdate())
         # Count the retained snapshot itself. Older publications and synthetic

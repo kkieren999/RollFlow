@@ -58,3 +58,11 @@ class ProtectedWorkspaceUITests(TestCase):
         self.assertContains(r,"Enter a valid scope")
         self.assertContains(r,"These modules cannot be safely scoped")
         self.assertFalse(StaffAccessGrant.objects.filter(user=self.teacher).exists())
+
+    def test_missing_coverage_is_explicit_not_a_server_error(self):
+        from .oneschool_views import coverage_message
+        self.assertIn("coverage is unavailable",coverage_message(self.version,self.day))
+        self.client.force_login(self.admin)
+        r=self.client.get("/manage/")
+        self.assertContains(r,"Published classes")
+        self.assertContains(r,'data-rf-shell="protected"')
