@@ -179,3 +179,67 @@ body:has(.rf-protected-shell) main .rf-seat{display:flex;flex-direction:column;a
 .rf-completion{padding:12px;border:1px solid var(--rf-border);border-radius:8px;margin:12px 0}
 .rf-completion label{font-weight:600;display:block}.rf-completion progress{display:block;width:100%;height:16px;accent-color:#16852b;margin:7px 0}.rf-completion p{font-size:12px;color:var(--rf-muted);margin:0}
 .rf-leadership-panel details summary{cursor:pointer;font-weight:600}
+
+/* RC2.7: shared protected presentation, accessibility and narrow-screen reflow.
+   Keep semantic controls and readable fallbacks; no access policy in CSS. */
+body:has(.rf-protected-shell){
+ --rf-focus-ring:#075f85;--rf-control-border:#8599a6;--rf-card-shadow:0 2px 8px #1123320c;
+ line-height:1.55;
+}
+body:has(.rf-protected-shell[data-theme="dark"]){
+ --rf-focus-ring:#f5d16c;--rf-control-border:#8fa8b6;--rf-card-shadow:none;
+}
+body:has(.rf-protected-shell) main :is(.live-card,.panel,.kpi,.rf-ui-card,.rf-directory-card){
+ box-shadow:var(--rf-card-shadow);
+}
+body:has(.rf-protected-shell) main h1{font-size:clamp(1.5rem,2.2vw,1.85rem);line-height:1.2;overflow-wrap:anywhere}
+body:has(.rf-protected-shell) main :is(p,li,td,th,label,summary){overflow-wrap:anywhere}
+body:has(.rf-protected-shell) main :is(a,button,input,select,textarea,summary,[tabindex="0"]):focus-visible{
+ outline:3px solid var(--rf-focus-ring)!important;outline-offset:2px;
+}
+body:has(.rf-protected-shell) #main-content:focus{outline:2px solid var(--rf-focus-ring);outline-offset:-2px}
+body:has(.rf-protected-shell) main a:not(.btn):not(.live-button):not(.rf-p-quicklink):not(.rf-tool-btn):not(.rf-view-toggle a):not(.rf-student-tabs a){
+ text-decoration:underline;text-underline-offset:3px;
+}
+body:has(.rf-protected-shell) main :is(input:not([type=checkbox]):not([type=radio]):not([type=hidden]),select,textarea){
+ border-color:var(--rf-control-border);min-height:42px;
+}
+body:has(.rf-protected-shell) main :is(button,.live-button,.btn,.rf-tool-btn,.rf-view-toggle a,.rf-student-tabs a){min-height:44px}
+body:has(.rf-protected-shell) main :is(input[type=checkbox],input[type=radio]){accent-color:var(--rf-action);width:18px;height:18px;vertical-align:middle}
+body:has(.rf-protected-shell) main .rf-mark-buttons button{min-width:44px}
+body:has(.rf-protected-shell) main .rf-mark-buttons button[aria-pressed=true]{box-shadow:inset 0 0 0 2px currentColor}
+body:has(.rf-protected-shell) main :is(.live-table,.table-wrap,.scroll,.rf-scroll-table){min-width:0;max-width:100%;overflow-x:auto}
+.rf-scroll-table{border-radius:8px}
+[data-rf-scrollable="true"]{scrollbar-color:var(--rf-control-border) var(--rf-surface)}
+body:has(.rf-protected-shell) main table caption{text-align:left;padding:8px;font-weight:600;color:var(--rf-text)}
+body:has(.rf-protected-shell) main :is(.live-grid,.rf-p-quickgrid,.kpis,.fields,.rf-class-grid)>*{min-width:0}
+body:has(.rf-protected-shell) main .rf-p-quicklink:focus-visible{outline-offset:2px}
+.rf-p-account summary,.rf-p-bell{min-height:44px}
+.rf-p-account summary:focus-visible,.rf-p-bell:focus-visible,.rf-p-menu:focus-visible,.rf-p-navlink:focus-visible{outline:3px solid #f5d16c;outline-offset:-3px}
+.rf-p-tabs a{min-height:44px;display:inline-flex;align-items:center}
+.rf-p-tabs a[aria-current="page"]{font-weight:700;text-decoration:underline;text-underline-offset:4px}
+.rf-p-stage{line-height:1.45}
+body:has(.rf-protected-shell[data-theme="dark"]) main :is(.btn:not(.primary),.person,.active,.helptext,.student-details small,.rf-schedule-empty,.rf-schedule-source,.rf-lesson-meta,.rf-lesson-time span){color:var(--rf-text)}
+body:has(.rf-protected-shell[data-theme="dark"]) main .btn:not(.primary){background:var(--rf-context);border-color:var(--rf-control-border)}
+body:has(.rf-protected-shell[data-theme="dark"]) main :is(.rf-native-tiles button,.rf-native-tiles button strong,.rf-native-tiles button small){color:var(--rf-text)!important}
+body:has(.rf-protected-shell[data-theme="dark"]) main .rf-native-tiles button{background:var(--rf-context)!important;border-color:var(--rf-control-border)!important}
+body:has(.rf-protected-shell[data-theme="dark"]) main .rf-native-tiles button[aria-pressed="true"]{box-shadow:inset 0 0 0 2px var(--rf-link)}
+@media(max-width:820px){
+ .rf-protected-shell[data-enhanced="true"] .rf-p-menu{min-height:44px}
+ .rf-protected-shell[data-enhanced="true"] .rf-protected-sidebar{top:var(--rf-mobile-header-height,64px);max-height:75vh;max-height:75dvh}
+ body:has(.rf-protected-shell) main :is(.live-actions,.rf-directory-filters,.rf-schedule-nav,.rf-seat-toolbar)>*{max-width:100%}
+ body:has(.rf-protected-shell) main :is(.live-grid,.rf-p-quickgrid){grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))}
+}
+@media(max-width:480px){
+ body:has(.rf-protected-shell) main#main-content{padding:12px 10px}
+ body:has(.rf-protected-shell) main :is(.live-card,.panel,.rf-ui-card,main#main-content>section){padding:12px}
+ body:has(.rf-protected-shell) main :is(.kpis,.fields,.student-search,.rf-native-tiles){grid-template-columns:1fr}
+ body:has(.rf-protected-shell) main :is(.rf-directory-filters,.rf-schedule-nav form){align-items:stretch}
+ body:has(.rf-protected-shell) main :is(.rf-directory-filters label,.rf-directory-filters input,.rf-directory-filters select){max-width:100%;width:100%}
+ body:has(.rf-protected-shell) main .rf-roll-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .rf-p-top-left{flex:1}.rf-p-top-left strong{overflow-wrap:anywhere}
+}
+@media(forced-colors:active){
+ body:has(.rf-protected-shell) main :is(button,a,input,select,textarea,summary):focus-visible{outline:3px solid Highlight!important}
+ .rf-status,.rf-p-navlink.is-active,.rf-mark-buttons button[aria-pressed="true"]{border:2px solid currentColor!important}
+}
