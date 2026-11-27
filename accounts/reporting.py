@@ -6,7 +6,7 @@ from .school_access import grants_for
 from .security_service import eligible_account
 from .attendance import publication_ready, lesson_valid, lesson_key
 from .attendance_operations import daily_status
-from .connected_school import visible_slots,personal_codes
+from .connected_school import visible_slots,personal_codes,date_is_school_day
 from .models import StaffProfile,Student,StudentMovement,WorkforceEntry,SupportTask,SupportReferral
 from .movement_service import identity_matches
 from .classroom_support import student_matches
@@ -82,8 +82,7 @@ def build(pub,choice,start,end,now=None):
     if not pub or not pub.active or not publication_ready(pub):
         return [],["No current source-ready dated publication. Reports are unavailable."]
     dates=date_range(start,end)
-    valid={d.isoformat() for d in dates} & set(pub.snapshot.get("calendar",{}).get("dates",[]))
-    days=[d for d in dates if d.isoformat() in valid]
+    days=[d for d in dates if date_is_school_day(pub,d)]
     notes=["Current reviewed publication only. Archived publications and dates outside its calendar are excluded.",
            "Aggregate operational counts, not official OneSchool attendance or confirmed physical location.",
            "Faculty means verified regular teaching allocation, not subject ownership. Year requires a single matching reviewed year and current roster."]
@@ -91,6 +90,8 @@ def build(pub,choice,start,end,now=None):
         notes.append("Some requested dates are outside the current published calendar; excluded dates are not treated as zero.")
     if not days:
         return [],notes
+    if domain=="support" and not (pub.starts<=start and end<=pub.ends):
+        return [],notes+["A completed support reporting week must be within the current publication date range."]
     scope=Scope(pub,choice)
     keys={day:scope.keys(day) for day in days}
     metrics=Counter()

@@ -114,7 +114,7 @@ def reports(request):
                     return HttpResponseForbidden("Reporting access changed.")
                 fmt=query["format"]
                 raw=csv_bytes(data) if fmt=="csv" else pdf_bytes(data)
-                audit(user,"leadership_report_export",after={"domain":choice["domain"],"scope":choice["scope"],"publication":data["publication"],
+                audit(user,"leadership_report_export",after={"domain":choice["domain"],"scope":choice["scope"],"scope_value":choice["value"],"publication":data["publication"],
                     "start":data["start"],"end":data["end"],"format":fmt,"digest":digest})
                 response=HttpResponse(raw,content_type="text/csv; charset=utf-8" if fmt=="csv" else "application/pdf")
                 response["Content-Disposition"]=f'attachment; filename="RollFlow-{choice["domain"]}-aggregate-{end.isoformat()}.{fmt}"'

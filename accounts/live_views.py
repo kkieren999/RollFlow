@@ -52,7 +52,7 @@ def home(request):
     if not eligible(request.user):
         return HttpResponseForbidden("Account not authorised.")
     ctx = shell(request.user)
-    if not (ctx["teaching"] or ctx["monitor"] or ctx["admin_access"] or ctx["modules"]):
+    if not (ctx["teaching"] or ctx["monitor"] or ctx["admin_access"] or ctx["modules"] or ctx["report_access"]):
         return HttpResponseForbidden("No assigned workspace.")
     pub = current()
     return page(request, "live_home.html", ready=publication_ready(pub))
