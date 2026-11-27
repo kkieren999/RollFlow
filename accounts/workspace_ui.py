@@ -67,9 +67,8 @@ def workspace_context(request):
     if ctx["report_access"]:
         group("REPORTING","Reports","chart",link("Leadership overview","leadership-overview"),link("Leadership reports","leadership-reports"))
     if admin:
-        group("SYSTEM","Account Management","shield",link("Account review","admin-account-review"),link("Roles & permissions","school-access-manage"),link("Role templates","security-templates"),
-              link("Access review","security-history",aliases=("/manage/security/effective/",)))
-        group("SYSTEM","Audit & Activity","list",link("Activity log","admin-audit-review"),link("Structured access history","security-history"),link("Legacy activity log","management-section",{"section":"audit"}))
+        group("SYSTEM","Account Management","shield",link("Account review","admin-account-review",aliases=("/manage/security/effective/",)),link("Roles & permissions","school-access-manage"),link("Role templates","security-templates"))
+        group("SYSTEM","Audit & Activity","list",link("Activity log","admin-audit-review"),link("Structured access history","security-history"))
         group("SYSTEM","System Management","database",link("System settings & readiness","admin-system-settings"))
         group("SYSTEM","OneSchool Import Centre","database",link("Document imports","oneschool-documents",aliases=("/manage/oneschool/documents/",)),
               link("Timetable imports","oneschool-centre",aliases=("/manage/oneschool/",) if path.startswith("/manage/oneschool/") and not path.startswith(("/manage/oneschool/documents/","/manage/oneschool/class-memberships/","/manage/oneschool/timetable-evidence/")) else ()),
