@@ -46,7 +46,7 @@ async function run(){
     if(id!=='admin'){
      assert(!protectedLabels.includes('Account Management'),id+' admin link leaked');
      assert.equal((await ctx.request.get(url+'/manage/access/')).status(),403,id+' direct admin boundary');
-     for(const route of ['/manage/system/','/manage/system/accounts/','/manage/system/audit/','/manage/system/settings/'])assert.equal((await ctx.request.get(url+route)).status(),403,id+' administration review boundary');
+     for(const route of ['/manage/system/','/manage/system/accounts/','/manage/system/audit/','/manage/system/settings/','/manage/system/pilot/'])assert.equal((await ctx.request.get(url+route)).status(),403,id+' administration review boundary');
     }
     assert.equal(await p.locator('main#main-content').count(),1,id+' single main landmark');
     const desktopMetrics=await p.evaluate(()=>({viewport:innerWidth,documentWidth:document.documentElement.scrollWidth,domNodes:document.querySelectorAll('*').length,loadMs:Math.round(performance.getEntriesByType('navigation')[0]?.duration||0)}));
@@ -75,6 +75,11 @@ async function run(){
         await p.screenshot({path:path.join(target,'admin-'+label+'-1440.png'),animations:'disabled'});
       }
       assert.match(await p.locator('main').innerText(),/Production blocked/);
+      assert.equal((await p.goto(url+'/manage/system/pilot/')).status(),200);
+      assert.match(await p.locator('main').innerText(),/Rehearsal scenarios \(12\)/);
+      assert.match(await p.locator('main').innerText(),/Open production gates \(10\)/);
+      await p.screenshot({path:path.join(target,'admin-pilot-readiness-1440.png'),animations:'disabled'});
+      await p.goto(url+'/manage/system/settings/');
       await p.setViewportSize({width:390,height:844});await p.screenshot({path:path.join(target,'admin-settings-390.png'),animations:'disabled'});
       await p.setViewportSize({width:1440,height:900});await p.goto(url+'/manage/access/');
       await p.locator('#id_scope').selectOption('school');
