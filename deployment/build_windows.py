@@ -61,7 +61,7 @@ def main():
         from windows_launchers import write_launchers
     write_launchers(out)
     (out / "BUILD-INFO.json").write_text(json.dumps({
-        "version": "5.0.0-rc.2.4",
+        "version": "5.0.0-rc.2.5",
         "source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
         "website_commit": (app / "training" / "SOURCE_COMMIT.txt").read_text().strip(),
         "website_mode": "exact offline public workspace; fictional data only",
@@ -69,7 +69,7 @@ def main():
         "channel": "unsigned synthetic staging release candidate"
     }, indent=2) + "\n", encoding="utf-8")
     (out / "READ FIRST.txt").write_text(
-        "ROLLFLOW 5.0 RC2.4 - SCHOOL MANAGEMENT SYSTEM (STAGING)\n"
+        "ROLLFLOW 5.0 RC2.5 - SCHOOL MANAGEMENT SYSTEM (STAGING)\n"
         "Extract the entire package to a new local folder before running it.\n"
         "Start RollFlow.cmd opens the protected database workspace menu.\n"
         "Open Training Demo.cmd opens the separate fictional offline website without database setup.\n"
@@ -97,7 +97,7 @@ def main():
             shutil.copyfile(ROOT/"deployment"/name,client/name)
         for name,cmd in (("Configure School Server.cmd","configure"),("Open School Server.cmd","open"),("School Connection Diagnostics.cmd","diagnose")):
             (client/name).write_text('@echo off\n"%~dp0python\\python.exe" -B "%~dp0workstation.py" '+cmd+'\nif errorlevel 1 pause\n'+('pause\n' if cmd!="open" else ''),encoding="ascii")
-        (client/"BUILD-INFO.json").write_text(json.dumps({"version":"5.0.0-rc.2.4","channel":"unsigned synthetic staging release candidate","source_commit":subprocess.check_output(["git","rev-parse","HEAD"],cwd=ROOT,text=True).strip(),"mode":"HTTPS browser launcher only"},indent=2),encoding="utf-8")
+        (client/"BUILD-INFO.json").write_text(json.dumps({"version":"5.0.0-rc.2.5","channel":"unsigned synthetic staging release candidate","source_commit":subprocess.check_output(["git","rev-parse","HEAD"],cwd=ROOT,text=True).strip(),"mode":"HTTPS browser launcher only"},indent=2),encoding="utf-8")
         (client/"READ FIRST.txt").write_text("Configure the exact school ICT-approved HTTPS server. No database, credentials or student records are stored by the launcher. Use your browser to sign in. Unsigned staging; no real records.\n",encoding="utf-8")
         manifest(client)
 
