@@ -3,9 +3,32 @@
 **Last reviewed:** 27 November 2026 (Australia/Brisbane)  
 **Project:** kkieren999/RollFlow  
 **Goal:** Deliver a secure, school-wide Windows/browser application suitable for an approved Queensland secondary school pilot and eventually live deployment. The current website is the UX reference, not the production data layer.  
-**Status:** V4.5 classroom and educational support committed; validation and production gates remain. No production launch or real school data authorised.
+**Status:** V4.6 leadership reporting committed; validation and production gates remain. No production launch or real school data authorised.
 
-## CURRENT CHECKPOINT — V4.5 classroom and student support (27 Nov 2026)
+## CURRENT CHECKPOINT — V4.6 leadership dashboards and reporting (27 Nov 2026)
+
+**Latest cumulative branch:** `feature/v4.6-leadership-reporting`, head `1926ef6704134ac734408b67b9d3567525f0c197`, draft PR #43 https://github.com/kkieren999/RollFlow/pull/43 (base windows-release). Verify actual branch head before edits. This supersedes prior checkpoints.
+
+### Build status
+- Repaired V4.4 exact commit 49750926, run #326 https://github.com/kkieren999/RollFlow/actions/runs/45896278993: all jobs passed.
+- V4.5 exact commit 4b034863: #328 https://github.com/kkieren999/RollFlow/actions/runs/45896510104 and #329 both passed application, PostgreSQL/native and Windows packaging. Verified V4.5 artifact 15154945055 https://github.com/kkieren999/RollFlow/actions/runs/45896510104/artifacts/15154945055 (expires 10 Dec 2026 21:17 UTC; recheck).
+- V4.6 first commit a8e0716c run #330 https://github.com/kkieren999/RollFlow/actions/runs/45928489042; latest exact commit 1926ef67 push #331 https://github.com/kkieren999/RollFlow/actions/runs/45928543300 and PR #332 https://github.com/kkieren999/RollFlow/actions/runs/45928555862: all application/PostgreSQL jobs in progress at inspection. Windows artifact expected RollFlow-V4.6.0-Leadership-Reporting-Windows-x64-STAGING; not verified.
+- No merge, production deployment or real data authorised.
+
+### Implemented
+- Protected /live/reports/ with exact module and scope selection (school, faculty, year), dedicated report-only workspace entry. Explicit report_attendance/report_movements/report_workforce and matching export_* grants. Faculty based on currently verified original teaching allocation, year only single matching class year and current roster identity/year. No automatic role or system administrator bypass. No cross-domain or cross-scope borrowing. No changes to existing grants.
+- Attendance scheduled unique valid lesson keys, verified submissions, outstanding/overdue, exceptions and latest manual reconciliation. Movement departure-date cohort and current state counts; no inferred physical location. Workforce current cover validity, duties, approved room changes/closures, absence counts omitted from year reports. No official OneSchool percentages, historical reconstruction or identifier exports. Current reviewed source-ready publication only, seven-day range within past year.
+- Support report/export school-only, completed Monday–Sunday week within current publication, distinct student counts, suppress cells under 5 including zero, no states/categories/student-level breakdown or totals. Basic disclosure minimisation, not approved disclosure-control policy.
+- Separate exact-domain/scope export permission, CSRF POST, confirmation, recomputed payload digest, expiry recheck, audit domain/scope/date/publication/format/digest. CSV formula protection and offline ReportLab PDF (requirements update). No schema migration. Version 4.6.0 staging; native Windows smoke actually generates a small PDF.
+- Code accounts/reporting.py, accounts/report_views.py, templates/leadership_reports.html, docs/v4.6-reporting.md. Six regression tests accounts/test_reporting.py for exact scope, mixed years, export digest/expiry/CSRF, valid PDF, CSV, attendance changes, movements/workforce scope, support suppression. Final validation pending.
+
+### Next actions
+1. Verify exact #331/#332 and repair actual failures; validate Windows artifact and expiry, update this file. No claim of passing until exact head tested.
+2. Complete V4.6 acceptance: approved statistical disclosure/retention/export rules, audit and performance/load, historical publications and true as-of snapshots, meaningful combined dashboards, longer-range analytics and scheduled exports if authorised. No raw sensitive student data. Date-limited current-publication reports are not official OneSchool reports.
+3. V4.7 Production Windows installer: review current native offline staging package and deployment docs. Build robust signed-installer-ready distribution, upgrade/rollback and central-server/client configuration, approved TLS and host validation, service lifecycle, shortcuts, secure diagnostics, versioned backups and tested restore, integrity verification and controlled update channel. Never embed real secrets, school data, or invent signing credentials; unsigned staging stays explicitly labelled. No production install or public release without explicit approval. Maintain existing training/fictional separation and data preservation. Add genuine protected multi-user browser tests to Windows gate (current fictional website smoke alone is insufficient).
+4. V5.0 launch remains gated on independent security review, approved SSO/MFA/OneSchool process and school ICT/privacy approval, full load/concurrency and restore drills, operational acceptance of unfinished V4.0–V4.6 features. Do not bypass gates. Update this handover before finishing each session.
+
+## PREVIOUS CHECKPOINT — V4.5 classroom and student support (27 Nov 2026)
 
 **Latest cumulative branch:** `feature/v4.5-classroom-student-support`, head `4b0348637e54617723ff77f3be965e6340f5bb8e`, draft PR #42 https://github.com/kkieren999/RollFlow/pull/42 (base windows-release, cumulative phases). Recheck actual head before editing. This supersedes earlier checkpoints.
 
@@ -154,7 +177,7 @@ This file is the durable project handover, not a transcript. Read it in full bef
 
 1. Connect to the GitHub repository and re-check the live branch heads, open pull requests, workflow runs, job logs and artifacts. Facts in this file are a snapshot; current repository evidence takes precedence.
 2. Resume the first incomplete task in the CURRENT CHECKPOINT above, then consult the earlier roadmap sections. Do not start an unrelated implementation or restart from an older release just because it is the default branch.
-3. Work from the latest cumulative Windows development branch, presently `feature/v4.5-classroom-student-support`. For a new phase, create a feature branch from the verified cumulative head. Inspect other overlapping branches before merging. Use an expected-head lease when updating a branch.
+3. Work from the latest cumulative Windows development branch, presently `feature/v4.6-leadership-reporting`. For a new phase, create a feature branch from the verified cumulative head. Inspect other overlapping branches before merging. Use an expected-head lease when updating a branch.
 4. Preserve working OneSchool imports, database schema/history, access boundaries and public website. Prefer incremental migrations and shared UI components; do not discard working code unnecessarily. Do not merge, deploy, delete existing databases, publish real data, or change school infrastructure without explicit approval.
 5. Add tests with fictional data. Run/trigger Django checks, migration consistency, all relevant regression tests, PostgreSQL/native smoke, browser checks and Windows packaging. Investigate failed jobs rather than weakening security or suppressing tests. A queued/running build is not a successful build.
 6. Create or update a draft PR. Report actual changes, limitations, branch, commit, PR, test outcomes and a verified artifact URL. Never claim an installer is ready unless the exact commit's required jobs passed and the artifact exists.
@@ -183,7 +206,9 @@ Stable handover URL: https://github.com/kkieren999/RollFlow/blob/development-han
 
 | Prior cumulative V4.4 development source | `feature/v4.4-workforce-relief-supervision` — `9284383eae9ea3b6148174cea509f5c41e1a4e28`, draft PR #41 |
 
-| **Current cumulative development source** | `feature/v4.5-classroom-student-support` — `4b0348637e54617723ff77f3be965e6340f5bb8e`, draft PR #42 |
+| Prior cumulative V4.5 development source | `feature/v4.5-classroom-student-support` — `4b0348637e54617723ff77f3be965e6340f5bb8e`, draft PR #42 |
+
+| **Current cumulative development source** | `feature/v4.6-leadership-reporting` — `1926ef6704134ac734408b67b9d3567525f0c197`, draft PR #43 |
 
 Links:
 - Website: https://kkieren999.github.io/RollFlow/
