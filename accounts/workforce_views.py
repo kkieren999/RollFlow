@@ -175,7 +175,7 @@ def board(request):
                 valid=action=="create" and form.is_valid()
                 if valid and form.cleaned_data.get("staff"):
                     # User before sources matches attendance and movement writers.
-                    staff=User.objects.select_for_update().get(pk=form.cleaned_data["staff"].pk)
+                    staff=User.objects.select_for_update(no_key=True).get(pk=form.cleaned_data["staff"].pk)
                     form.cleaned_data["staff"]=staff
                 lock_sources()
                 active=current()
@@ -250,7 +250,7 @@ def acknowledge(request,pk):
     if not request.user.is_authenticated:
         return redirect("teacher-login")
     with transaction.atomic():
-        user=User.objects.select_for_update().get(pk=request.user.pk)
+        user=User.objects.select_for_update(no_key=True).get(pk=request.user.pk)
         if not self_allowed(user):
             return HttpResponseForbidden("Staff workspace access required.")
         n=get_object_or_404(WorkforceNotice.objects.select_for_update(),pk=pk,recipient=user)
