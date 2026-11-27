@@ -7,7 +7,10 @@
 
 ## CURRENT CHECKPOINT — V5.0 RC2.2 protected teacher experience (27 Nov 2026)
 
-**Latest cumulative branch:** `feature/v5.0-rc2.2-teacher-experience`, head `f656f9ebac91daaab38c215f64bfab7f8b6cb461`, draft PR #47 https://github.com/kkieren999/RollFlow/pull/47 (base windows-release). Start further work from exact latest head after CI verification. Parent RC2.1 761a5fc1903192f88350e5f70fb3635153ffcf38. Public website reference bbb40b56b2d6c70b660ff894d59db8b7cb250298 unchanged. No production merge, deployment, signatures, real records or approval.
+**Latest cumulative branch:** `feature/v5.0-rc2.2-teacher-experience`, head `7e2ded117c614e2b591d608d3d2c8bd3816533be`, draft PR #47 https://github.com/kkieren999/RollFlow/pull/47 (base windows-release). Start further work from exact latest head after CI verification. Parent RC2.1 761a5fc1903192f88350e5f70fb3635153ffcf38. Public website reference bbb40b56b2d6c70b660ff894d59db8b7cb250298 unchanged. No production merge, deployment, signatures, real records or approval.
+
+### Latest regression repair
+- Initial RC2.2 #354 ran 179 tests, one error (supervision row lacks code, Django default filter eagerly resolves item.code). Latest head 7e2ded117c614e2b591d608d3d2c8bd3816533be fixes the template to explicitly branch on item.name, so duty/gap cards need no fabricated class code. Exact run #358 https://github.com/kkieren999/RollFlow/actions/runs/45975121384 in_progress at inspection. All latest results pending; verify before distribution. Do not weaken the duty test.
 
 ### Exact build status
 - RC1 d8c7811955faa7ddb68217a9441a42e35925c18b verified #343 installers https://github.com/kkieren999/RollFlow/actions/runs/45942735166/artifacts/15174255342 and portable https://github.com/kkieren999/RollFlow/actions/runs/45942735166/artifacts/15173801699 expire 11 Dec 2026 UTC.
@@ -24,7 +27,7 @@
 - Deliberate limits: personal master rather than unrestricted school timetable; existing seated classroom actions only verified current lesson; interactive seating, classroom action wizard and student support/movement followups RC2.3; full historical attendance/relief, actual period availability, all-role rendered reference review, directory load/performance and logging/privacy (search names in URL) need acceptance. Current scope derives current reviewed class rosters not frozen past history. No school mode launch.
 
 ### Next steps
-1. Check exact RC2.1 #352/#353 and RC2.2 #356/#357. Read failing logs and repair without weakening security, tests or hold. If prior screenshot test fails, repair inherited RC2.2 as well. Verify artifact names, IDs, expiry before claiming download. Review reference/protected screenshot pairs; screenshot source is not live visual parity. Correct remaining labels/layout/contrast and user acceptance.
+1. Check exact RC2.1 #352/#353 and RC2.2 latest head 7e2ded11. Read failing logs and repair without weakening security, tests or hold. If prior screenshot test fails, repair inherited RC2.2 as well. Verify artifact names, IDs, expiry before claiming download. Review reference/protected screenshot pairs; screenshot source is not live visual parity. Correct remaining labels/layout/contrast and user acceptance.
 2. RC2.3 — student management and support: interactive accessible seating, structured classroom action wizard, student movements pass/register/actual period day history with explicit scopes, tasks/referrals/follow-up, real DB and audit. Continue cumulatively; preserve all verified workflows. RC2.4 leadership/workforce, RC2.5 administration, RC2.6 complete verification remain. All ten release gates open: identity/MFA, OneSchool, security, privacy, operations, deployment/signing, recovery, capacity, interface parity, pilot approval. No real school data or production launch until independently approved release. Update permanent handover every development session.
 
 ## PREVIOUS CHECKPOINT — V5.0 RC2.1 protected interface foundation (27 Nov 2026)
