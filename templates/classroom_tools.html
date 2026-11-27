@@ -1,5 +1,5 @@
 {% extends "live_base.html" %}{% block title %}Classroom Management{% endblock %}{% block content %}
-<p><a href="{% url 'live-day' %}">‹ Daily Schedule</a> · <a href="{% url 'teacher-class-detail' row.code %}">Class details</a></p>
+{% if lesson_links %}{% include "lesson_workflow_nav.html" %}{% else %}<p><a href="{% url 'live-day' %}">‹ Daily Schedule</a> · <a href="{% url 'teacher-class-detail' row.code %}">Class details</a></p>{% endif %}
 <h1>{{ row.code }} · Classroom Management</h1><p>{{ row.name }} · {{ row.period }} · Room {{ row.room }} · {{ roster|length }} students</p>
 {% if not regular %}<p class="live-warn">Relief access is limited to the current roster and lesson operations. Persistent seating, observations and support referrals are reserved for the verified regular teacher.</p><ul>{% for s in roster %}<li>{{ s.name }}</li>{% endfor %}</ul>
 {% else %}
