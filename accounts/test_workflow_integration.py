@@ -4,7 +4,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from . import test_movements, test_live_foundation
-from .models import AttendanceRoll, StudentMovement, AttendanceRevision
+from .models import AttendanceRoll, StudentMovement, AttendanceRevision, WorkforceNotice, ReliefAttendanceAssignment
 
 
 @override_settings(ROLLFLOW_PROTECTED_WORKSPACE=True, SECURE_SSL_REDIRECT=False,
@@ -60,6 +60,35 @@ class WorkflowIntegrationTests(TestCase):
             self.assertNotIn("<script",html.split("<title>",1)[1].split("</title>",1)[0])
         self.assertContains(self.client.get(self.issue_url),'aria-label="Current lesson workflows"')
         self.assertContains(self.client.get(self.url),'aria-label="Current lesson workflows"')
+
+    def test_private_inbox_filter_and_scope(self):
+        own=WorkforceNotice.objects.create(recipient=self.teacher,publication=self.pub,day=self.day,message="Own unread notice")
+        WorkforceNotice.objects.create(recipient=self.teacher,publication=self.pub,day=self.day,message="Own read notice",acknowledged_at=timezone.now())
+        WorkforceNotice.objects.create(recipient=self.other,publication=self.pub,day=self.day,message="Another staff notice")
+        url=reverse("workforce-mine")
+        res=self.client.get(url,{"inbox":"unread"})
+        self.assertContains(res,"Own unread notice")
+        self.assertNotContains(res,"Own read notice")
+        self.assertNotContains(res,"Another staff notice")
+        self.assertEqual(self.client.get(url,{"inbox":"invalid"}).status_code,400)
+        self.assertEqual(self.client.post(reverse("workforce-ack",args=[own.pk])).status_code,302)
+        self.assertNotContains(self.client.get(url,{"inbox":"unread"}),"Own unread notice")
+
+    def test_relief_inbox_revalidates_current_allocation(self):
+        self.pub.snapshot["slots"]=[r for r in self.pub.snapshot["slots"] if r["code"]!="SCI8"]
+        self.pub.save(update_fields=["snapshot"])
+        ReliefAttendanceAssignment.objects.create(publication=self.pub,lesson_date=self.day,
+            class_code="ENG7",period="P1",start="09:00",end="10:00",regular_teacher=self.teacher,
+            relief_teacher=self.other,created_by=self.admin,expires_at=timezone.now()+timedelta(hours=1))
+        self.client.force_login(self.other)
+        url=reverse("workforce-mine")
+        self.assertContains(self.client.get(url),"Verified allocation")
+        self.assertContains(self.client.get(url),"Open roll")
+        self.profile.timetable_link_verified=False
+        self.profile.save(update_fields=["timetable_link_verified"])
+        res=self.client.get(url)
+        self.assertContains(res,"Recorded assignment — current access not verified")
+        self.assertNotContains(res,"Open roll")
 
     def test_only_current_lesson_shows_movement_action(self):
         from .workflow_integration import lesson_links
