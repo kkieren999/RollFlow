@@ -2,7 +2,7 @@ name: V3 foundation tests
 on:
   workflow_dispatch:
   push:
-    branches: [feature/v5.0-rc2.6-system-integration, feature/v5.0-rc2.5-administration-system-management, feature/v5.0-rc2.4-leadership-operations, feature/v5.0-rc2.3-student-experience, feature/v5.0-rc2.2-teacher-experience, feature/v5.0-rc2.1-interface-foundation, feature/v5.0-production-launch-candidate, feature/v4.7-windows-installer, feature/v4.6-leadership-reporting, feature/v4.5-classroom-student-support, feature/v4.4-workforce-relief-supervision, feature/v4.3-student-movements, feature/v4.2-live-attendance, feature/v4.1-school-data-oneschool, feature/v4.0-accounts-roles-security, feature/v3.9-live-foundation, feature/v3.8-windows-rebuild, feature/v3.7-staff-access, windows-release, v3.0-foundation, feature/v3.6.5-connected-school-data, feature/v3.6.6-automated-school-setup, feature/v3.6.7-unified-ui, feature/v3.6.7-student-movements-dashboard, feature/v3.6.7-varied-fictional-movements, feature/admin-movement-destinations-windows, feature/v3.6.7-movement-student-day-template, feature/v3.6.7-log-services-into-day-template]
+    branches: [feature/v5.0-rc2.7-visual-accessibility-performance, feature/v5.0-rc2.6-system-integration, feature/v5.0-rc2.5-administration-system-management, feature/v5.0-rc2.4-leadership-operations, feature/v5.0-rc2.3-student-experience, feature/v5.0-rc2.2-teacher-experience, feature/v5.0-rc2.1-interface-foundation, feature/v5.0-production-launch-candidate, feature/v4.7-windows-installer, feature/v4.6-leadership-reporting, feature/v4.5-classroom-student-support, feature/v4.4-workforce-relief-supervision, feature/v4.3-student-movements, feature/v4.2-live-attendance, feature/v4.1-school-data-oneschool, feature/v4.0-accounts-roles-security, feature/v3.9-live-foundation, feature/v3.8-windows-rebuild, feature/v3.7-staff-access, windows-release, v3.0-foundation, feature/v3.6.5-connected-school-data, feature/v3.6.6-automated-school-setup, feature/v3.6.7-unified-ui, feature/v3.6.7-student-movements-dashboard, feature/v3.6.7-varied-fictional-movements, feature/admin-movement-destinations-windows, feature/v3.6.7-movement-student-day-template, feature/v3.6.7-log-services-into-day-template]
   pull_request:
     branches: [windows-release, main, v3.0-foundation, integration/v3.6.1-windows-teacher-portal, feature/v3.6.2-oneschool-import-centre, feature/v3.6.4-real-oneschool-format-support, fix/v3.6.4-oneschool-unknown-worksheet-size, fix/v3.6.4.2-empty-staff-pdf-legends, fix/v3.6.4.3-cross-line-alignment, feature/v3.6.5-connected-school-data, feature/v3.6.6-automated-school-setup, feature/v3.6.7-unified-ui]
 permissions:
@@ -61,7 +61,7 @@ jobs:
 
   windows-offline-bundle:
     needs: [tests, postgres-and-native]
-    if: github.ref == 'refs/heads/feature/v5.0-rc2.6-system-integration' || github.ref == 'refs/heads/feature/v5.0-rc2.5-administration-system-management' || github.ref == 'refs/heads/feature/v5.0-rc2.4-leadership-operations' || github.ref == 'refs/heads/feature/v5.0-rc2.3-student-experience' || github.ref == 'refs/heads/feature/v5.0-rc2.2-teacher-experience' || github.ref == 'refs/heads/feature/v5.0-rc2.1-interface-foundation' || github.ref == 'refs/heads/feature/v5.0-production-launch-candidate' || github.ref == 'refs/heads/feature/v4.7-windows-installer' || github.ref == 'refs/heads/feature/v4.6-leadership-reporting' || github.ref == 'refs/heads/feature/v4.5-classroom-student-support' || github.ref == 'refs/heads/feature/v4.4-workforce-relief-supervision' || github.ref == 'refs/heads/feature/v4.3-student-movements' || github.ref == 'refs/heads/feature/v4.2-live-attendance' || github.ref == 'refs/heads/feature/v4.1-school-data-oneschool' || github.ref == 'refs/heads/feature/v4.0-accounts-roles-security' || github.ref == 'refs/heads/feature/v3.9-live-foundation' || github.ref == 'refs/heads/feature/v3.8-windows-rebuild' || github.ref == 'refs/heads/feature/v3.7-staff-access' || github.event_name == 'pull_request' || github.ref == 'refs/heads/windows-release' || github.ref == 'refs/heads/v3.0-foundation' || github.ref == 'refs/heads/feature/v3.6.5-connected-school-data' || github.ref == 'refs/heads/feature/v3.6.6-automated-school-setup' || github.ref == 'refs/heads/feature/v3.6.7-unified-ui' || github.ref == 'refs/heads/feature/v3.6.7-student-movements-dashboard' || github.ref == 'refs/heads/feature/v3.6.7-varied-fictional-movements' || github.ref == 'refs/heads/feature/admin-movement-destinations-windows' || github.ref == 'refs/heads/feature/v3.6.7-movement-student-day-template' || github.ref == 'refs/heads/feature/v3.6.7-log-services-into-day-template'
+    if: github.ref == 'refs/heads/feature/v5.0-rc2.7-visual-accessibility-performance' || github.ref == 'refs/heads/feature/v5.0-rc2.6-system-integration' || github.ref == 'refs/heads/feature/v5.0-rc2.5-administration-system-management' || github.ref == 'refs/heads/feature/v5.0-rc2.4-leadership-operations' || github.ref == 'refs/heads/feature/v5.0-rc2.3-student-experience' || github.ref == 'refs/heads/feature/v5.0-rc2.2-teacher-experience' || github.ref == 'refs/heads/feature/v5.0-rc2.1-interface-foundation' || github.ref == 'refs/heads/feature/v5.0-production-launch-candidate' || github.ref == 'refs/heads/feature/v4.7-windows-installer' || github.ref == 'refs/heads/feature/v4.6-leadership-reporting' || github.ref == 'refs/heads/feature/v4.5-classroom-student-support' || github.ref == 'refs/heads/feature/v4.4-workforce-relief-supervision' || github.ref == 'refs/heads/feature/v4.3-student-movements' || github.ref == 'refs/heads/feature/v4.2-live-attendance' || github.ref == 'refs/heads/feature/v4.1-school-data-oneschool' || github.ref == 'refs/heads/feature/v4.0-accounts-roles-security' || github.ref == 'refs/heads/feature/v3.9-live-foundation' || github.ref == 'refs/heads/feature/v3.8-windows-rebuild' || github.ref == 'refs/heads/feature/v3.7-staff-access' || github.event_name == 'pull_request' || github.ref == 'refs/heads/windows-release' || github.ref == 'refs/heads/v3.0-foundation' || github.ref == 'refs/heads/feature/v3.6.5-connected-school-data' || github.ref == 'refs/heads/feature/v3.6.6-automated-school-setup' || github.ref == 'refs/heads/feature/v3.6.7-unified-ui' || github.ref == 'refs/heads/feature/v3.6.7-student-movements-dashboard' || github.ref == 'refs/heads/feature/v3.6.7-varied-fictional-movements' || github.ref == 'refs/heads/feature/admin-movement-destinations-windows' || github.ref == 'refs/heads/feature/v3.6.7-movement-student-day-template' || github.ref == 'refs/heads/feature/v3.6.7-log-services-into-day-template'
     runs-on: windows-2025
     timeout-minutes: 25
     steps:
@@ -112,7 +112,7 @@ jobs:
           & $iscc "/DWorkstation=1" "/DBundleDir=$client" "/O$out" deployment/installer.iss
           if ($LASTEXITCODE -ne 0) { throw 'Workstation setup compilation failed' }
           foreach ($kind in @('LocalLab','Workstation')) {
-            $exe = "$out/RollFlow-V5.0.0-rc.2.6-$kind-x64-STAGING-Setup.exe"
+            $exe = "$out/RollFlow-V5.0.0-rc.2.7-$kind-x64-STAGING-Setup.exe"
             $dest = "$env:RUNNER_TEMP/rf-installed-$kind"
             $p = Start-Process -FilePath $exe -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-',"/DIR=$dest") -Wait -PassThru
             if ($p.ExitCode -ne 0) { throw "Installer failed: $kind" }
@@ -232,7 +232,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Protected multi-session browser smoke failed' }
       - uses: actions/upload-artifact@v4
         with:
-          name: RollFlow-RC2.6-Protected-UI-Comparison
+          name: RollFlow-RC2.7-Protected-UI-Comparison
           path: ${{ runner.temp }}/rf-ui-evidence/
           if-no-files-found: error
           retention-days: 14
@@ -250,14 +250,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Production launch hold did not work' }
       - uses: actions/upload-artifact@v4
         with:
-          name: RollFlow-V5.0.0-rc.2.6-Portable-Windows-x64-STAGING
+          name: RollFlow-V5.0.0-rc.2.7-Portable-Windows-x64-STAGING
           path: ${{ runner.temp }}/RollFlow/
           if-no-files-found: error
           retention-days: 14
 
       - uses: actions/upload-artifact@v4
         with:
-          name: RollFlow-V5.0.0-rc.2.6-Windows-Installers-x64-STAGING
+          name: RollFlow-V5.0.0-rc.2.7-Windows-Installers-x64-STAGING
           path: ${{ runner.temp }}/rf-installers/
           if-no-files-found: error
           retention-days: 14
