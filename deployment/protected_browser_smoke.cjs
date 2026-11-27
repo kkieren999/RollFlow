@@ -85,7 +85,7 @@ if(!url||!password)throw Error('Disposable protected browser fixture missing');
     const issue='/live/movements/issue/?code=BROWSER7&period=P1&start=00%3A00';
     assert.equal((await t.goto(url+issue)).status(),200);
     await t.locator('select[name=student]').selectOption({label:'Fictional, BrowserAllowed'});
-    await t.locator('select[name=destination]').selectOption({label:'Fictional CI water break · 10 min'});
+    await t.locator('select[name=destination]').selectOption(await t.locator('select[name=destination] option').filter({hasText:'Fictional CI water break'}).getAttribute('value'));
     await t.locator('input[name=confirm]').check();
     await Promise.all([t.waitForURL(/\/live\/movements\/\d+\/$/),t.getByRole('button',{name:'Issue and record departure'}).click()]);
     const movement=t.url();

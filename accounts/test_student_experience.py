@@ -11,6 +11,9 @@ class StudentMovementDayTests(TestCase):
     def setUp(self):
         test_movements.MovementTests.setUp(self)
 
+    def issue_data(self,**kw):
+        return test_movements.MovementTests.issue_data(self,**kw)
+
     def test_multiple_visits_by_recorded_period_and_scope(self):
         first=test_movements.MovementTests.make_pass(self)
         self.assertEqual(test_movements.MovementTests.act(self,self.admin,first,"close",1,reason="entered_in_error").status_code,302)
