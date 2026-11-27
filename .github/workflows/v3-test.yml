@@ -225,7 +225,7 @@ jobs:
       - name: Generate release candidate readiness evidence
         shell: pwsh
         run: |
-          $bundle = "$env:RUNNER_TEMP/rf-installed-LocalLab"
+          $bundle = "$env:RUNNER_TEMP/RollFlow"
           $out = "$env:RUNNER_TEMP/rf-installers"
           & "$bundle/python/python.exe" -B -m deployment.release_readiness --bundle $bundle --json | Set-Content "$out/PRODUCTION-READINESS.json" -Encoding utf8
           if ($LASTEXITCODE -ne 0) { throw 'Release inspection failed' }

@@ -4,7 +4,7 @@ from threading import Barrier
 from unittest import skipUnless
 from django.db import connection,close_old_connections
 from django.test import TransactionTestCase,Client,override_settings
-from .test_live_foundation import LiveFoundationTests
+from . import test_live_foundation
 from .models import AttendanceRoll,AttendanceRevision
 
 @skipUnless(connection.vendor=="postgresql","Row-lock concurrency gate requires PostgreSQL.")
@@ -13,12 +13,12 @@ from .models import AttendanceRoll,AttendanceRevision
 class ReleaseConcurrencyTests(TransactionTestCase):
     def setUp(self):
         # TransactionTestCase commits fixture rows so separate worker DB connections can read them.
-        LiveFoundationTests.setUp(self)
+        test_live_foundation.LiveFoundationTests.setUp(self)
 
     def test_two_concurrent_certifications_keep_one_revision(self):
         clients=[Client(),Client()]
         for c in clients:c.force_login(self.teacher)
-        payload=LiveFoundationTests.payload(self,"submit")
+        payload=test_live_foundation.LiveFoundationTests.payload(self,"submit")
         barrier=Barrier(2)
         def submit(client):
             close_old_connections()
