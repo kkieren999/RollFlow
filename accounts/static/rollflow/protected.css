@@ -96,3 +96,5 @@ body:has(.rf-protected-shell[data-theme="dark"]) main tbody tr:hover{background:
 }
 @media(max-width:420px){.rf-p-account-name{display:none}.rf-p-top-right{gap:7px}.rf-p-top-left{gap:7px}}
 @media(prefers-reduced-motion:reduce){.rf-protected-shell *{scroll-behavior:auto!important;transition:none!important}}
+
+.rf-p-quicklink small{display:block;color:var(--rf-muted);font-size:12px}.rf-p-quicklink>span:last-child{margin-left:auto}.rf-protected-shell{position:relative;min-width:0}.rf-p-account summary:focus-visible,.rf-p-menu:focus-visible,.rf-p-navlink:focus-visible{outline:3px solid #e8b63e;outline-offset:-3px}

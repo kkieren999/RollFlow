@@ -29,6 +29,8 @@ def main():
             else:raise RuntimeError("Protected server did not become ready.")
             subprocess.run(["node",str(ROOT/"deployment"/"protected_browser_smoke.cjs")],cwd=ROOT,
                 env={**os.environ,"RF_PROTECTED_BROWSER_URL":url},check=True,timeout=120)
+            subprocess.run(["node",str(ROOT/"deployment"/"protected_ui_parity.cjs")],cwd=ROOT,
+                env={**os.environ,"RF_PROTECTED_BROWSER_URL":url},check=True,timeout=300)
         finally:
             child.terminate()
             child.wait(timeout=15)

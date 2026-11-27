@@ -35,3 +35,28 @@ def seed():
         snapshot={"source":"dated","timetable_version":version.pk,"calendar":{"dates":[day.isoformat()]},
             "stats":{"rosters_ready":True,"skipped_pairs":0},"classes":classes,"slots":slots,
             "student_identity":{str(s.pk):s.student_id for s in students},"bindings":bindings})
+
+
+    # Role-specific fictional staging profiles; deliberately limited to actual
+    # implemented scopes, not copied demo authority. No real identities.
+    User.objects.create_superuser("browser_admin",email="admin@example.invalid",password=password)
+    profiles[0].faculty="English"
+    profiles[0].save(update_fields=["faculty"])
+    profiles[1].faculty="Mathematics"
+    profiles[1].save(update_fields=["faculty"])
+    for key,role,scope,value,caps,teaches in [
+        ("principal","Principal","school","",["staff","students","published_classes","published_timetable","attendance_monitor","movement_monitor","workforce_monitor","report_attendance"],False),
+        ("deputy","Deputy Principal","school","",["staff","students","published_classes","published_timetable","attendance_monitor","movement_monitor","workforce_monitor"],False),
+        ("hod","Head of Department","faculty","English",["staff","published_classes","published_timetable","report_attendance"],False),
+        ("ylc","Head of Year","year","7",["students","published_classes","published_timetable","report_attendance"],False),
+        ("business","Business Manager","school","",["staff","workforce_monitor","report_workforce"],False),
+        ("office","Administration Officer","school","",["staff","students","movement_monitor","workforce_monitor"],False),
+        ("learning","Learning Support Teacher","school","",["support_task","support_referral"],True),
+        ("aide","Teacher Aide","school","",["support_task"],False),
+        ("relief","Relief Teacher","school","",["support_task"],True),
+        ("guidance","Guidance Officer","school","",["support_referral"],False),
+    ]:
+        u=User.objects.create_user("browser_"+key,password=password,first_name="Fictional",last_name=role)
+        StaffProfile.objects.create(user=u,staff_id="BROWSER_"+key.upper(),teaching_enabled=teaches,
+            faculty="English" if key=="hod" else "")
+        StaffAccessGrant.objects.create(user=u,role=role,scope=scope,scope_value=value,capabilities=caps,granted_by=admin)

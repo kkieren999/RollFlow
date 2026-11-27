@@ -224,11 +224,18 @@ jobs:
           # outside the checkout, so explicitly expose the CI-only dependency.
           $env:NODE_PATH = Join-Path $env:GITHUB_WORKSPACE 'node_modules'
           if (!(Test-Path (Join-Path $env:NODE_PATH 'playwright-core/package.json'))) { throw 'Playwright CI dependency missing' }
+          $env:RF_UI_SCREENSHOTS = Join-Path $env:RUNNER_TEMP "rf-ui-evidence"
           $testScript = Join-Path $bundle 'app/deployment/protected_browser_smoke.cjs'
           node -e "console.log(require('node:module').createRequire(process.argv[1]).resolve('playwright-core'))" $testScript
           if ($LASTEXITCODE -ne 0) { throw 'Installed protected browser test cannot resolve Playwright' }
           & "$bundle/python/python.exe" -m deployment.protected_browser_server --state "$env:RUNNER_TEMP/rf-restored"
           if ($LASTEXITCODE -ne 0) { throw 'Protected multi-session browser smoke failed' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RollFlow-RC2.1-Protected-UI-Comparison
+          path: ${{ runner.temp }}/rf-ui-evidence/
+          if-no-files-found: error
+          retention-days: 14
       - name: Generate release candidate readiness evidence
         shell: pwsh
         run: |
