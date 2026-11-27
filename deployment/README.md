@@ -1,3 +1,7 @@
+# RC4 release qualification
+
+**Unsigned fictional staging only.** Read [RC4 qualification](../docs/v5.0-rc4-release-qualification.md) and [ICT handover](../docs/v5.0-rc4-ict-handover.md) first. Use the RC4 version and exact tested commit with the inherited RC3 procedures. Failed or incomplete CI is not qualified. All production gates remain open.
+
 # RC3 operational guidance
 
 **Fictional staging only.** Start with [RC3 ICT deployment runbook](../docs/v5.0-rc3-ict-deployment.md), [pilot readiness index](../docs/v5.0-rc3-pilot-readiness.md) and the Pilot Readiness launcher. The legacy school-mode examples below describe a future architecture only and are blocked by code in this release. Current RC3 launcher paths and snapshot/isolated restore procedures are in the RC3 runbook and recovery handbook; historical version instructions below are not the current installation procedure.
