@@ -20,7 +20,7 @@ class SharedInterfaceTests(TestCase):
         "/manage/", "/manage/staff/", "/manage/students/", "/manage/classes/",
         "/manage/timetable/", "/manage/master/", "/manage/relief/",
         "/manage/attendance/", "/manage/movements/", "/manage/notices/",
-        "/manage/reports/", "/manage/roles/", "/manage/data/",
+        "/manage/reports/", "/manage/data/",
         "/manage/oneschool/", "/manage/audit/", "/manage/settings/",
     )
     ADMIN_EXTERNAL = (
@@ -61,6 +61,8 @@ class SharedInterfaceTests(TestCase):
                 html = self.assert_interface(path)
                 self.assertIn("ADMINISTRATION PORTAL", html)
                 self.assertNotIn("href=\"/teacher/roster/", html)
+        self.assertRedirects(self.client.get("/manage/roles/"), "/manage/access/")
+        self.assert_interface("/manage/access/", "Staff access grants")
         html = self.assert_interface("/manage/connected/setup/", "Automated School Setup")
         self.assertIn('href="/manage/connected/"', html)
         html = self.assert_interface("/manage/oneschool/documents/", "OneSchool Import Centre")

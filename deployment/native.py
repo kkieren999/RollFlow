@@ -83,6 +83,7 @@ def config_env(cfg):
     school = cfg["mode"] == "school"
     env.update({
         "ROLLFLOW_DEBUG": "0" if school else "1",
+        "ROLLFLOW_PROTECTED_WORKSPACE": "1",
         "ROLLFLOW_SCHOOL_MODE": "1" if school else "0",
         "ROLLFLOW_LIVE_TIMETABLE": "1" if school else "0",
         "ROLLFLOW_TRUST_HTTPS_PROXY": "1" if school else "0",
