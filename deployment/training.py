@@ -2,6 +2,7 @@
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
+import argparse
 import functools
 import webbrowser
 
@@ -38,17 +39,24 @@ class TrainingHandler(SimpleHTTPRequestHandler):
         super().end_headers()
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--port", type=int, default=PORT, help="Loopback port (0 for isolated testing)")
+    parser.add_argument("--no-browser", action="store_true")
+    args = parser.parse_args()
+    if not (0 <= args.port <= 65535):
+        parser.error("Invalid port.")
     if not (ROOT / "index.html").is_file():
         raise SystemExit("Training demo files are missing. Extract a complete RollFlow bundle.")
     handler = functools.partial(TrainingHandler, directory=str(ROOT))
     try:
-        server = ThreadingHTTPServer(("127.0.0.1", PORT), handler)
+        server = ThreadingHTTPServer(("127.0.0.1", args.port), handler)
     except OSError as exc:
         raise SystemExit("Training port is in use. Close the previous training session or contact ICT.") from exc
-    url = f"http://127.0.0.1:{PORT}/"
+    url = f"http://127.0.0.1:{server.server_port}/"
     print("Fictional training only. Do not enter real student or staff data.")
-    print(url + " — close this window to stop training.")
-    webbrowser.open(url)
+    print(url + " — close this window to stop training.", flush=True)
+    if not args.no_browser:
+        webbrowser.open(url)
     with server:
         try:
             server.serve_forever()
