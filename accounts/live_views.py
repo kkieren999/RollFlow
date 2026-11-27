@@ -41,6 +41,11 @@ def shell(user):
 
 
 def page(request, template, **context):
+    from django.conf import settings
+    if settings.ROLLFLOW_PROTECTED_WORKSPACE and template in ("live_roll.html", "classroom_tools.html", "movement_issue.html") and context.get("row"):
+        from .workflow_integration import lesson_links
+        context["lesson_links"] = lesson_links(context["row"])
+        context["lesson_active"] = {"live_roll.html":"roll", "classroom_tools.html":"classroom", "movement_issue.html":"movement"}[template]
     return render(request, template, {**shell(request.user), **context})
 
 
