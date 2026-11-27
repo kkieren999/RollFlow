@@ -96,7 +96,7 @@ def build_dated_candidate(version):
              "missing_profiles": sorted(staff - set(known)),
              "unassigned_slots": sum(not s["staff"] for s in slots),
              "legend_only": 0, "verified_mappings": len(bindings)}
-    snapshot = {"source": "dated", "timetable_version": version.pk,
+    snapshot = {"source": "dated", "data_validation": 1, "timetable_version": version.pk,
                 "calendar": {"dates": dates, "closed": [], "times": {}},
                 "classes": sorted(classes.values(), key=lambda c:c["code"]),
                 "slots": slots, "bindings": bindings, "stats": stats, "student_identity": identity}
