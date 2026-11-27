@@ -15,7 +15,7 @@ const ref=http.createServer((req,res)=>{
  res.writeHead(200,{'Content-Type':file.endsWith('.css')?'text/css':'text/html; charset=utf-8'});res.end(fs.readFileSync(path.join(root,file)));
 });
 const mapping={admin:'admin',principal:'principal',deputy:'deputy',hod:'hod',ylc:'ylc',business:'business',office:'office',teacher:'teacher',swilliams:'other',learning:'learning',aide:'aide',relief:'relief',guidance:'guidance'};
-const expected={admin:['Staff Management','Student Management','Account Management','OneSchool Import Centre'],principal:['Student Search','Attendance Overview','Reports'],deputy:['Attendance Overview','Student Movements'],hod:['Class Finder','Master Timetable','Reports'],ylc:['Student Search','Class Finder','Reports'],business:['Staff Directory','Workforce Allocations','Reports'],office:['Student Search','Student Movements'],teacher:['Daily Schedule','Student Support'],swilliams:['Daily Schedule','Student Support'],learning:['Daily Schedule','Student Support'],aide:['Student Support'],relief:['Daily Schedule','Student Support'],guidance:['Student Support']};
+const expected={admin:['Staff Management','Student Management','Account Management','OneSchool Import Centre'],principal:['Student Search','Attendance Overview','Reports'],deputy:['Attendance Overview','Student Movements'],hod:['Class Finder','Master Timetable','Reports'],ylc:['Student Search','Class Finder','Reports'],business:['Staff Directory','Workforce Allocations','Reports'],office:['Student Search','Student Movements'],teacher:['Daily Schedule','Master Timetable','Class Finder','Student Search','Student Support'],swilliams:['Daily Schedule','Master Timetable','Class Finder','Student Search','Student Support'],learning:['Daily Schedule','Student Support'],aide:['Student Support'],relief:['Daily Schedule','Student Support'],guidance:['Student Support']};
 async function run(){
  await new Promise((resolve,reject)=>{ref.once('error',reject);ref.listen(0,'127.0.0.1',resolve)});
  const refurl='http://127.0.0.1:'+ref.address().port;
@@ -74,6 +74,11 @@ async function run(){
       assert.equal(await p.locator('[data-rf-shell=protected]').getAttribute('data-theme'),'dark');
       await p.reload();assert.equal(await p.locator('[data-rf-shell=protected]').getAttribute('data-theme'),'dark');
       await p.screenshot({path:path.join(target,'teacher-protected-dark.png'),animations:'disabled'});
+      for(const [label,route] of [['week','/teacher/week/'],['master','/live/teacher/master/'],['classes','/live/teacher/classes/'],['class-detail','/live/teacher/classes/BROWSER7/'],['students','/live/teacher/students/'],['roll','/live/roll/?code=BROWSER7&period=P1&start=00%3A00']]){
+        const res=await p.goto(url+route);assert.equal(res.status(),200,'RC2.2 '+label);
+        assert.doesNotMatch(await p.locator('main').innerText(),/BrowserDenied|BROWSER8/);
+        await p.screenshot({path:path.join(target,'teacher-'+label+'-protected-dark.png'),animations:'disabled'});
+      }
     }
     assert.deepEqual(errors,[],id+' protected script errors');assert.deepEqual(external,[],id+' external requests');
     evidence.push({account:id,reference:referenceLabels,protected:protectedLabels,referenceOnly:referenceLabels.filter(x=>!protectedLabels.includes(x)),protectedOnly:protectedLabels.filter(x=>!referenceLabels.includes(x))});
@@ -85,7 +90,7 @@ async function run(){
   const combined=[...prior,...evidence];
   assert.equal(new Set(combined.map(x=>x.account)).size,combined.length,'Duplicate evidence account');
   if(batch===2)assert.deepEqual(combined.map(x=>x.account).sort(),Object.keys(mapping).sort(),'All 13 reference accounts captured');
-  fs.writeFileSync(outfile,JSON.stringify({websiteCommit:fs.readFileSync(path.join(root,'SOURCE_COMMIT.txt'),'utf8').trim(),scope:'RC2.1 shell only; differences are open, not approval',accounts:combined},null,2));
+  fs.writeFileSync(outfile,JSON.stringify({websiteCommit:fs.readFileSync(path.join(root,'SOURCE_COMMIT.txt'),'utf8').trim(),scope:'RC2.2 shell and protected teacher workflows; differences are open, not approval',accounts:combined},null,2));
  }finally{if(browser)await browser.close();ref.close()}
 }
 run().catch(e=>{console.error(e.stack);process.exitCode=1});
