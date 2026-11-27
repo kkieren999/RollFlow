@@ -175,7 +175,7 @@ def staff_edit(request, pk=None):
                     return HttpResponseForbidden("Administrator access revoked.")
                 before = {}
                 if target:
-                    user = User.objects.select_for_update().get(pk=target.pk)
+                    user = User.objects.select_for_update(no_key=True).get(pk=target.pk)
                     before = account_state(user)
                     if user.pk == request.user.pk and (c["role"] != "admin" or not c["active"]):
                         return HttpResponseForbidden("Cannot remove your own administrator access.")
@@ -243,7 +243,7 @@ def staff_reset(request, pk):
         with transaction.atomic():
             if not lock_administrator(request.user):
                 return HttpResponseForbidden("Administrator access revoked.")
-            target = User.objects.select_for_update().get(pk=pk)
+            target = User.objects.select_for_update(no_key=True).get(pk=pk)
             target.set_password(form.cleaned_data["password"])
             target.save(update_fields=["password"])
             revoke_sessions(target)
@@ -259,7 +259,7 @@ def staff_status(request, pk):
     with transaction.atomic():
         if not lock_administrator(request.user):
             return HttpResponseForbidden("Administrator access revoked.")
-        target = get_object_or_404(User.objects.select_for_update(), pk=pk)
+        target = get_object_or_404(User.objects.select_for_update(no_key=True), pk=pk)
         before = account_state(target)
         if target.pk == request.user.pk:
             return HttpResponseForbidden("You cannot deactivate your own administrator account.")
