@@ -66,3 +66,27 @@ class ProtectedWorkspaceUITests(TestCase):
         r=self.client.get("/manage/")
         self.assertContains(r,"Published classes")
         self.assertContains(r,'data-rf-shell="protected"')
+
+    def test_rc27_shell_snapshot_is_render_local(self):
+        from unittest.mock import patch
+        from . import live_views, workspace_ui
+        with patch.object(live_views,"shell",wraps=live_views.shell) as primary, patch.object(workspace_ui,"shell",wraps=workspace_ui.shell) as fallback:
+            self.assertContains(self.client.get("/live/"),'data-rf-shell="protected"')
+            self.assertEqual(primary.call_count,1)
+            self.assertEqual(fallback.call_count,0)
+            self.assertContains(self.client.get("/live/day/"),'data-rf-shell="protected"')
+            self.assertEqual(primary.call_count,2)
+            self.assertEqual(fallback.call_count,0)
+            self.client.force_login(self.admin)
+            self.assertContains(self.client.get("/manage/"),'data-rf-group="Account Management"')
+            self.assertEqual(fallback.call_count,1)
+            self.client.force_login(self.teacher)
+            self.assertNotContains(self.client.get("/live/"),'data-rf-group="Account Management"')
+            self.assertEqual(primary.call_count,3)
+
+    def test_accessible_main_and_attendance_totals(self):
+        self.assertContains(self.client.get("/live/day/"),'id="main-content" tabindex="-1"')
+        self.assertContains(self.client.get("/live/day/"),'aria-label="Account menu for')
+        res=self.client.get(self.url)
+        self.assertContains(res,'aria-label="Attendance totals" aria-live="polite" aria-atomic="true"')
+        self.assertContains(res,'<th scope="col">Student</th>',html=True)
