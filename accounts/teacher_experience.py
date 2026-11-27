@@ -93,6 +93,8 @@ def personal_schedule(pub,user,day,today=None):
                     item["classroom_url"]=reverse("classroom-tools")+"?"+params
                     item["class_url"]=reverse("teacher-class-detail",kwargs={"code":row["code"]})
                     item["started"]=lesson_started(day,row)
+                    from .workflow_integration import lesson_links
+                    item["movement_url"]=lesson_links(row)["movement"]
             except AttendanceUnavailable:
                 item["status"]="Roster review required"
         result["lessons"].append(item)
