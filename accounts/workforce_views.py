@@ -10,7 +10,7 @@ from django.utils import timezone
 from django.core.paginator import Paginator
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET,require_http_methods,require_POST
-from .attendance import lesson_valid,lesson_key,publication_ready
+from .attendance import lesson_valid,lesson_key,publication_ready,own_lessons
 from .attendance_admin_views import lock_sources
 from .connected_school import current,visible_slots,date_is_school_day
 from .models import WorkforceEntry,WorkforceNotice,ReliefAttendanceAssignment,AttendanceRoll,StudentMovement,StaffProfile
@@ -227,9 +227,21 @@ def mine(request):
     qs=entries(pub,day).filter(staff=request.user) if pub else WorkforceEntry.objects.none()
     cover=ReliefAttendanceAssignment.objects.filter(publication=pub,lesson_date=day,relief_teacher=request.user,
         cancelled_at__isnull=True,expires_at__gt=timezone.now()) if pub else ReliefAttendanceAssignment.objects.none()
+    from .permissions import can_teach
+    from .workflow_integration import lesson_links
+    verified = {lesson_key(r):r for r in own_lessons(pub,request.user,day) if r.get("relief")} if day>=timezone.localdate() and can_teach(request.user) else {}
+    cover_rows=[]
+    for assignment in cover.order_by("start","pk"):
+        row=verified.get((assignment.class_code,assignment.period,assignment.start))
+        cover_rows.append({"assignment":assignment,"verified":bool(row),
+                           "links":lesson_links(row) if row and day==timezone.localdate() else {}})
     notices=WorkforceNotice.objects.filter(recipient=request.user).select_related("publication").order_by("-created_at","-pk")
-    return page(request,"workforce_mine.html",pub=pub,day=day,entries=qs,cover=cover,
-        day_closed=closed(pub,day),notices=Paginator(notices,30).get_page(request.GET.get("page")))
+    inbox=request.GET.get("inbox","all")
+    if inbox not in ("all","unread"):return HttpResponseBadRequest("Unknown inbox filter.")
+    unread=notices.filter(acknowledged_at__isnull=True).count()
+    if inbox=="unread":notices=notices.filter(acknowledged_at__isnull=True)
+    return page(request,"workforce_mine.html",pub=pub,day=day,entries=qs,cover=cover,cover_rows=cover_rows,
+        day_closed=closed(pub,day),notices=Paginator(notices,30).get_page(request.GET.get("page")),inbox=inbox,unread=unread)
 
 
 @never_cache
