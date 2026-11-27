@@ -1,0 +1,48 @@
+{% extends "live_base.html" %}
+{% block title %}Administration Portal{% endblock %}
+{% block content %}
+<p><a href="{% url 'management-dashboard' %}">Administration dashboard</a> / System management</p>
+<h1>{% if section == "accounts" %}Account Review{% elif section == "audit" %}Audit &amp; Activity{% elif section == "settings" %}System Settings &amp; Readiness{% else %}Administration Portal{% endif %}</h1>
+<p>Protected administration · Version {{ version }} · Fictional staging only</p>
+<nav class="rf-student-tabs" aria-label="Administration sections">
+<a href="{% url 'admin-system-centre' %}" {% if section == "overview" %}aria-current="page"{% endif %}>Overview</a>
+<a href="{% url 'admin-account-review' %}" {% if section == "accounts" %}aria-current="page"{% endif %}>Account review</a>
+<a href="{% url 'admin-audit-review' %}" {% if section == "audit" %}aria-current="page"{% endif %}>Audit &amp; activity</a>
+<a href="{% url 'admin-system-settings' %}" {% if section == "settings" %}aria-current="page"{% endif %}>System settings</a>
+<a href="{% url 'admin-pilot-readiness' %}">Pilot readiness</a>
+</nav>
+{% if section == "overview" %}
+<div class="live-grid">{% for label,value in stats %}<section class="live-card"><h2>{{ value }}</h2><p>{{ label }}</p></section>{% endfor %}</div>
+<section class="live-card"><h2>Review priorities</h2>
+<p>Awaiting document review: {{ import_count }} · Draft timetables: {{ draft_count }}</p>
+<p>{% if not publication %}No school data publication.{% elif not ready or not in_coverage %}Published data requires readiness or date coverage review.{% else %}Current publication passes operational roster/source checks for its date range; this is not production approval.{% endif %}</p>
+<a href="{% url 'school-data-overview' %}">Review school data</a> · <a href="{% url 'automated-school-setup' %}">Review pending teacher verification</a></section>
+{% for heading,items in groups %}<section class="live-card"><h2>{{ heading }}</h2><div class="live-grid">
+{% for item in items %}<article><h3><a href="{{ item.url }}">{{ item.label }}</a></h3><p>{{ item.description }}</p></article>{% endfor %}</div></section>{% endfor %}
+<p>Leadership reporting remains available only with explicit report grants; administrator status does not grant report or export access.</p>
+{% elif section == "accounts" %}
+<p>Review account and identity state separately from effective permissions. A recorded grant may be expired, future-dated, or no longer valid. Use the effective access review before assigning rights.</p>
+<form method="get" class="rf-directory-filters"><label>Search accounts <input name="q" value="{{ q }}" maxlength="150"></label><label>Account state <select name="status">{% for key,label in statuses %}<option value="{{ key }}" {% if key == status %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label><button>Filter</button><a href="{% url 'admin-account-review' %}">Clear</a></form>
+<p>{{ rows.paginator.count }} matching accounts</p>
+<section class="live-card live-table"><table><thead><tr><th scope="col">Username / name</th><th scope="col">Account</th><th scope="col">Timetable identity</th><th scope="col">Recorded grant</th><th scope="col">Review</th></tr></thead><tbody>
+{% for u in rows %}<tr><td>{{ u.username }}<small> {{ u.get_full_name }}</small></td><td>{% if u.pending %}Pending verification{% elif not u.is_active %}Inactive{% elif u.is_staff and u.is_superuser %}Active administrator{% else %}Active staff{% endif %}</td><td>{% if u.staff_profile.timetable_link_verified %}Verified ID recorded{% else %}Not verified{% endif %}</td><td>{% if u.recorded_grant %}Yes — review effective access{% else %}None recorded{% endif %}</td><td><a href="{% url 'security-effective' u.pk %}">Effective access</a> · {% if u.pending %}<a href="{% url 'automated-school-setup' %}">Verify setup</a>{% else %}<a href="{% url 'management-staff-edit' u.pk %}">Edit account</a>{% endif %}</td></tr>
+{% empty %}<tr><td colspan="5">No matching accounts.</td></tr>{% endfor %}</tbody></table></section>
+<nav aria-label="Account pages">{% if rows.has_previous %}<a href="?q={{ q|urlencode }}&amp;status={{ status }}&amp;page={{ rows.previous_page_number }}">Previous</a>{% endif %} Page {{ rows.number }} of {{ rows.paginator.num_pages }} {% if rows.has_next %}<a href="?q={{ q|urlencode }}&amp;status={{ status }}&amp;page={{ rows.next_page_number }}">Next</a>{% endif %}</nav>
+<p><a href="{% url 'school-access-manage' %}">Manage explicit grants</a> · <a href="{% url 'management-staff-add' %}">Add staff account</a></p>
+{% elif section == "audit" %}
+<p>Read-only application records, not a tamper-proof external audit service. Security events and structured access changes are separate sources; no export, deletion or editing is provided here.</p>
+<form method="get" class="rf-directory-filters"><label>Source <select name="source"><option value="security" {% if source == "security" %}selected{% endif %}>Security events</option><option value="access" {% if source == "access" %}selected{% endif %}>Access changes</option></select></label><label>Search events <input name="q" value="{{ q }}" maxlength="150"></label><button>Filter</button><a href="{% url 'admin-audit-review' %}">Clear</a></form>
+<p>{{ rows.paginator.count }} matching events</p>
+<section class="live-card live-table"><table><thead><tr><th scope="col">Recorded at</th><th scope="col">Actor</th><th scope="col">Action</th><th scope="col">Subject / target</th></tr></thead><tbody>
+{% for e in rows %}<tr><td>{{ e.created_at|date:"d M Y H:i:s T" }}</td><td>{{ e.actor.username|default:"Unavailable" }}</td><td>{% if source == "access" %}{{ e.action }}{% else %}{{ e.event }}{% endif %}</td><td>{% if source == "access" %}{{ e.target.username|default:"—" }}{% else %}{{ e.subject|default:"—" }}{% endif %}</td></tr>{% empty %}<tr><td colspan="4">No matching events.</td></tr>{% endfor %}</tbody></table></section>
+<nav aria-label="Audit pages">{% if rows.has_previous %}<a href="?source={{ source }}&amp;q={{ q|urlencode }}&amp;page={{ rows.previous_page_number }}">Previous</a>{% endif %} Page {{ rows.number }} of {{ rows.paginator.num_pages }} {% if rows.has_next %}<a href="?source={{ source }}&amp;q={{ q|urlencode }}&amp;page={{ rows.next_page_number }}">Next</a>{% endif %}</nav>
+<p><a href="{% url 'security-history' %}">Open structured access history</a></p>
+{% else %}
+<section class="live-card"><h2>Release and mode</h2><p role="status"><strong>Production blocked.</strong> Unsigned synthetic staging; no real school records. OneSchool remains authoritative.</p><p>This page does not change deployment flags, credentials, ports, secrets or database configuration.</p></section>
+<section class="live-card"><h2>School data readiness</h2>{% if publication %}<p>Publication #{{ publication.pk }} · {{ publication.name }} · {{ publication.starts }} – {{ publication.ends }}</p><p>Operational source/roster checks: {% if ready %}Pass{% else %}Review required{% endif %} · Current date within range: {% if in_coverage %}Yes{% else %}No{% endif %}</p>{% else %}<p>No active publication.</p>{% endif %}
+{% for issue in issues %}<p>{{ issue }}</p>{% empty %}<p>No source provenance warnings reported by the current check.</p>{% endfor %}<p>{{ version_count }} publication records · {{ import_count }} staged archive batches · {{ draft_count }} draft timetable versions</p><a href="{% url 'school-data-overview' %}">Review publications and reconciliation</a></section>
+<section class="live-card"><h2>Managed school configuration</h2><p>{{ rooms }} manual room records · {{ periods }} manual period records · {{ destinations }} active movement destinations</p><p><a href="{% url 'management-timetable' %}">Rooms, periods and timetable</a> · <a href="{% url 'movement-destinations' %}">Movement destination settings</a> · <a href="{% url 'security-templates' %}">Role templates</a></p></section>
+<section class="live-card"><h2>Backup and recovery</h2><p>Backup status is not verified by this portal. Use the authorised local deployment snapshot and isolated restore procedures, including archive/key protection; database-only backup does not establish complete recovery. This interface cannot launch a backup, restore or shell command. Publication restoration is a separate guarded workflow in the school data centre.</p></section>
+<section class="live-card"><h2>Open launch gates ({{ gates|length }})</h2><ul>{% for key,requirement in gates %}<li>{{ requirement }} — Open</li>{% endfor %}</ul></section>
+{% endif %}
+{% endblock %}

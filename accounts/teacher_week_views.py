@@ -22,6 +22,9 @@ def week(request):
     if not can_teach(request.user):
         return HttpResponseForbidden("Teacher access required.")
 
+    if settings.ROLLFLOW_PROTECTED_WORKSPACE:
+        from .teacher_experience_views import schedule
+        return schedule(request,mode="week")
     from .connected_school import current
     if current():
         from .connected_views import teacher_schedule

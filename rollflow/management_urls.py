@@ -1,8 +1,20 @@
 from django.urls import path
-from accounts import connected_views, automated_views
+from accounts import pilot_views, admin_experience, connected_views, automated_views, data_views, attendance_admin_views
 from accounts import staff_views, student_views, timetable_views, master_views, oneschool_views, oneschool_document_views
 
 urlpatterns = [
+    path('system/', admin_experience.centre, name='admin-system-centre'),
+    path('system/accounts/', admin_experience.centre, {'section':'accounts'}, name='admin-account-review'),
+    path('system/audit/', admin_experience.centre, {'section':'audit'}, name='admin-audit-review'),
+    path('system/pilot/', pilot_views.readiness, name='admin-pilot-readiness'),
+    path('system/settings/', admin_experience.centre, {'section':'settings'}, name='admin-system-settings'),
+    path('attendance/student-history/', attendance_admin_views.student_report, name='attendance-student-report'),
+    path('attendance/correct/<int:pk>/', attendance_admin_views.correct, name='attendance-correct'),
+    path('attendance/relief/', attendance_admin_views.relief, name='attendance-relief'),
+    path('school-data/', data_views.overview, name='school-data-overview'),
+    path('school-data/restore/<int:pk>/', data_views.restore, name='school-data-restore'),
+    path('school-data/transfers/', data_views.transfer_list, name='school-data-transfers'),
+    path('school-data/transfers/<int:pk>/', data_views.transfer, name='school-data-transfer'),
     path("", staff_views.dashboard, name="management-dashboard"),
     path("connected/", connected_views.centre, name="connected-school"),
     path("connected/dated/", connected_views.dated_centre, name="connected-dated"),

@@ -1,0 +1,15 @@
+{% extends "live_base.html" %}
+{% block title %}Pilot Readiness{% endblock %}
+{% block content %}
+<p><a href="{% url 'admin-system-settings' %}">System settings &amp; readiness</a> / Pilot readiness</p>
+<h1>Pilot Readiness &amp; Operational Acceptance</h1>
+<p>Version {{ pilot.version }} · Fictional staging rehearsal only</p>
+<p class="live-warn" role="status"><strong>Production blocked.</strong> This checklist is not a completed assessment or approval. Do not use real school records or departmental credentials.</p>
+<section class="live-card"><h2>Rehearsal scenarios ({{ pilot.scenarios|length }})</h2>
+<p>Use distinct fictional accounts on approved isolated test equipment. Record evidence and decisions privately outside RollFlow; this page does not collect or store sign-offs.</p>
+<div class="live-table"><table><thead><tr><th scope="col">Scenario</th><th scope="col">Responsible role</th><th scope="col">Acceptance evidence</th><th scope="col">Status</th></tr></thead><tbody>
+{% for item in pilot.scenarios %}<tr><td><strong>{{ item.id }}</strong> {{ item.title }}</td><td>{{ item.owner_role }}</td><td>{{ item.acceptance }}</td><td>{{ item.status }}</td></tr>{% endfor %}
+</tbody></table></div></section>
+<section class="live-card"><h2>Open production gates ({{ pilot.gates|length }})</h2><p>Only a subsequent independently reviewed code release can remove the launch hold. Successful staging or local checklist completion cannot do so.</p><ul>{% for gate in pilot.gates %}<li><strong>{{ gate.owner_role }}</strong> — {{ gate.requirement }} (Open)</li>{% endfor %}</ul></section>
+<section class="live-card"><h2>Local pilot pack</h2><p>See the installed RC3 documents: ICT deployment runbook, staff onboarding, administrator and recovery handbook, and operational acceptance record. Use the local Pilot Readiness launcher to inspect the package. This portal does not start a deployment, backup or external service.</p><a href="{% url 'admin-system-settings' %}">Return to system settings</a></section>
+{% endblock %}
