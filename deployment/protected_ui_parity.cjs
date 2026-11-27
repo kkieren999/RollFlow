@@ -49,11 +49,18 @@ async function run(){
      for(const route of ['/manage/system/','/manage/system/accounts/','/manage/system/audit/','/manage/system/settings/'])assert.equal((await ctx.request.get(url+route)).status(),403,id+' administration review boundary');
     }
     assert.equal(await p.locator('main#main-content').count(),1,id+' single main landmark');
+    const desktopMetrics=await p.evaluate(()=>({viewport:innerWidth,documentWidth:document.documentElement.scrollWidth,domNodes:document.querySelectorAll('*').length,loadMs:Math.round(performance.getEntriesByType('navigation')[0]?.duration||0)}));
     await rp.screenshot({path:path.join(target,id+'-reference-1440.png'),animations:'disabled'});
     await p.screenshot({path:path.join(target,id+'-protected-1440.png'),animations:'disabled'});
     await rp.setViewportSize({width:390,height:844});await p.setViewportSize({width:390,height:844});
-    await p.locator('.rf-p-menu').click();assert.equal(await p.locator('.rf-p-menu').getAttribute('aria-expanded'),'true');assert(await p.locator('.rf-protected-sidebar').isVisible());
+    await p.locator('.rf-p-menu').focus();await p.keyboard.press('Enter');assert.equal(await p.locator('.rf-p-menu').getAttribute('aria-expanded'),'true');assert(await p.locator('.rf-protected-sidebar').isVisible());
+    assert(await p.locator('.rf-protected-sidebar').evaluate(el=>el.contains(document.activeElement)),id+' mobile menu focus enters sidebar');
     await p.keyboard.press('Escape');assert.equal(await p.locator('.rf-p-menu').getAttribute('aria-expanded'),'false');
+    assert(await p.locator('.rf-p-menu').evaluate(el=>document.activeElement===el),id+' Escape returns focus');
+    await p.locator('a.rf-skip[href="#main-content"]').focus();await p.keyboard.press('Enter');
+    assert(await p.locator('#main-content').evaluate(el=>document.activeElement===el),id+' skip link reaches main');
+    const mobileMetrics=await p.evaluate(()=>({viewport:innerWidth,documentWidth:document.documentElement.scrollWidth,scrollRegions:[...document.querySelectorAll('[data-rf-scrollable="true"]')].length}));
+    await p.locator('.rf-p-menu').focus();
     await rp.screenshot({path:path.join(target,id+'-reference-390.png'),animations:'disabled'});
     await p.screenshot({path:path.join(target,id+'-protected-390.png'),animations:'disabled'});
     if(id==='admin'){
@@ -109,7 +116,7 @@ async function run(){
       }
     }
     assert.deepEqual(errors,[],id+' protected script errors');assert.deepEqual(external,[],id+' external requests');
-    evidence.push({account:id,reference:referenceLabels,protected:protectedLabels,referenceOnly:referenceLabels.filter(x=>!protectedLabels.includes(x)),protectedOnly:protectedLabels.filter(x=>!referenceLabels.includes(x))});
+    evidence.push({account:id,desktopMetrics,mobileMetrics,reference:referenceLabels,protected:protectedLabels,referenceOnly:referenceLabels.filter(x=>!protectedLabels.includes(x)),protectedOnly:protectedLabels.filter(x=>!referenceLabels.includes(x))});
     console.log('Protected/reference UI captured:',id);
    }finally{await rctx.close();await ctx.close()}
   }
@@ -118,7 +125,7 @@ async function run(){
   const combined=[...prior,...evidence];
   assert.equal(new Set(combined.map(x=>x.account)).size,combined.length,'Duplicate evidence account');
   if(batch===2)assert.deepEqual(combined.map(x=>x.account).sort(),Object.keys(mapping).sort(),'All 13 reference accounts captured');
-  fs.writeFileSync(outfile,JSON.stringify({websiteCommit:fs.readFileSync(path.join(root,'SOURCE_COMMIT.txt'),'utf8').trim(),scope:'RC2.6 integrated protected workflows across 13 roles; differences are open, not approval',accounts:combined},null,2));
+  fs.writeFileSync(outfile,JSON.stringify({websiteCommit:fs.readFileSync(path.join(root,'SOURCE_COMMIT.txt'),'utf8').trim(),scope:'RC2.7 protected workflow visual/accessibility checks across 13 roles; measurements are diagnostic, not capacity or compliance certification; differences are open, not approval',accounts:combined},null,2));
  }finally{if(browser)await browser.close();ref.close()}
 }
 run().catch(e=>{console.error(e.stack);process.exitCode=1});
