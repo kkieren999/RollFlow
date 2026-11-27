@@ -60,6 +60,10 @@ async function run(){
     await p.locator('a.rf-skip[href="#main-content"]').focus();await p.keyboard.press('Enter');
     assert(await p.locator('#main-content').evaluate(el=>document.activeElement===el),id+' skip link reaches main');
     const mobileMetrics=await p.evaluate(()=>({viewport:innerWidth,documentWidth:document.documentElement.scrollWidth,scrollRegions:[...document.querySelectorAll('[data-rf-scrollable="true"]')].length}));
+    assert(await p.evaluate(()=>[...document.querySelectorAll('[data-rf-scrollable="true"]')].every(el=>el.tabIndex>=0&&(el.hasAttribute('aria-label')||el.hasAttribute('aria-labelledby')))),id+' overflowing tables are keyboard reachable and named');
+    await p.setViewportSize({width:320,height:700});
+    const narrowMetrics=await p.evaluate(()=>({viewport:innerWidth,documentWidth:document.documentElement.scrollWidth}));
+    await p.setViewportSize({width:390,height:844});
     await p.locator('.rf-p-menu').focus();
     await rp.screenshot({path:path.join(target,id+'-reference-390.png'),animations:'disabled'});
     await p.screenshot({path:path.join(target,id+'-protected-390.png'),animations:'disabled'});
@@ -116,7 +120,7 @@ async function run(){
       }
     }
     assert.deepEqual(errors,[],id+' protected script errors');assert.deepEqual(external,[],id+' external requests');
-    evidence.push({account:id,desktopMetrics,mobileMetrics,reference:referenceLabels,protected:protectedLabels,referenceOnly:referenceLabels.filter(x=>!protectedLabels.includes(x)),protectedOnly:protectedLabels.filter(x=>!referenceLabels.includes(x))});
+    evidence.push({account:id,desktopMetrics,mobileMetrics,narrowMetrics,reference:referenceLabels,protected:protectedLabels,referenceOnly:referenceLabels.filter(x=>!protectedLabels.includes(x)),protectedOnly:protectedLabels.filter(x=>!referenceLabels.includes(x))});
     console.log('Protected/reference UI captured:',id);
    }finally{await rctx.close();await ctx.close()}
   }
