@@ -93,6 +93,8 @@ def students(request):
 def student_detail(request,pk):
     rejected=deny(request)
     if rejected:return rejected
-    record=student_projection(directory_classes(current(),request.user)).get(pk)
+    pub=current()
+    record=student_projection(directory_classes(pub,request.user)).get(pk)
     if not record:raise Http404("Student not within your verified teaching scope.")
-    return page(request,"teacher_experience_student.html",record=record)
+    from .workflow_integration import student_workflow
+    return page(request,"teacher_experience_student.html",record=record,workflow=student_workflow(pub,request.user,record))
