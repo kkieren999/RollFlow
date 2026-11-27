@@ -163,6 +163,7 @@ def relief(request):
         row=form.rows.get(selected)
         if row is None:return HttpResponseBadRequest("Choose an exact reviewed lesson.")
         candidates,candidate_note=relief_candidates(pub,day,row)
+        if request.method=="GET":form.initial["lesson"]=selected
     assignments=ReliefAttendanceAssignment.objects.filter(lesson_date=day).select_related("regular_teacher","relief_teacher").order_by("start","pk")
     return render(request,"attendance_relief.html",{"form":form,"publication":pub,"day":day,"assignments":assignments,"error":error,
         "selected":selected,"candidates":candidates,"candidate_note":candidate_note,"lesson_choices":form.fields["lesson"].choices})

@@ -22,7 +22,7 @@ def dashboard(user,query=None):
     if not choice:return None
     today=timezone.localdate()
     # Default daily operations view, or existing fixed completed support week.
-    params=dict(query)
+    params={k:query.get(k) for k in ('start','end') if k in query}
     if choice["domain"]!="support" and not any(k in params for k in ("start","end")):
         params.update(start=today.isoformat(),end=today.isoformat())
     start,end=parse_dates(params,choice["domain"])

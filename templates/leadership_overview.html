@@ -1,0 +1,7 @@
+{% extends "live_base.html" %}{% block title %}Leadership Dashboard{% endblock %}{% block content %}
+<h1>Leadership Dashboard</h1><p>Review operational summaries for your explicitly assigned modules and scopes. No student-level records or access inferred from role titles.</p>
+<section class="live-card"><h2>Report areas and scopes</h2><nav class="rf-student-tabs" aria-label="Leadership report scopes">{% for c in leadership.choices %}<a href="?{{ c.query }}" {% if c.selected %}aria-current="page"{% endif %}>{{ c.label }} · {{ c.scope_label }}</a>{% endfor %}</nav>
+<form method="get" class="rf-directory-filters"><input type="hidden" name="domain" value="{{ leadership.choice.domain }}"><input type="hidden" name="scope" value="{{ leadership.choice.scope }}"><input type="hidden" name="value" value="{{ leadership.choice.value }}"><div><label for="rf-lead-start">From</label><input id="rf-lead-start" type="date" name="start" value="{{ leadership.start|date:'Y-m-d' }}" required></div><div><label for="rf-lead-end">To</label><input id="rf-lead-end" type="date" name="end" value="{{ leadership.end|date:'Y-m-d' }}" required></div><button>Refresh summary</button></form><p>Up to seven days. Educational support uses a completed Monday–Sunday week and suppressed small cells.</p></section>
+{% include "leadership_metrics.html" %}
+{% include "operations_shortcuts.html" %}
+{% endblock %}

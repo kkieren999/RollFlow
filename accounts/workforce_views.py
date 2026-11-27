@@ -158,6 +158,9 @@ def board(request):
         day=selected_date(request)
     except ValueError:
         return HttpResponseBadRequest("Invalid planning date.")
+    view=request.GET.get("view","all")
+    if view not in ("all","relief","absence","duty","room","closure","history"):
+        return HttpResponseBadRequest("Unknown workforce view.")
     pub=current()
     form=EntryForm(request.POST if request.method=="POST" and request.POST.get("action")=="create" else None,pub=pub,day=day)
     error=""
@@ -193,11 +196,20 @@ def board(request):
         except (ValueError,IntegrityError) as exc:
             error=str(exc) if isinstance(exc,ValueError) else "Conflicting workforce change. Reload and review."
     qs=WorkforceEntry.objects.filter(day=day).select_related("staff","publication","created_by").order_by("kind","start","pk")
+    if view in ("absence","duty","room","closure"):
+        qs=qs.filter(kind=view)
+    if view=="history":
+        from django.db.models import Q
+        qs=qs.filter(Q(cancelled_at__isnull=False)|~Q(publication=pub))
+    ready=publication_ready(pub) and date_is_school_day(pub,day) if pub else False
+    current_entries=entries(pub,day) if ready else WorkforceEntry.objects.none()
     rows=coverage(pub,day)
     cover=ReliefAttendanceAssignment.objects.filter(lesson_date=day).select_related("regular_teacher","relief_teacher","publication").order_by("start","pk")
-    return page(request,"workforce_board.html",pub=pub,day=day,form=form,error=error,
+    return page(request,"workforce_board.html",pub=pub,day=day,form=form,error=error,view=view,ready=ready,
+        current_counts={k:current_entries.filter(kind=k).count() for k in ("absence","duty","room","closure")},
+        tabs=[("all","Overview"),("relief","Relief Management"),("absence","Staff availability"),("duty","Supervision"),("room","Room changes"),("closure","School exceptions"),("history","Change history")],
         writable=can_write(request.user) and planning_day(pub,day),entries=Paginator(qs,50).get_page(request.GET.get("page")),
-        coverage=rows,uncovered=sum(not r["covered"] for r in rows),cover=cover,day_closed=closed(pub,day))
+        coverage=rows,uncovered=sum(not r["covered"] for r in rows),cover=Paginator(cover,50).get_page(request.GET.get("cover_page")),day_closed=closed(pub,day))
 
 
 @never_cache
