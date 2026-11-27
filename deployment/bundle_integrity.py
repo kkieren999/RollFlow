@@ -16,11 +16,15 @@ def manifest(root,name="SHA256SUMS.txt"):
     if target.exists():
         raise ValueError("Manifest already exists.")
     lines=[]
+    seen=set()
     for p in sorted(root.rglob("*")):
         if p.is_symlink():
             raise ValueError("Unexpected symbolic link.")
         if p.is_file():
-            lines.append(digest(p)+"  "+p.relative_to(root).as_posix())
+            relative=p.relative_to(root).as_posix()
+            if relative.casefold() in seen:raise ValueError("Case-colliding bundle path.")
+            seen.add(relative.casefold())
+            lines.append(digest(p)+"  "+relative)
     target.write_text("\n".join(lines)+"\n",encoding="utf-8")
 
 
@@ -45,7 +49,14 @@ def verify(root,name="SHA256SUMS.txt",strict=False):
         if digest(p)!=expected:raise ValueError("Checksum mismatch: "+relative)
     if not seen:raise ValueError("Empty manifest.")
     if strict:
-        actual={p.relative_to(root).as_posix().casefold() for p in root.rglob("*") if p.is_file() and p!=target}
+        actual=set()
+        for p in root.rglob("*"):
+            if p.is_symlink():raise ValueError("Unexpected symbolic link.")
+            if p.is_file() and p!=target:
+                relative=p.relative_to(root).as_posix().casefold()
+                if relative in actual:raise ValueError("Case-colliding bundle path.")
+                actual.add(relative)
+            elif not p.is_dir() and p!=target:raise ValueError("Unexpected bundle entry.")
         if actual!=seen:raise ValueError("Unexpected or missing files.")
     return len(seen)
 
