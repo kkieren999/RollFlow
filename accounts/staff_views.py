@@ -81,12 +81,19 @@ def dashboard(request):
         imported_stats=[("Imported allocations",a.get("lessons",0)),("Imported classes",a.get("classes",0)),("Imported staff IDs",a.get("staff",0)),("Imported rooms",a.get("rooms",0)),("Imported school days",a.get("days",0)),("Today’s allocations",len(rows)),("Today’s classes",len({r["code"] for r in rows}))]
     if connected:
         today_rows = visible_slots(connected, timezone.localdate())
-        counts = connected.snapshot["stats"]
-        imported_stats = [("Published classes", counts["classes"]), ("Weekly class slots", counts["slots"]),
-                          ("Published student-class links", counts["memberships"]),
-                          ("Verified mappings at publication", counts["verified_mappings"]),
-                          ("Today’s allocations", len(today_rows)),
-                          ("Today’s classes", len({row["code"] for row in today_rows}))]
+        # Count the retained snapshot itself. Older publications and synthetic
+        # fixtures may omit summary keys; do not report a fabricated zero.
+        snapshot=connected.snapshot
+        classes,slots,bindings=(snapshot.get(k) for k in ("classes","slots","bindings"))
+        valid_classes=isinstance(classes,list) and all(isinstance(c,dict) for c in classes)
+        imported_stats = [
+            ("Published classes",len(classes) if valid_classes else "Unavailable"),
+            ("Published lesson allocations",len(slots) if isinstance(slots,list) else "Unavailable"),
+            ("Published student-class links",sum(len(c["students"]) for c in classes)
+             if valid_classes and all(isinstance(c.get("students"),list) for c in classes) else "Unavailable"),
+            ("Verified mappings at publication",len(bindings) if isinstance(bindings,dict) else "Unavailable"),
+            ("Today’s allocations",len(today_rows)),
+            ("Today’s classes",len({row["code"] for row in today_rows}))]
     return page(request, "dashboard", connected_publication=connected, published_import=version, coverage_warning=coverage_message(version,timezone.localdate()) if version else "", imported_stats=imported_stats, stats=[
         ("Staff accounts", users.count()),
         ("Active staff", users.filter(is_active=True).count()),

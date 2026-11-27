@@ -14,6 +14,7 @@ OPEN_GATES = (
     ("deployment", "Approved central service, managed HTTPS clients and signed distribution"),
     ("recovery", "Approved encrypted backups, recovery drill and rollback plan"),
     ("capacity", "Full school multi-user, load, concurrency and accessibility acceptance"),
+    ("interface", "Approved protected website workflow and visual parity across all authorised staff roles"),
     ("pilot", "Fictional pilot acceptance, staff training and authorised go-live decision"),
 )
 

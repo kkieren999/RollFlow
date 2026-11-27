@@ -158,7 +158,7 @@ def workspace(request, module=None):
         data = scoped_rows(grants, module) if module else []
     rows = Paginator(data, 50).get_page(request.GET.get("page")) if module else None
     return render(request, "school_workspace.html", {
-        "grants": grants, "modules": modules, "module": module, "rows": rows,
+        "grants": grants, "modules": modules, "module": module, "module_label": modules.get(module), "rows": rows,
         "publication": publication, "day": day,
         "teaching": can_teach(request.user),
         "admin_access": request.user.is_staff and request.user.is_superuser,
