@@ -40,13 +40,20 @@ def shell(user):
             "modules": modules, "grants": grants}
 
 
-def page(request, template, **context):
+def page(request, template, *, _presentation_shell=None, **context):
     from django.conf import settings
     if settings.ROLLFLOW_PROTECTED_WORKSPACE and template in ("live_roll.html", "classroom_tools.html", "movement_issue.html") and context.get("row"):
         from .workflow_integration import lesson_links
         context["lesson_links"] = lesson_links(context["row"])
         context["lesson_active"] = {"live_roll.html":"roll", "classroom_tools.html":"classroom", "movement_issue.html":"movement"}[template]
-    return render(request, template, {**shell(request.user), **context})
+    # Share the freshly computed presentation snapshot with the context processor
+    # only during this render. Never use it for endpoint authorization or writes.
+    ctx = shell(request.user) if _presentation_shell is None else _presentation_shell
+    request._rf_render_shell = ctx
+    try:
+        return render(request, template, {**ctx, **context})
+    finally:
+        del request._rf_render_shell
 
 
 @never_cache
@@ -64,7 +71,7 @@ def home(request):
     from .leadership_experience import dashboard, operational_summary
     leadership=dashboard(request.user) if settings.ROLLFLOW_PROTECTED_WORKSPACE and ctx["report_access"] else None
     operations=operational_summary(request.user,pub) if settings.ROLLFLOW_PROTECTED_WORKSPACE else []
-    return page(request, "live_home.html", ready=publication_ready(pub),leadership=leadership,operations=operations)
+    return page(request, "live_home.html", _presentation_shell=ctx, ready=publication_ready(pub),leadership=leadership,operations=operations)
 
 
 def roster_token(students):
