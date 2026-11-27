@@ -4,22 +4,22 @@
 #endif
 #ifdef Workstation
   #define AppName "RollFlow Staff Workstation (Staging)"
-  #define AppCode "RollFlow.Workstation.4.7.0.Staging"
+  #define AppCode "RollFlow.Workstation.5.0.0-rc.1.Staging"
   #define AppFolder "RollFlow-Workstation"
-  #define SetupName "RollFlow-V4.7.0-Workstation-x64-STAGING-Setup"
+  #define SetupName "RollFlow-V5.0.0-rc.1-Workstation-x64-STAGING-Setup"
 #else
   #define AppName "RollFlow Local School Lab (Staging)"
-  #define AppCode "RollFlow.LocalLab.4.7.0.Staging"
+  #define AppCode "RollFlow.LocalLab.5.0.0-rc.1.Staging"
   #define AppFolder "RollFlow-LocalLab"
-  #define SetupName "RollFlow-V4.7.0-LocalLab-x64-STAGING-Setup"
+  #define SetupName "RollFlow-V5.0.0-rc.1-LocalLab-x64-STAGING-Setup"
 #endif
 [Setup]
 AppId={#AppCode}
 AppName={#AppName}
-AppVersion=4.7.0
+AppVersion=5.0.0-rc.1
 AppPublisher=RollFlow
-DefaultDirName={localappdata}\Programs\{#AppFolder}\4.7.0
-DefaultGroupName={#AppName} 4.7
+DefaultDirName={localappdata}\Programs\{#AppFolder}\5.0.0-rc.1
+DefaultGroupName={#AppName} 5.0 RC1
 DisableProgramGroupPage=yes
 DisableDirPage=yes
 UsePreviousAppDir=no
@@ -32,7 +32,7 @@ SolidCompression=yes
 OutputBaseFilename={#SetupName}
 CloseApplications=no
 RestartApplications=no
-UninstallDisplayName={#AppName} 4.7
+UninstallDisplayName={#AppName} 5.0 RC1
 #ifdef Workstation
 Uninstallable=yes
 #else
@@ -53,6 +53,7 @@ Name: "{userdesktop}\RollFlow School Server (Staging)"; Filename: "{app}\Open Sc
 #else
 Name: "{group}\Protected local staging"; Filename: "{app}\Start RollFlow.cmd"; WorkingDir: "{app}"
 Name: "{group}\Fictional training"; Filename: "{app}\Open Training Demo.cmd"; WorkingDir: "{app}"
+Name: "{group}\Production readiness"; Filename: "{app}\Production Readiness.cmd"; WorkingDir: "{app}"
 Name: "{group}\Verify package"; Filename: "{app}\Verify Package.cmd"; WorkingDir: "{app}"
 Name: "{userdesktop}\RollFlow Local Lab (Staging)"; Filename: "{app}\Start RollFlow.cmd"; WorkingDir: "{app}"; Tasks: desktopicon
 #endif

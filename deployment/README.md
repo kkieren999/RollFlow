@@ -1,3 +1,7 @@
+# V5.0 RC1 — production launch preparation
+
+See [V5.0 release candidate](../docs/v5.0-release-candidate.md). School startup is deliberately blocked. Use fictional local staging only; no real data or public deployment.
+
 # V4.7 Windows installer staging
 
 See [V4.7 installation and recovery](../docs/v4.7-installer.md). Versioned per-user installers; no automatic database upgrade, no school data. Use the workstation-only package for the approved HTTPS server, not a separate database on every PC.

@@ -109,6 +109,9 @@ def load(state):
     return cfg
 
 def init(args, state):
+    if args.mode=="school":
+        from rollflow.release_policy import assert_school_release
+        assert_school_release()
     if state.exists():
         raise RuntimeError("Instance directory already exists; refusing to overwrite it.")
     if args.mode == "school" and not args.host:
@@ -165,6 +168,9 @@ def init(args, state):
           "ICT must configure the approved HTTPS proxy and access controls before use.")
 
 def serve(cfg):
+    if cfg["mode"]=="school":
+        from rollflow.release_policy import assert_school_release
+        assert_school_release()
     # Waitress is deliberately bound to loopback in both profiles.
     os.environ.update(config_env(cfg))
     os.environ["DJANGO_SETTINGS_MODULE"] = "rollflow.settings"
@@ -270,6 +276,20 @@ def upgrade(cfg):
         lock.unlink(missing_ok=True)
 
 
+@contextmanager
+def exclusive_operation(state):
+    """Cooperative guard for this release's native runner. No automatic stale-lock deletion."""
+    lock=state/"native-operation.lock"
+    try:
+        write_private(lock,"Native operation in progress.\n")
+    except FileExistsError:
+        raise RuntimeError("Another native operation or unresolved interruption exists. Stop and contact ICT.") from None
+    try:
+        yield
+    finally:
+        lock.unlink(missing_ok=True)
+
+
 def main():
     if os.name != "nt":
         os.umask(0o077)
@@ -312,13 +332,21 @@ def main():
         from deployment.recovery import diagnostics
         diagnostics(cfg)
         return
+    if cfg["mode"]=="school":
+        from rollflow.release_policy import assert_school_release
+        assert_school_release()
+    with exclusive_operation(state):
+        execute_existing(cfg,args,state)
+
+
+def execute_existing(cfg,args,state):
     if (state/"recovery-required.lock").exists():
         raise RuntimeError("Recovery required. Preserve this instance; restore into a separate staging state.")
+    if (state / "upgrade-in-progress.lock").exists():
+        raise RuntimeError("Upgrade in progress. Do not start or manage the instance.")
     if args.command == "upgrade":
         upgrade(cfg)
         return
-    if (state / "upgrade-in-progress.lock").exists():
-        raise RuntimeError("Upgrade in progress. Do not start or manage the instance.")
     if args.command=="snapshot":
         from deployment.recovery import snapshot
         snapshot(cfg,args.output)

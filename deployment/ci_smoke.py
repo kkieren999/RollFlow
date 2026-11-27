@@ -65,6 +65,10 @@ def main():
             call("manage.py", "shell", "-c",
                  "from django.test import Client; r=Client().get('/login/', secure=True, HTTP_HOST='rollflow.school.example'); assert r.status_code==200; assert 'connect-src' in r['Content-Security-Policy']; assert Client().get('/login/', HTTP_HOST='rollflow.school.example').status_code == 301; print('School security smoke passed')",
                  env=env)
+            # The production server must refuse to launch despite valid-looking school settings.
+            denied=subprocess.run([sys.executable,"-c","import rollflow.wsgi"],cwd=ROOT,env=env,
+                                  capture_output=True,text=True)
+            assert denied.returncode!=0 and "school mode blocked" in denied.stderr
             env["ROLLFLOW_DEBUG"] = "1"
             bad = subprocess.run([sys.executable, "manage.py", "check"], cwd=ROOT, env=env,
                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

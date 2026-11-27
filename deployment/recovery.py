@@ -70,11 +70,22 @@ def restore(snapshot_path,state,pg_bin,db_port,web_port):
     if state.exists() or state.is_relative_to(snap):
         raise ValueError("Restore only into a new independent state directory.")
     verify(snap,"SNAPSHOT-SHA256.txt",strict=True)
+    # No arbitrary files, nested paths or partial archives in a recovery snapshot.
+    allowed={"SNAPSHOT.json","SNAPSHOT-SHA256.txt","rollflow.dump","oneschool-import.key","oneschool-imports"}
+    if any(p.name not in allowed for p in snap.iterdir()):
+        raise ValueError("Unexpected snapshot entry.")
+    archive=snap/"oneschool-imports"
+    if archive.exists() and (not archive.is_dir() or any(not p.is_file() or p.is_symlink() or p.suffix!=".rfenc" for p in archive.iterdir())):
+        raise ValueError("Invalid snapshot archive.")
+    if archive.is_dir() and any(archive.iterdir()) and not (snap/"oneschool-import.key").is_file():
+        raise ValueError("Snapshot archive key missing.")
     meta=json.loads((snap/"SNAPSHOT.json").read_text(encoding="utf-8"))
     if meta!={"format":1,"mode":"staging","contains_private_data":True}:
         raise ValueError("Only staging snapshots supported by this recovery tool.")
     if not (snap/"rollflow.dump").is_file():
         raise ValueError("Snapshot dump missing.")
+    with (snap/"rollflow.dump").open("rb") as stream:
+        if stream.read(5)!=b"PGDMP":raise ValueError("Invalid PostgreSQL dump.")
     init(SimpleNamespace(mode="staging",host=None,pg_bin=pg_bin,db_port=db_port,web_port=web_port,no_admin=True),state)
     from .native import load
     cfg=load(state)
@@ -102,5 +113,6 @@ def diagnostics(cfg):
     print("Mode:",cfg.get("mode","unknown"))
     print("Database runtime present:",pg(cfg,"pg_ctl").is_file())
     print("Recovery marker present:",(Path(cfg["state"])/"recovery-required.lock").exists())
+    print("Native operation lock present:",(Path(cfg["state"])/"native-operation.lock").exists())
     print("Upgrade lock present:",(Path(cfg["state"])/"upgrade-in-progress.lock").exists())
     print("No credentials, student records or database logs included.")
