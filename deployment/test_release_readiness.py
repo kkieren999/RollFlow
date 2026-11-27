@@ -31,3 +31,33 @@ class ReleaseReadinessTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 with exclusive_operation(state):raise ValueError("test")
             self.assertFalse((state/"native-operation.lock").exists())
+
+    def test_invalid_snapshot_does_not_create_destination(self):
+        from deployment.recovery import restore,seal
+        from subprocess import CalledProcessError
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)
+            snap=root/"snapshot";snap.mkdir()
+            (snap/"rollflow.dump").write_bytes(b"PGDMPnot a valid database")
+            seal(snap,"staging")
+            dest=root/"new"
+            with patch("deployment.recovery.run",side_effect=CalledProcessError(1,["pg_restore"])), patch("deployment.recovery.init") as init:
+                with self.assertRaises(CalledProcessError):
+                    restore(snap,dest,root,55433,18081)
+                init.assert_not_called()
+            self.assertFalse(dest.exists())
+
+    def test_tampered_snapshot_fails_before_runtime(self):
+        from deployment.recovery import restore,seal
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)
+            snap=root/"snapshot";snap.mkdir()
+            (snap/"rollflow.dump").write_bytes(b"PGDMPfictional")
+            seal(snap,"staging")
+            (snap/"rollflow.dump").write_bytes(b"PGDMPmodified")
+            dest=root/"new"
+            with patch("deployment.recovery.run") as command:
+                with self.assertRaisesRegex(ValueError,"Checksum mismatch"):
+                    restore(snap,dest,root,55433,18081)
+                command.assert_not_called()
+            self.assertFalse(dest.exists())
