@@ -3,7 +3,7 @@
 Only an independently reviewed subsequent code release may remove these blockers.
 An approval checklist, config file or successful CI run is not authorisation.
 """
-VERSION = "5.0.0-rc.2.4"
+VERSION = "5.0.0-rc.2.5"
 CHANNEL = "unsigned synthetic staging release candidate"
 OPEN_GATES = (
     ("identity", "Approved identity provider integration, MFA and account lifecycle acceptance"),
