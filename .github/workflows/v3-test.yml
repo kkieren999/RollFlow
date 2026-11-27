@@ -236,8 +236,11 @@ jobs:
           $out = "$env:RUNNER_TEMP/rf-installers"
           & "$bundle/python/python.exe" -B -m deployment.release_readiness --bundle $bundle --json | Set-Content "$out/PRODUCTION-READINESS.json" -Encoding utf8
           if ($LASTEXITCODE -ne 0) { throw 'Release inspection failed' }
-          & "$bundle/python/python.exe" -B -m deployment.release_readiness --require-production
-          if ($LASTEXITCODE -ne 2) { throw 'Production launch hold did not work' }
+          # The readiness CLI intentionally exits 2 while production is blocked.
+          # Validate that exact result in a subprocess; return 0 to the Actions shell
+          # only when the safeguard worked. Never swallow unexpected exit codes.
+          & "$bundle/python/python.exe" -B -c "import subprocess,sys; result=subprocess.run([sys.executable,'-B','-m','deployment.release_readiness','--require-production']); print('Production hold exit code:',result.returncode); sys.exit(0 if result.returncode == 2 else 1)"
+          if ($LASTEXITCODE -ne 0) { throw 'Production launch hold did not work' }
       - uses: actions/upload-artifact@v4
         with:
           name: RollFlow-V5.0.0-rc.1-Portable-Windows-x64-STAGING
