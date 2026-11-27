@@ -46,11 +46,11 @@ def seed():
     profiles[1].save(update_fields=["faculty"])
     for key,role,scope,value,caps,teaches in [
         ("principal","Principal","school","",["staff","students","published_classes","published_timetable","attendance_monitor","movement_monitor","workforce_monitor","report_attendance"],False),
-        ("deputy","Deputy Principal","school","",["staff","students","published_classes","published_timetable","attendance_monitor","movement_monitor","workforce_monitor"],False),
+        ("deputy","Deputy Principal","school","",["staff","students","published_classes","published_timetable","attendance_monitor","movement_monitor","workforce_monitor","report_attendance","report_workforce"],False),
         ("hod","Head of Department","faculty","English",["staff","published_classes","published_timetable","report_attendance"],False),
         ("ylc","Head of Year","year","7",["students","published_classes","published_timetable","report_attendance"],False),
         ("business","Business Manager","school","",["staff","workforce_monitor","report_workforce"],False),
-        ("office","Administration Officer","school","",["staff","students","movement_monitor","workforce_monitor"],False),
+        ("office","Administration Officer","school","",["staff","students","movement_monitor","workforce_monitor","report_workforce"],False),
         ("learning","Learning Support Teacher","school","",["support_task","support_referral"],True),
         ("aide","Teacher Aide","school","",["support_task"],False),
         ("relief","Relief Teacher","school","",["support_task"],True),

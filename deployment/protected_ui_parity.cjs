@@ -80,6 +80,24 @@ async function run(){
         await p.screenshot({path:path.join(target,'teacher-'+label+'-protected-dark.png'),animations:'disabled'});
       }
     }
+    if(['principal','deputy','hod','ylc','business','office'].includes(id)){
+      await p.setViewportSize({width:1440,height:900});
+      const resp=await p.goto(url+'/live/leadership/');assert.equal(resp.status(),200,id+' leadership overview');
+      assert.equal(await p.locator('[data-rf-leadership-domain]').count(),1);
+      assert.doesNotMatch(await p.locator('main').innerText(),/BrowserAllowed|BrowserDenied/);
+      if(id==='hod'||id==='ylc'){
+        assert.equal(await p.locator('[data-rf-leadership-scope]').getAttribute('data-rf-leadership-scope'),id==='hod'?'faculty':'year');
+        assert.equal((await ctx.request.get(url+'/live/leadership/?domain=attendance&scope=school')).status(),403);
+        assert.equal((await ctx.request.get(url+'/live/workforce/')).status(),403);
+      }
+      await p.screenshot({path:path.join(target,id+'-leadership-1440.png'),animations:'disabled'});
+      if(['principal','deputy','business','office'].includes(id)){
+        assert.equal((await p.goto(url+'/live/workforce/?view=absence')).status(),200);
+        assert.equal(await p.getByRole('link',{name:'Staff availability',exact:true}).getAttribute('aria-current'),'page');
+        assert.equal(await p.getByRole('button',{name:'Approve change'}).count(),0);
+        await p.screenshot({path:path.join(target,id+'-workforce-1440.png'),animations:'disabled'});
+      }
+    }
     assert.deepEqual(errors,[],id+' protected script errors');assert.deepEqual(external,[],id+' external requests');
     evidence.push({account:id,reference:referenceLabels,protected:protectedLabels,referenceOnly:referenceLabels.filter(x=>!protectedLabels.includes(x)),protectedOnly:protectedLabels.filter(x=>!referenceLabels.includes(x))});
     console.log('Protected/reference UI captured:',id);
@@ -90,7 +108,7 @@ async function run(){
   const combined=[...prior,...evidence];
   assert.equal(new Set(combined.map(x=>x.account)).size,combined.length,'Duplicate evidence account');
   if(batch===2)assert.deepEqual(combined.map(x=>x.account).sort(),Object.keys(mapping).sort(),'All 13 reference accounts captured');
-  fs.writeFileSync(outfile,JSON.stringify({websiteCommit:fs.readFileSync(path.join(root,'SOURCE_COMMIT.txt'),'utf8').trim(),scope:'RC2.3 shell, teacher and student workflows; differences are open, not approval',accounts:combined},null,2));
+  fs.writeFileSync(outfile,JSON.stringify({websiteCommit:fs.readFileSync(path.join(root,'SOURCE_COMMIT.txt'),'utf8').trim(),scope:'RC2.4 protected leadership, workforce, teacher and student workflows; differences are open, not approval',accounts:combined},null,2));
  }finally{if(browser)await browser.close();ref.close()}
 }
 run().catch(e=>{console.error(e.stack);process.exitCode=1});
