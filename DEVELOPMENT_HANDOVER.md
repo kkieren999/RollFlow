@@ -3,9 +3,33 @@
 **Last reviewed:** 27 November 2026 (Australia/Brisbane)  
 **Project:** kkieren999/RollFlow  
 **Goal:** Deliver a secure, school-wide Windows/browser application suitable for an approved Queensland secondary school pilot and eventually live deployment. The current website is the UX reference, not the production data layer.  
-**Status:** V4.7 Windows installers and recovery committed; validation and production approval gates remain. No production launch or real school data authorised.
+**Status:** V5.0 RC1 production launch candidate committed; production startup blocked, validation and approvals remain. No production launch or real school data authorised.
 
-## CURRENT CHECKPOINT — V4.7 Windows installation and recovery (27 Nov 2026)
+## CURRENT CHECKPOINT — V5.0 RC1 production launch preparation (27 Nov 2026)
+
+**Latest cumulative branch:** `feature/v5.0-production-launch-candidate`, head `49fb1e1ae17c0a4d520407bde2b01dda619e978a`, draft PR #45 https://github.com/kkieren999/RollFlow/pull/45 (base windows-release). Verify actual head before edits. This supersedes all prior checkpoints.
+
+### Build status (exact evidence)
+- V4.6 repaired head 7ef5dddf9639b90473d1c0ce9bfc4d2c9cac6ca4 run #333 https://github.com/kkieren999/RollFlow/actions/runs/45930453060: all jobs passed; verified artifact 15168621893 https://github.com/kkieren999/RollFlow/actions/runs/45930453060/artifacts/15168621893 expires 11 Dec 2026 02:52 UTC; recheck before download.
+- V4.7 exact latest head a511ec7d #336 https://github.com/kkieren999/RollFlow/actions/runs/45930736471 and #337 https://github.com/kkieren999/RollFlow/actions/runs/45930752794: tests and PostgreSQL/native including isolated restore passed; Windows compiling/testing installers at last inspection. Do not claim final installer verified before all jobs and artifacts pass.
+- V5.0 RC1 initial commit 690f61736a7f40130b9371cc678808712d5b1158 #338 https://github.com/kkieren999/RollFlow/actions/runs/45931047404; latest exact commit 49fb1e1a #339 https://github.com/kkieren999/RollFlow/actions/runs/45931110509 tests and PostgreSQL/native running. PR #45 opened; inspect exact head PR runs. Expected V5.0 artifacts RollFlow-V5.0.0-rc.1-Windows-Installers-x64-STAGING and RollFlow-V5.0.0-rc.1-Portable-Windows-x64-STAGING; no verified RC installer yet.
+- No merge, signing, production release or deployment. No real school records or departmental credentials authorised.
+
+### Implemented
+- Version 5.0.0-rc.1 unsigned synthetic staging, cumulative modules retained, no schema migration. rollflow/release_policy.py fixed OPEN_GATES, school native initialization/start/management and standard WSGI school/live-timetable startup blocked. Not an environment toggle or a self-certified checklist. Ordinary staging still supported. No claim that runtime guards stop someone modifying source or using a different server entry point.
+- deployment/release_readiness.py CLI, --json and --bundle checks exact candidate version/commit format and SHA256 manifest; --require-production exits 2 while blocked. Local Windows Production Readiness shortcut and CI-generated PRODUCTION-READINESS.json after successful installed browser checks. Manifest establishes integrity only, not publisher authenticity or independent approval.
+- ProtectedSessionMiddleware globally checks eligible authenticated accounts in protected workspace and flushes denied sessions; private/no-store headers on authenticated protected responses. Inherits existing local account access controls; no approved SSO/MFA implementation.
+- Native exclusive cooperative state lock, stale lock investigation; failed recovery/upgrade guards retained; isolated staging restore checks allowed snapshot entries, archive/key presence and PGDMP magic before initialization. Old binaries/direct processes do not obey the new lock; ICT must stop and retire old code. No automatic rollback to old schema.
+- New tests: deployment/test_release_readiness.py, accounts/test_release_concurrency.py (PostgreSQL TransactionTestCase simultaneous certified submissions, one success/one conflict/one revision), accounts/test_protected_session.py. CI checks actual WSGI denial with valid-looking school settings, inherits V4.7 installed Chrome, archive restore and installer smoke. Latest tests pending. No full school capacity claim.
+- docs/v5.0-release-candidate.md: nine open gate categories, evidence/approval owner matrix, fictional rollout, incident/recovery and pilot plan. All approvals OPEN.
+
+### Next actions — no automatic launch
+1. Verify #339 and exact PR head and V4.7 #336/#337. Repair actual failing tests/installer compile/restore/browser checks and any package metadata/manifest issues, verify exact artifacts and expiration, update this file. V5.0 RC1 is not a release until verified. Never weaken tests or startup hold to pass.
+2. Close outstanding engineering requirements in subsequent cumulative RCs: approved provider selection/registration and actual SSO/MFA integration with immutable identity binding and revocation; authorised OneSchool transfer (local manual reconciliation not delivery), enrolment history and rollback; historical attendance/correction, movement handover, partial-day/recurring relief, assigned confidential support policy, delegated actions and reporting privacy/history; centrally managed client configuration, service lifecycle and monitoring, signing/timestamping, controlled updates; whole-school protected workflow E2E, real concurrency/load/accessibility/outage testing, dependency/security assessment, encrypted production backup/recovery drill. See previous checkpoints and docs for details.
+3. Obtain independent security review, school ICT/data/privacy/records approval, operational sign-off, approved provider and integration credentials via private infrastructure, signed distribution and verified recovery, fictional pilot acceptance and explicit exact-release go-live decision. Do not store private evidence or secrets in public GitHub. No real data until authorised. The fixed startup hold can only be removed in a later independently reviewed release after evidence for all gates. Do not edit OPEN_GATES just to launch.
+4. Continue with V5.0 RC2 validation and production acceptance rather than declaring an invented V5.1 or an unapproved live launch. Preserve public fictional website and earlier staging releases. Update this same handover file before ending every development session.
+
+## PREVIOUS CHECKPOINT — V4.7 Windows installation and recovery (27 Nov 2026)
 
 **Latest cumulative branch:** `feature/v4.7-windows-installer`, head `a511ec7dea58bdf6108cb62bbc07ae7a433698d4`, draft PR #44 https://github.com/kkieren999/RollFlow/pull/44 (base windows-release). Verify actual head before changes. This supersedes all earlier checkpoints.
 
@@ -200,7 +224,7 @@ This file is the durable project handover, not a transcript. Read it in full bef
 
 1. Connect to the GitHub repository and re-check the live branch heads, open pull requests, workflow runs, job logs and artifacts. Facts in this file are a snapshot; current repository evidence takes precedence.
 2. Resume the first incomplete task in the CURRENT CHECKPOINT above, then consult the earlier roadmap sections. Do not start an unrelated implementation or restart from an older release just because it is the default branch.
-3. Work from the latest cumulative Windows development branch, presently `feature/v4.7-windows-installer`. For a new phase, create a feature branch from the verified cumulative head. Inspect other overlapping branches before merging. Use an expected-head lease when updating a branch.
+3. Work from the latest cumulative Windows development branch, presently `feature/v5.0-production-launch-candidate`. For a new phase, create a feature branch from the verified cumulative head. Inspect other overlapping branches before merging. Use an expected-head lease when updating a branch.
 4. Preserve working OneSchool imports, database schema/history, access boundaries and public website. Prefer incremental migrations and shared UI components; do not discard working code unnecessarily. Do not merge, deploy, delete existing databases, publish real data, or change school infrastructure without explicit approval.
 5. Add tests with fictional data. Run/trigger Django checks, migration consistency, all relevant regression tests, PostgreSQL/native smoke, browser checks and Windows packaging. Investigate failed jobs rather than weakening security or suppressing tests. A queued/running build is not a successful build.
 6. Create or update a draft PR. Report actual changes, limitations, branch, commit, PR, test outcomes and a verified artifact URL. Never claim an installer is ready unless the exact commit's required jobs passed and the artifact exists.
@@ -233,7 +257,9 @@ Stable handover URL: https://github.com/kkieren999/RollFlow/blob/development-han
 
 | Prior cumulative V4.6 development source | `feature/v4.6-leadership-reporting` — `1926ef6704134ac734408b67b9d3567525f0c197`, draft PR #43 |
 
-| **Current cumulative development source** | `feature/v4.7-windows-installer` — `a511ec7dea58bdf6108cb62bbc07ae7a433698d4`, draft PR #44 |
+| Prior cumulative V4.7 development source | `feature/v4.7-windows-installer` — `a511ec7dea58bdf6108cb62bbc07ae7a433698d4`, draft PR #44 |
+
+| **Current cumulative development source** | `feature/v5.0-production-launch-candidate` — `49fb1e1ae17c0a4d520407bde2b01dda619e978a`, draft PR #45 |
 
 Links:
 - Website: https://kkieren999.github.io/RollFlow/
