@@ -102,7 +102,10 @@ async function run(){
       for(const [label,route] of [['week','/teacher/week/'],['master','/live/teacher/master/'],['classes','/live/teacher/classes/'],['class-detail','/live/teacher/classes/BROWSER7/'],['students','/live/teacher/students/'],['roll','/live/roll/?code=BROWSER7&period=P1&start=00%3A00'],['classroom','/live/classroom/?code=BROWSER7&period=P1&start=00%3A00'],['support','/live/support/'],['movements','/live/movements/']]){
         const res=await p.goto(url+route);assert.equal(res.status(),200,'RC2.2 '+label);
         assert.doesNotMatch(await p.locator('main').innerText(),/BrowserDenied|BROWSER8/);
-        if(label==='movements')assert(await p.locator('#rf-movement-search').isVisible(),'Movement filter script loaded');
+        if(label==='movements'){
+          await p.locator('#rf-movement-search[data-ready=true]').waitFor({state:'visible',timeout:10000});
+          assert(await p.locator('#rf-movement-query').isEnabled(),'Movement filter script loaded');
+        }
         await p.screenshot({path:path.join(target,'teacher-'+label+'-protected-dark.png'),animations:'disabled'});
       }
     }
