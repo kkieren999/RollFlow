@@ -61,7 +61,7 @@ def main():
         from windows_launchers import write_launchers
     write_launchers(out)
     (out / "BUILD-INFO.json").write_text(json.dumps({
-        "version": "5.0.0-rc.2.8",
+        "version": "5.0.0-rc.3",
         "source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
         "website_commit": (app / "training" / "SOURCE_COMMIT.txt").read_text().strip(),
         "website_mode": "exact offline public workspace; fictional data only",
@@ -69,7 +69,7 @@ def main():
         "channel": "unsigned synthetic staging release candidate"
     }, indent=2) + "\n", encoding="utf-8")
     (out / "READ FIRST.txt").write_text(
-        "ROLLFLOW 5.0 RC2.8 - SCHOOL MANAGEMENT SYSTEM (STAGING)\n"
+        "ROLLFLOW 5.0 RC3 - SCHOOL MANAGEMENT SYSTEM (STAGING)\n"
         "Extract the entire package to a new local folder before running it.\n"
         "Start RollFlow.cmd opens the protected database workspace menu.\n"
         "Open Training Demo.cmd opens the separate fictional offline website without database setup.\n"
@@ -80,7 +80,7 @@ def main():
         "then Start Existing Protected.cmd. Never initialise or delete an existing instance.\n"
         "Existing school staging data and the fresh database are not shared.\n"
         "Protected leadership, workforce, teacher and student workflows extended; full workflow parity and production approval remain open.\n"
-        "See app/deployment/README.md and app/docs/v5.0-release-candidate.md. No real school data in staging.\n",
+        "Start with app/docs/v5.0-rc3-pilot-readiness.md and the Pilot Readiness launcher. No real school data in staging.\n",
         encoding="utf-8")
     (out / "Verify Package.cmd").write_text('@echo off\n"%~dp0python\\python.exe" -B -m deployment.bundle_integrity "%~dp0."\npause\n',encoding="ascii")
     if __package__:
@@ -88,6 +88,7 @@ def main():
     else:
         from bundle_integrity import manifest
     (out / "Production Readiness.cmd").write_text('@echo off\n"%~dp0python\\python.exe" -B -m deployment.release_readiness\npause\n',encoding="ascii")
+    (out / "Pilot Readiness.cmd").write_text('@echo off\n"%~dp0python\\python.exe" -B -m deployment.pilot_readiness --bundle "%~dp0."\npause\n',encoding="ascii")
     manifest(out)
     if args.client_output:
         client=args.client_output.resolve()
@@ -97,8 +98,12 @@ def main():
             shutil.copyfile(ROOT/"deployment"/name,client/name)
         for name,cmd in (("Configure School Server.cmd","configure"),("Open School Server.cmd","open"),("School Connection Diagnostics.cmd","diagnose")):
             (client/name).write_text('@echo off\n"%~dp0python\\python.exe" -B "%~dp0workstation.py" '+cmd+'\nif errorlevel 1 pause\n'+('pause\n' if cmd!="open" else ''),encoding="ascii")
-        (client/"BUILD-INFO.json").write_text(json.dumps({"version":"5.0.0-rc.2.8","channel":"unsigned synthetic staging release candidate","source_commit":subprocess.check_output(["git","rev-parse","HEAD"],cwd=ROOT,text=True).strip(),"mode":"HTTPS browser launcher only"},indent=2),encoding="utf-8")
-        (client/"READ FIRST.txt").write_text("Configure the exact school ICT-approved HTTPS server. No database, credentials or student records are stored by the launcher. Use your browser to sign in. Unsigned staging; no real records.\n",encoding="utf-8")
+        (client/"BUILD-INFO.json").write_text(json.dumps({"version":"5.0.0-rc.3","channel":"unsigned synthetic staging release candidate","source_commit":subprocess.check_output(["git","rev-parse","HEAD"],cwd=ROOT,text=True).strip(),"mode":"HTTPS browser launcher only"},indent=2),encoding="utf-8")
+        (client/"READ FIRST.txt").write_text("Configure the exact school ICT-approved HTTPS server. No database, credentials or student records are stored by the launcher. Use your browser to sign in. Unsigned staging; no real records. See pilot-docs/v5.0-rc3-pilot-readiness.md.\n",encoding="utf-8")
+        pilot_docs=client/"pilot-docs"
+        pilot_docs.mkdir()
+        for path in sorted((app/"docs").glob("v5.0-rc3-*.md")):
+            shutil.copyfile(path,pilot_docs/path.name)
         manifest(client)
 
 
