@@ -110,6 +110,8 @@ def dashboard(request):
 def section(request, section):
     if section == "dashboard":
         return redirect("management-dashboard")
+    if settings.ROLLFLOW_PROTECTED_WORKSPACE and section in ("audit", "settings"):
+        return redirect("admin-audit-review" if section == "audit" else "admin-system-settings")
     if section == "roles":
         return redirect("school-access-manage")
     if section == "relief" and settings.ROLLFLOW_PROTECTED_WORKSPACE:
