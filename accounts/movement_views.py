@@ -103,7 +103,7 @@ def issue(request):
     try:
         with transaction.atomic():
             if request.method=="POST":
-                actor=User.objects.select_for_update().get(pk=request.user.pk)
+                actor=User.objects.select_for_update(no_key=True).get(pk=request.user.pk)
                 lock_sources()
                 list(StaffProfile.objects.select_for_update().filter(user=actor))
             else:
@@ -160,7 +160,7 @@ def change(request,pk):
         return redirect("teacher-login")
     try:
         with transaction.atomic():
-            actor=User.objects.select_for_update().get(pk=request.user.pk)
+            actor=User.objects.select_for_update(no_key=True).get(pk=request.user.pk)
             # Recheck grants after locking their rows, so revocation is serialised.
             list(StaffAccessGrant.objects.select_for_update().filter(user=actor).order_by("pk"))
             if not may_access(actor):
