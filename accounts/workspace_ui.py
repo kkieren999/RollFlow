@@ -36,17 +36,21 @@ def workspace_context(request):
     if teaching:
         group("TEACHING","Daily Schedule","calendar",link("Daily schedule","live-day",aliases=("/live/roll/","/live/classroom/","/live/movements/issue/","/teacher/timetable/")),
               link("Weekly timetable","teacher-week"))
+    if teaching:
+        group("TEACHING","Master Timetable","calendar",link("My verified allocations","teacher-personal-master"),*[directory(c,l) for c,l in (("published_timetable","Published timetable"),("timetable","Manual timetable")) if c in caps])
+        group("TEACHING","Class Finder","list",link("My classes","teacher-class-finder",aliases=("/live/teacher/classes/","/teacher/roster/")),*[directory(c,l) for c,l in (("published_classes","Published classes"),("classes","Manual classes")) if c in caps])
+        group("TEACHING","Student Search","search",link("My students","teacher-student-search",aliases=("/live/teacher/students/",)),*([directory("students","Scoped student directory")] if "students" in caps else []))
     if admin:
         group("SCHOOL MANAGEMENT","Staff Management","users",link("Staff directory","management-section",{"section":"staff"},("/manage/staff/",)))
         group("SCHOOL MANAGEMENT","Student Management","users",link("Student directory","management-student-directory",aliases=("/manage/students/",)))
         group("SCHOOL MANAGEMENT","Timetable Management","calendar",link("Timetable","management-timetable",aliases=("/manage/timetable/","/manage/rooms/","/manage/periods/")),
               link("Master timetable","management-master",aliases=("/manage/connected/master/",)),
               link("Class directory","management-class-directory",aliases=("/manage/classes/","/manage/enrolments/","/manage/connected/classes/","/manage/connected/roster/")))
-    else:
+    elif not teaching:
         group("WORKSPACE","Master Timetable","calendar",*[directory(c,l) for c,l in (("published_timetable","Published timetable"),("timetable","Manual timetable")) if c in caps])
         group("WORKSPACE","Class Finder","list",*[directory(c,l) for c,l in (("published_classes","Published classes"),("classes","Manual classes")) if c in caps])
         if "students" in caps:group("WORKSPACE","Student Search","search",directory("students","Student directory"))
-        if "staff" in caps:group("WORKSPACE","Staff Directory","users",directory("staff","Staff directory"))
+    if not admin and "staff" in caps:group("WORKSPACE","Staff Directory","users",directory("staff","Staff directory"))
     if ctx["monitor"]:
         group("STUDENT MANAGEMENT","Attendance Overview","check",link("Attendance overview","live-monitor"),
               *([link("Student history","attendance-student-report"),link("Attendance reconciliation","school-data-transfers",aliases=("/manage/school-data/transfers/",)),

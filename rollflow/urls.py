@@ -8,7 +8,7 @@ from accounts.school_access_views import workspace, manage_access
 
 from accounts import live_views, security_views, movement_views, workforce_views, classroom_views, report_views
 
-from accounts import ui_views
+from accounts import ui_views, teacher_experience_views
 
 urlpatterns = [
     path('account/theme/', ui_views.theme, name='ui-theme'),
@@ -30,6 +30,11 @@ urlpatterns = [
     path("account/password/", security_views.password, name="security-password"),
     path("live/", live_views.home, name="live-home"),
     path("live/day/", live_views.my_day, name="live-day"),
+    path("live/teacher/master/", teacher_experience_views.schedule, {"mode":"master"}, name="teacher-personal-master"),
+    path("live/teacher/classes/", teacher_experience_views.classes, name="teacher-class-finder"),
+    path("live/teacher/classes/<str:code>/", teacher_experience_views.class_detail, name="teacher-class-detail"),
+    path("live/teacher/students/", teacher_experience_views.students, name="teacher-student-search"),
+    path("live/teacher/students/<int:pk>/", teacher_experience_views.student_detail, name="teacher-student-detail"),
     path("live/roll/", live_views.mark_roll, name="live-roll"),
     path("live/attendance/", live_views.monitor, name="live-monitor"),
     path("", portal_login, name="teacher-login"),

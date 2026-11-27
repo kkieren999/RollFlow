@@ -74,6 +74,10 @@ def my_day(request):
         return redirect("teacher-login")
     if not eligible(request.user) or not can_teach(request.user):
         return HttpResponseForbidden("Teaching access required.")
+    from django.conf import settings
+    if settings.ROLLFLOW_PROTECTED_WORKSPACE:
+        from .teacher_experience_views import schedule
+        return schedule(request)
     pub, day = current(), timezone.localdate()
     rows = own_lessons(pub, request.user, day)
     lessons = [dict(row, url=lesson_url(row), status=status_label(roll_for(day,row), pub))
@@ -90,6 +94,8 @@ def mark_roll(request):
     if not eligible(request.user) or not can_teach(request.user):
         return HttpResponseForbidden("Teaching access required.")
     day = timezone.localdate()
+    if request.GET.get("date") and request.GET["date"] != day.isoformat():
+        return HttpResponseBadRequest("Attendance is only editable for today’s verified allocation.")
     key = tuple(request.GET.get(k, "") for k in ("code", "period", "start"))
     if not all(key):
         return HttpResponseBadRequest("Select a lesson from My day.")
@@ -159,7 +165,7 @@ def mark_roll(request):
             student_rows = [{"name": s.preferred_name or s.first_name, "last":s.last_name,
                              "pk":s.pk, "mark":marks.get(str(s.pk),"")} for s in students]
             return page(request, "live_roll.html", row=row, day=day, publication_id=pub.pk, roll=roll,
-                        students=student_rows, choices=MARKS, error=error, roster_token=roster_token(students))
+                        students=student_rows, choices=MARKS, error=error, roster_token=roster_token(students), started=lesson_started(day,row))
     except AttendanceUnavailable as exc:
         return render(
             request, "live_conflict.html", {**shell(request.user), "error":str(exc)}, status=409)

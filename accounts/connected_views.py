@@ -208,6 +208,10 @@ def teacher_schedule(request, week=False):
 @never_cache
 @require_GET
 def roster(request, code, admin_only=False):
+    from django.conf import settings
+    if settings.ROLLFLOW_PROTECTED_WORKSPACE and not admin_only:
+        from .teacher_experience_views import class_detail
+        return class_detail(request,code)
     role = role_for(request.user)
     if role is None:
         return redirect("admin-login" if admin_only else "teacher-login")
