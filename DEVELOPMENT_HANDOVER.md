@@ -7,7 +7,11 @@
 
 ## CURRENT CHECKPOINT — V5.0 RC1 production launch preparation (27 Nov 2026)
 
-**Latest cumulative branch:** `feature/v5.0-production-launch-candidate`, head `ba9f6de79710a371cf81c9e85979b6c687257c55`, draft PR #45 https://github.com/kkieren999/RollFlow/pull/45 (base windows-release). Verify actual head before edits. This supersedes all prior checkpoints.
+**Latest cumulative branch:** `feature/v5.0-production-launch-candidate`, head `d8c7811955faa7ddb68217a9441a42e35925c18b`, draft PR #45 https://github.com/kkieren999/RollFlow/pull/45 (base windows-release). Verify actual head before edits. This supersedes all prior checkpoints.
+
+### Windows readiness exit-code repair (27 Nov 2026)
+- Prior RC1 head ba9f6de7, run #341 https://github.com/kkieren999/RollFlow/actions/runs/45932755807: all application, PostgreSQL/native, Windows installer compilation and execution, installed schema, snapshot/archive restoration, fictional website and protected multi-session browser tests passed. Final readiness evidence step failed because its expected exit code 2 propagated to the PowerShell/Actions step. Both artifact uploads skipped; no verified RC installer available from #341.
+- New head `d8c7811955faa7ddb68217a9441a42e35925c18b`: Windows CI invokes the unchanged readiness CLI through a Python subprocess, requires exact child exit code 2 and returns 0 to CI only on that expected result. Any other code fails; production launch hold, manifest validation, tests and artifact gates remain intact. Run #343 https://github.com/kkieren999/RollFlow/actions/runs/45942735166 in_progress at inspection. Check latest run and actual artifact IDs before providing downloads. No deployment authorised.
 
 ### Windows browser CI repair (27 Nov 2026)
 - RC1 prior head `49fb1e1a` runs #339/#340 failed Windows protected multi-session browser test with MODULE_NOT_FOUND playwright-core. Application and PostgreSQL/native jobs in #339 passed. The preceding Chrome step installed Playwright in checkout and set NODE_PATH only in its own PowerShell process; subsequent installed-app step lacked it. RollFlow server and fixture started; this does not establish protected browser acceptance.
@@ -28,7 +32,7 @@
 - docs/v5.0-release-candidate.md: nine open gate categories, evidence/approval owner matrix, fictional rollout, incident/recovery and pilot plan. All approvals OPEN.
 
 ### Next actions — no automatic launch
-1. Verify repaired head ba9f6de7 and exact PR head and V4.7 #336/#337. Repair actual failing tests/installer compile/restore/browser checks and any package metadata/manifest issues, verify exact artifacts and expiration, update this file. V5.0 RC1 is not a release until verified. Never weaken tests or startup hold to pass.
+1. Verify repaired head d8c78119 and exact PR head and V4.7 #336/#337. Repair actual failing tests/installer compile/restore/browser checks and any package metadata/manifest issues, verify exact artifacts and expiration, update this file. V5.0 RC1 is not a release until verified. Never weaken tests or startup hold to pass.
 2. Close outstanding engineering requirements in subsequent cumulative RCs: approved provider selection/registration and actual SSO/MFA integration with immutable identity binding and revocation; authorised OneSchool transfer (local manual reconciliation not delivery), enrolment history and rollback; historical attendance/correction, movement handover, partial-day/recurring relief, assigned confidential support policy, delegated actions and reporting privacy/history; centrally managed client configuration, service lifecycle and monitoring, signing/timestamping, controlled updates; whole-school protected workflow E2E, real concurrency/load/accessibility/outage testing, dependency/security assessment, encrypted production backup/recovery drill. See previous checkpoints and docs for details.
 3. Obtain independent security review, school ICT/data/privacy/records approval, operational sign-off, approved provider and integration credentials via private infrastructure, signed distribution and verified recovery, fictional pilot acceptance and explicit exact-release go-live decision. Do not store private evidence or secrets in public GitHub. No real data until authorised. The fixed startup hold can only be removed in a later independently reviewed release after evidence for all gates. Do not edit OPEN_GATES just to launch.
 4. Continue with V5.0 RC2 validation and production acceptance rather than declaring an invented V5.1 or an unapproved live launch. Preserve public fictional website and earlier staging releases. Update this same handover file before ending every development session.
@@ -263,7 +267,7 @@ Stable handover URL: https://github.com/kkieren999/RollFlow/blob/development-han
 
 | Prior cumulative V4.7 development source | `feature/v4.7-windows-installer` — `a511ec7dea58bdf6108cb62bbc07ae7a433698d4`, draft PR #44 |
 
-| **Current cumulative development source** | `feature/v5.0-production-launch-candidate` — `ba9f6de79710a371cf81c9e85979b6c687257c55`, draft PR #45 |
+| **Current cumulative development source** | `feature/v5.0-production-launch-candidate` — `d8c7811955faa7ddb68217a9441a42e35925c18b`, draft PR #45 |
 
 Links:
 - Website: https://kkieren999.github.io/RollFlow/
