@@ -211,6 +211,8 @@ def roster(request, code, admin_only=False):
     from django.conf import settings
     if settings.ROLLFLOW_PROTECTED_WORKSPACE and not admin_only:
         from .teacher_experience_views import class_detail
+        if request.GET.get("date") and request.GET["date"] != timezone.localdate().isoformat():
+            return HttpResponseBadRequest("Historical rosters are not available. Open the current verified Class Finder.")
         return class_detail(request,code)
     role = role_for(request.user)
     if role is None:

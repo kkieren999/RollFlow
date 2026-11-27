@@ -5,7 +5,6 @@ Today-only attendance writes continue through live_views.mark_roll.
 """
 from collections import Counter,defaultdict
 from datetime import date,timedelta,time
-from django.core.paginator import Paginator
 from django.urls import reverse
 from django.utils import timezone
 from urllib.parse import urlencode
@@ -107,7 +106,7 @@ def personal_schedule(pub,user,day,today=None):
     for row in all_rows:
         try:
             start,end=row["start"],row["end"]
-            if len(start)==len(end)==5 and time.fromisoformat(start)<time.fromisoformat(end):
+            if isinstance(start,str) and isinstance(end,str) and len(start)==len(end)==5 and time.fromisoformat(start)<time.fromisoformat(end):
                 timing[str(row["period"])].add((start,end))
         except (ValueError,TypeError,KeyError):continue
     if day>=today:
@@ -145,7 +144,8 @@ def directory_classes(pub,user,today=None):
         if lesson_valid(row) and row.get("date") in calendar and today.isoformat()<=row["date"]<=pub.ends.isoformat():
             bydate[row["date"]].append(row)
     for iso,rows in bydate.items():
-        day=date.fromisoformat(iso)
+        try:day=date.fromisoformat(iso)
+        except (ValueError,TypeError):continue
         if not valid_day(pub,day):continue
         counts=Counter(lesson_key(r) for r in rows)
         for r in rows:

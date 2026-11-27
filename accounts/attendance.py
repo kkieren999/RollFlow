@@ -79,7 +79,13 @@ def own_lessons(pub, user, day, ignore_absence=False):
         key=lesson_key(r)
         assignment=relief.get(key)
         if assignment:
-            if assignment.relief_teacher_id!=user.pk or assignment.end!=r["end"] or not codes:
+            # Recheck both identities and the original binding, not just the
+            # assignee. An invalidated original allocation must fail closed.
+            if (assignment.relief_teacher_id!=user.pk or assignment.end!=r["end"] or not codes
+                    or r.get("staff") not in personal_codes(pub,assignment.regular_teacher)):
+                continue
+            from .workforce_service import duty_conflict
+            if duty_conflict(pub,day,user,r["start"],r["end"]):
                 continue
         elif r.get("staff") not in codes:
             continue

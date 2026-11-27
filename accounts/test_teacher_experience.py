@@ -97,3 +97,22 @@ class TeacherExperienceTests(TestCase):
         self.assertRedirects(self.client.post(self.url,test_live_foundation.LiveFoundationTests.payload(self,"submit",rev=1,mark="P")),self.url)
         self.assertContains(self.client.get(self.url),"This roll is locked.")
         self.assertEqual(AttendanceRoll.objects.get().marks,{str(self.student.pk):"P"})
+
+
+    def test_relief_directory_and_roll_recheck_original_binding(self):
+        from .models import ReliefAttendanceAssignment
+        # Remove the relief teacher's conflicting lesson on today only.
+        self.pub.snapshot["slots"]=[r for r in self.pub.snapshot["slots"] if not
+            (r["code"]=="SCI8" and r["date"]==self.day.isoformat())]
+        self.pub.save(update_fields=["snapshot"])
+        ReliefAttendanceAssignment.objects.create(publication=self.pub,lesson_date=self.day,
+            class_code="ENG7",period="P1",start="09:00",end="10:00",regular_teacher=self.teacher,
+            relief_teacher=self.other,created_by=self.admin,expires_at=timezone.now()+timedelta(hours=1))
+        self.client.force_login(self.other)
+        self.assertContains(self.client.get("/live/day/"),"Relief cover")
+        self.assertContains(self.client.get("/live/teacher/classes/ENG7/"),"FictionalPupil")
+        self.profile.timetable_link_verified=False
+        self.profile.save(update_fields=["timetable_link_verified"])
+        self.assertNotContains(self.client.get("/live/day/"),'data-timetable-class="ENG7"')
+        self.assertEqual(self.client.get("/live/teacher/classes/ENG7/").status_code,404)
+        self.assertEqual(self.client.get(self.url).status_code,403)
