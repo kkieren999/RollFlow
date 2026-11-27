@@ -23,7 +23,7 @@ class ReportingTests(TestCase):
         self.path="/live/reports/"
         self.client.force_login(self.leader)
 
-    def grant(self,scope,value,caps):
+    def report_grant(self,scope,value,caps):
         return StaffAccessGrant.objects.create(user=self.leader,role="Custom",scope=scope,scope_value=value,
             capabilities=caps,granted_by=self.admin)
 
@@ -32,8 +32,8 @@ class ReportingTests(TestCase):
 
     def test_explicit_report_scope_and_no_cross_domain_borrowing(self):
         self.assertEqual(self.client.get(self.path).status_code,403)
-        self.grant("year","7",["report_attendance"])
-        self.grant("school","",["report_movements"])
+        self.report_grant("year","7",["report_attendance"])
+        self.report_grant("school","",["report_movements"])
         self.assertContains(self.client.get("/live/"),"Leadership dashboards")
         r=self.client.get(self.path,self.params())
         self.assertEqual(r.status_code,200)
@@ -47,8 +47,8 @@ class ReportingTests(TestCase):
         self.assertEqual(self.client.get(self.path).status_code,403)
 
     def test_faculty_and_mixed_year_validation(self):
-        self.grant("faculty","English",["report_attendance"])
-        self.grant("year","7",["report_attendance"])
+        self.report_grant("faculty","English",["report_attendance"])
+        self.report_grant("year","7",["report_attendance"])
         r=self.client.get(self.path,self.params(scope="faculty",value="English"))
         self.assertEqual(dict(r.context["data"]["rows"])["Scheduled lesson keys"],1)
         self.pub.snapshot["classes"][0]["years"]=[7,8]
@@ -61,12 +61,12 @@ class ReportingTests(TestCase):
         self.assertEqual(dict(r.context["data"]["rows"])["Scheduled lesson keys"],0)
 
     def test_exports_require_exact_grant_and_digest_and_audit(self):
-        self.grant("year","7",["report_attendance"])
-        self.grant("school","",["export_attendance"])
+        self.report_grant("year","7",["report_attendance"])
+        self.report_grant("school","",["export_attendance"])
         r=self.client.get(self.path,self.params())
         p=self.params(digest=r.context["digest"],confirm="yes",format="csv")
         self.assertEqual(self.client.post(self.path,p).status_code,403)
-        g=self.grant("year","7",["export_attendance"])
+        g=self.report_grant("year","7",["export_attendance"])
         self.assertEqual(self.client.post(self.path,{**p,"digest":"bad"}).status_code,409)
         self.assertEqual(self.client.post(self.path,{**p,"confirm":"no"}).status_code,400)
         r=self.client.post(self.path,p)
@@ -90,7 +90,7 @@ class ReportingTests(TestCase):
         self.assertEqual(c.post(self.path,p).status_code,403)
 
     def test_attendance_submission_invalidates_review_digest(self):
-        self.grant("year","7",["report_attendance","export_attendance"])
+        self.report_grant("year","7",["report_attendance","export_attendance"])
         r=self.client.get(self.path,self.params())
         p=self.params(digest=r.context["digest"],confirm="yes",format="csv")
         self.client.force_login(self.teacher)
@@ -101,7 +101,7 @@ class ReportingTests(TestCase):
         self.assertEqual(dict(r.context["data"]["rows"])["Verified submitted rolls"],1)
 
     def test_workforce_and_movement_aggregates(self):
-        self.grant("year","7",["report_movements","report_workforce"])
+        self.report_grant("year","7",["report_movements","report_workforce"])
         d=MovementDestination.objects.create(name="Fictional desk",created_by=self.admin)
         now=timezone.now()
         for student,actor,code in [(self.student,self.teacher,"ENG7"),(self.outside,self.other,"SCI8")]:
@@ -119,7 +119,7 @@ class ReportingTests(TestCase):
         self.assertNotContains(r,"fictional-teacher")
 
     def test_support_suppression_fixed_week_and_source_gate(self):
-        self.grant("school","",["report_support","export_support"])
+        self.report_grant("school","",["report_support","export_support"])
         start=self.day-timedelta(days=self.day.weekday()+7)
         end=start+timedelta(days=6)
         self.pub.starts=start
