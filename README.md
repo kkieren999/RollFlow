@@ -1,3 +1,7 @@
+# RollFlow V3.8 — School Management System (Windows staging)
+
+See [Windows rebuild and mode boundaries](docs/v3.8-windows-rebuild.md). Start RollFlow.cmd opens the complete offline website; protected database testing has a separate launcher.
+
 # RollFlow V3.6.4 — Real OneSchool export layouts (draft)
 
 This integration branch contains **both** the Windows PostgreSQL password-file

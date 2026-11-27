@@ -265,3 +265,278 @@ class PendingTeacherSetup(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     activated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+", null=True, blank=True)
     activated_at = models.DateTimeField(null=True, blank=True)
+
+
+class RoleTemplate(models.Model):
+    """Reusable, reviewed capability bundle. Assignment copies, never inherits, rights."""
+    name = models.CharField(max_length=80, unique=True)
+    scope = models.CharField(max_length=12)
+    capabilities = models.JSONField(default=list)
+    active = models.BooleanField(default=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class AccessAudit(models.Model):
+    """Structured, application-append-only permission and account change record."""
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    target = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
+                               on_delete=models.PROTECT, related_name="+")
+    action = models.CharField(max_length=40)
+    before = models.JSONField(default=dict)
+    after = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class StaffAccessGrant(models.Model):
+    """Explicit, bounded read access. Never confers Django admin or teaching."""
+    template = models.ForeignKey(RoleTemplate, null=True, blank=True, on_delete=models.PROTECT)
+    class_publication = models.ForeignKey(ConnectedSchoolPublication, null=True, blank=True, on_delete=models.PROTECT)
+    starts_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+                             related_name="school_access_grants")
+    role = models.CharField(max_length=80)
+    scope = models.CharField(max_length=12)
+    scope_value = models.CharField(max_length=100, blank=True)
+    capabilities = models.JSONField(default=list)
+    created_at = models.DateTimeField(auto_now_add=True)
+    granted_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+                                   related_name="+")
+
+    class Meta:
+        constraints = [models.CheckConstraint(condition=models.Q(starts_at__isnull=True) | models.Q(expires_at__isnull=True) | models.Q(expires_at__gt=models.F("starts_at")), name="staff_grant_time_order")]
+
+
+class AttendanceRoll(models.Model):
+    """One dated class lesson, with frozen roster and server-owned state."""
+    publication = models.ForeignKey(ConnectedSchoolPublication, on_delete=models.PROTECT)
+    lesson_date = models.DateField()
+    class_code = models.CharField(max_length=30)
+    period = models.CharField(max_length=50)
+    start = models.CharField(max_length=5)
+    end = models.CharField(max_length=5)
+    teacher = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    roster = models.JSONField()
+    marks = models.JSONField(default=dict)
+    revision = models.PositiveIntegerField(default=1)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["lesson_date", "class_code", "period", "start"],
+                                                name="unique_dated_attendance_lesson")]
+
+
+class AttendanceRevision(models.Model):
+    """Append-only through application endpoints, retained for reconciliation."""
+    roll = models.ForeignKey(AttendanceRoll, on_delete=models.PROTECT, related_name="history")
+    revision = models.PositiveIntegerField()
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    action = models.CharField(max_length=12)
+    reason = models.CharField(max_length=500, blank=True)
+    marks = models.JSONField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["roll", "revision"], name="unique_attendance_revision")]
+
+
+class AttendanceTransferReview(models.Model):
+    """Local review manifest only; never proof of a successful OneSchool upload."""
+    roll = models.ForeignKey(AttendanceRoll, on_delete=models.PROTECT, related_name="transfer_reviews")
+    revision = models.PositiveIntegerField()
+    digest = models.CharField(max_length=64)
+    row_count = models.PositiveIntegerField()
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    reviewed_at = models.DateTimeField(auto_now_add=True)
+    reconciled_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+", null=True, blank=True)
+    reconciled_at = models.DateTimeField(null=True, blank=True)
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["roll", "revision", "digest"], name="unique_attendance_transfer_review")]
+
+
+class ReliefAttendanceAssignment(models.Model):
+    """One explicitly reviewed lesson; no general access to a teacher's schedule."""
+    publication = models.ForeignKey(ConnectedSchoolPublication, on_delete=models.PROTECT)
+    lesson_date = models.DateField()
+    class_code = models.CharField(max_length=30)
+    period = models.CharField(max_length=50)
+    start = models.CharField(max_length=5)
+    end = models.CharField(max_length=5)
+    regular_teacher = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    relief_teacher = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["publication", "lesson_date", "class_code", "period", "start"],
+            condition=models.Q(cancelled_at__isnull=True), name="unique_active_relief_attendance")]
+
+
+class MovementDestination(models.Model):
+    """Reviewed non-clinical destination configuration; stable identity for scoped grants."""
+    name = models.CharField(max_length=80, unique=True)
+    expected_minutes = models.PositiveSmallIntegerField(default=10)
+    requires_reception = models.BooleanField(default=False)
+    active = models.BooleanField(default=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.CheckConstraint(condition=models.Q(expected_minutes__gte=1, expected_minutes__lte=180),
+                                                name="movement_duration_bounds")]
+
+
+class StudentMovement(models.Model):
+    class State(models.TextChoices):
+        OUTBOUND = "outbound", "Departed classroom"
+        ARRIVED = "arrived", "Checked in"
+        RETURNING = "returning", "Returning to classroom"
+        RETURNED = "returned", "Returned"
+        CLOSED = "closed", "Administratively closed — return unconfirmed"
+
+    publication = models.ForeignKey(ConnectedSchoolPublication, on_delete=models.PROTECT)
+    student = models.ForeignKey(Student, on_delete=models.PROTECT)
+    issuer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    destination = models.ForeignKey(MovementDestination, on_delete=models.PROTECT)
+    destination_name = models.CharField(max_length=80)
+    requires_reception = models.BooleanField()
+    lesson_date = models.DateField()
+    class_code = models.CharField(max_length=30)
+    period = models.CharField(max_length=50)
+    start = models.CharField(max_length=5)
+    end = models.CharField(max_length=5)
+    origin_room = models.CharField(max_length=100, blank=True)
+    state = models.CharField(max_length=12, choices=State.choices, default=State.OUTBOUND)
+    revision = models.PositiveIntegerField(default=1)
+    departed_at = models.DateTimeField()
+    due_at = models.DateTimeField()
+    closed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["student"], condition=models.Q(closed_at__isnull=True), name="one_open_student_movement"),
+            models.CheckConstraint(condition=(models.Q(state__in=["outbound","arrived","returning"],closed_at__isnull=True) |
+                models.Q(state__in=["returned","closed"],closed_at__isnull=False)), name="movement_closed_state"),
+            models.CheckConstraint(condition=models.Q(due_at__gt=models.F("departed_at")), name="movement_due_order"),
+        ]
+        indexes = [models.Index(fields=["closed_at","due_at"],name="movement_open_due_idx")]
+
+
+class MovementEvent(models.Model):
+    """Append-only through protected endpoints. No free-text medical/welfare details."""
+    movement = models.ForeignKey(StudentMovement, on_delete=models.PROTECT, related_name="events")
+    revision = models.PositiveIntegerField()
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    action = models.CharField(max_length=20)
+    from_state = models.CharField(max_length=12, blank=True)
+    to_state = models.CharField(max_length=12)
+    reason_code = models.CharField(max_length=30, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["movement","revision"],name="unique_movement_revision")]
+
+
+class WorkforceEntry(models.Model):
+    """Approved dated operational overlay; no clinical absence detail."""
+    class Kind(models.TextChoices):
+        ABSENCE = "absence", "Full-day unavailability"
+        DUTY = "duty", "Supervision duty"
+        ROOM = "room", "Lesson room change"
+        CLOSURE = "closure", "School day exception (closed)"
+
+    publication = models.ForeignKey(ConnectedSchoolPublication, on_delete=models.PROTECT)
+    day = models.DateField()
+    kind = models.CharField(max_length=12, choices=Kind.choices)
+    staff = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="+")
+    class_code = models.CharField(max_length=30, blank=True)
+    period = models.CharField(max_length=50, blank=True)
+    start = models.CharField(max_length=5, blank=True)
+    end = models.CharField(max_length=5, blank=True)
+    location = models.CharField(max_length=100, blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["publication","day","staff"], condition=models.Q(kind="absence",cancelled_at__isnull=True), name="unique_workforce_absence"),
+            models.UniqueConstraint(fields=["publication","day","class_code","period","start"], condition=models.Q(kind="room",cancelled_at__isnull=True), name="unique_workforce_room"),
+            models.UniqueConstraint(fields=["publication","day"], condition=models.Q(kind="closure",cancelled_at__isnull=True), name="unique_workforce_closure"),
+        ]
+        indexes = [models.Index(fields=["publication","day","kind"],name="workforce_pub_day_kind")]
+
+
+class WorkforceNotice(models.Model):
+    """Private operational inbox, acknowledgement is not delivery confirmation."""
+    recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    publication = models.ForeignKey(ConnectedSchoolPublication, on_delete=models.PROTECT)
+    day = models.DateField()
+    message = models.CharField(max_length=240)
+    created_at = models.DateTimeField(auto_now_add=True)
+    acknowledged_at = models.DateTimeField(null=True, blank=True)
+
+
+class ClassroomPlan(models.Model):
+    """Teacher-owned seating map, bound to an exact reviewed publication."""
+    publication = models.ForeignKey(ConnectedSchoolPublication,on_delete=models.PROTECT)
+    teacher = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT)
+    class_code = models.CharField(max_length=30)
+    seats = models.JSONField(default=dict)
+    revision = models.PositiveIntegerField(default=1)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["publication","teacher","class_code"],name="unique_classroom_plan")]
+
+
+class ClassroomObservation(models.Model):
+    """Structured educational observation, never a clinical or discipline case."""
+    publication = models.ForeignKey(ConnectedSchoolPublication,on_delete=models.PROTECT)
+    teacher = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT)
+    student = models.ForeignKey(Student,on_delete=models.PROTECT)
+    class_code = models.CharField(max_length=30)
+    lesson_date = models.DateField()
+    category = models.CharField(max_length=30)
+    created_at = models.DateTimeField(auto_now_add=True)
+    withdrawn_at = models.DateTimeField(null=True,blank=True)
+
+
+class SupportTask(models.Model):
+    """Explicit named recipient and one student; no general case access."""
+    publication = models.ForeignKey(ConnectedSchoolPublication,on_delete=models.PROTECT)
+    student = models.ForeignKey(Student,on_delete=models.PROTECT)
+    class_code = models.CharField(max_length=30)
+    requested_by = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,related_name="+")
+    assigned_to = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,related_name="+")
+    category = models.CharField(max_length=30)
+    due_on = models.DateField()
+    state = models.CharField(max_length=12,default="pending")
+    revision = models.PositiveIntegerField(default=1)
+    created_at = models.DateTimeField(auto_now_add=True)
+    closed_at = models.DateTimeField(null=True,blank=True)
+
+    class Meta:
+        constraints = [models.CheckConstraint(condition=models.Q(state__in=["pending","accepted"],closed_at__isnull=True) | models.Q(state__in=["completed","cancelled"],closed_at__isnull=False),name="support_task_state")]
+
+
+class SupportReferral(models.Model):
+    """Minimal educational referral. No narrative, diagnosis or safeguarding case notes."""
+    publication = models.ForeignKey(ConnectedSchoolPublication,on_delete=models.PROTECT)
+    student = models.ForeignKey(Student,on_delete=models.PROTECT)
+    class_code = models.CharField(max_length=30)
+    requested_by = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,related_name="+")
+    assigned_to = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,related_name="+",null=True,blank=True)
+    category = models.CharField(max_length=30)
+    state = models.CharField(max_length=12,default="pending")
+    revision = models.PositiveIntegerField(default=1)
+    follow_up_on = models.DateField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    closed_at = models.DateTimeField(null=True,blank=True)
+
+    class Meta:
+        constraints = [models.CheckConstraint(condition=models.Q(state__in=["pending","assigned","reviewed"],closed_at__isnull=True) | models.Q(state__in=["closed","withdrawn"],closed_at__isnull=False),name="support_referral_state")]

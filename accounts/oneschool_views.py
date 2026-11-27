@@ -7,10 +7,17 @@ def shift_date(day,days):
     return min(MAX_DAY,max(MIN_DAY,day+timedelta(days=days)))
 
 def coverage_message(version,today):
-    value=today.isoformat()
-    if value>version.summary["last_date"]:
+    summary=version.summary if isinstance(version.summary,dict) else {}
+    try:
+        first=date.fromisoformat(summary["first_date"])
+        last=date.fromisoformat(summary["last_date"])
+        if first>last:
+            raise ValueError("Reversed timetable coverage")
+    except (KeyError,TypeError,ValueError):
+        return "Published timetable date coverage is unavailable. Review the imported source before use."
+    if today>last:
         return "Published timetable has expired. Import a timetable covering today."
-    if value<version.summary["first_date"]:
+    if today<first:
         return "Published timetable starts in the future."
     return ""
 from django import forms
@@ -189,7 +196,7 @@ def dated(request, personal=False,admin_only=False):
     tabs=[{"date":shift_date(monday,i).isoformat(),"label":["Monday","Tuesday","Wednesday","Thursday","Friday"][i],"url":params(date=shift_date(monday,i).isoformat())} for i in range(5)]
     current_periods=[p for p in period_headers if p["current"]]
     next_period=next((p for p in period_headers if is_today and p["start"]>current_time),None)
-    context=dict(live_timetable=settings.ROLLFLOW_LIVE_TIMETABLE,version=version,selected_date=day.isoformat(),day=day,tabs=tabs,periods=period_headers,groups=groups,rows=shown if personal else filtered,query=query,year=year,years=years,hide=hide,personal=personal,unlinked=personal and not staff_id,link_message=link_message,record_exists=record is not None,admin=role=="admin",staff=staff,room=room,highlight=highlight,has_filter=bool(query or year or staff or staff_key or room),staff_key=staff_key,visible_count=sum(1 for r in rows if (r["start"],r["end"],r["period"]) in visible),coverage_warning=coverage_message(version,today),staff_choices=sorted({r["staff_code"] for r in rows if r["staff_code"]}|({staff} if staff else set())),room_choices=sorted({r["room"] for r in rows if r["room"]}|({room} if room else set())),today_url=params(date=today.isoformat()),prev_url=params(date=shift_date(day,-7).isoformat()),next_url=params(date=shift_date(day,7).isoformat()),first_url=params(date=version.summary["first_date"]),clear_url=params(q="",year="",staff="",staff_id="",room=""),break_url=params(breaks="" if hide else "hide"),highlight_url=params(highlight="" if highlight else "1"),is_today=is_today,current_periods=current_periods,next_period=next_period)
+    context=dict(live_timetable=settings.ROLLFLOW_LIVE_TIMETABLE,version=version,selected_date=day.isoformat(),day=day,tabs=tabs,periods=period_headers,groups=groups,rows=shown if personal else filtered,query=query,year=year,years=years,hide=hide,personal=personal,unlinked=personal and not staff_id,link_message=link_message,record_exists=record is not None,admin=role=="admin",staff=staff,room=room,highlight=highlight,has_filter=bool(query or year or staff or staff_key or room),staff_key=staff_key,visible_count=sum(1 for r in rows if (r["start"],r["end"],r["period"]) in visible),coverage_warning=coverage_message(version,today),staff_choices=sorted({r["staff_code"] for r in rows if r["staff_code"]}|({staff} if staff else set())),room_choices=sorted({r["room"] for r in rows if r["room"]}|({room} if room else set())),today_url=params(date=today.isoformat()),prev_url=params(date=shift_date(day,-7).isoformat()),next_url=params(date=shift_date(day,7).isoformat()),first_url=params(date=version.summary.get("first_date",today.isoformat())),clear_url=params(q="",year="",staff="",staff_id="",room=""),break_url=params(breaks="" if hide else "hide"),highlight_url=params(highlight="" if highlight else "1"),is_today=is_today,current_periods=current_periods,next_period=next_period)
     if role=="admin":
         return page(request,"master",dated_import=True,**context)
     return render(request,"imported_teacher.html",context)
