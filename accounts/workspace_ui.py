@@ -31,7 +31,7 @@ def workspace_context(request):
     caps=set(ctx["modules"])
     if admin:
         group("SCHOOL MANAGEMENT","Dashboard","home",link("Dashboard","management-dashboard"),link("Administration portal","admin-system-centre"),link("Staff workspace","live-home"))
-    elif not teaching:
+    else:
         group("WORKSPACE","Dashboard","home",link("Dashboard","live-home",aliases=("/workspace/",) if path=="/workspace/" else ()))
     if teaching:
         group("TEACHING","Daily Schedule","calendar",link("Daily schedule","live-day",aliases=("/live/roll/","/live/classroom/","/live/movements/issue/","/teacher/timetable/")),
@@ -53,13 +53,13 @@ def workspace_context(request):
     if not admin and "staff" in caps:group("WORKSPACE","Staff Directory","users",directory("staff","Staff directory"))
     if ctx["monitor"]:
         group("STUDENT MANAGEMENT","Attendance Overview","check",link("Attendance overview","live-monitor"),
-              *([link("Student history","attendance-student-report"),link("Attendance reconciliation","school-data-transfers",aliases=("/manage/school-data/transfers/",)),
+              *([link("Student history","attendance-student-report",aliases=("/manage/attendance/correct/",)),link("Attendance reconciliation","school-data-transfers",aliases=("/manage/school-data/transfers/",)),
                  link("Relief attendance","attendance-relief")] if admin else []))
     if ctx["movements"]:
         group("STUDENT MANAGEMENT","Student Movements","arrows",link("Movement register","movement-board",aliases=("/live/movements/",) if not path.startswith("/live/movements/issue/") else ()),
               *([link("Destinations","movement-destinations")] if admin else []))
     if ctx["support_access"]:
-        group("STUDENT MANAGEMENT","Student Support","heart",link("Support tasks and referrals","support-board"))
+        group("STUDENT MANAGEMENT","Student Support","heart",link("Support tasks and referrals","support-board",aliases=("/live/support/",)))
     if ctx["workforce_monitor"] or ctx["workforce_self"]:
         group("OPERATIONS","Workforce Allocations","users",
               *([link("Workforce overview","workforce-board")] if ctx["workforce_monitor"] else []),
